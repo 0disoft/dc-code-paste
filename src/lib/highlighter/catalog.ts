@@ -39,3 +39,7 @@ export const defaultTheme: DcThemeId = "github-dark";
 export function isSupportedLanguage(value: string): value is DcLanguageId {
   return supportedLanguages.some((language) => language.id === value);
 }
+
+export function isSupportedTheme(value: string): value is DcThemeId {
+  return supportedThemes.some((theme) => theme.id === value);
+}

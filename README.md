@@ -36,6 +36,9 @@ The app is built with `@sveltejs/adapter-static`.
 https://0disoft.github.io/dc-code-paste/
 ```
 
+The repository can stay private while the editor is still being shaped. Enable GitHub Pages after
+the repository is ready to become public.
+
 ## Paste Contract
 
 The app keeps an editor document model internally, then exports inline-style HTML for rich-text
@@ -92,6 +95,19 @@ editors that expect raw HTML source.
 Older `calloutBox` documents with a `kind` attribute are still accepted by the exporter, but new
 editor content uses the explicit box node names above.
 
+## Drafts
+
+The editor saves the current draft in browser `localStorage` after the editor is ready:
+
+- Tiptap document JSON
+- Code language and Shiki theme
+- Body, selection, and code font settings
+- Line number setting
+- Paste structure: `DC 테이블` or `기본`
+
+The draft is restored on the next page load. `초기화` clears the saved draft and returns the editor
+to the bundled sample article.
+
 ## Manual DC Paste Check
 
 Before treating a release as ready, check both paste paths in a browser:
@@ -102,3 +118,7 @@ Before treating a release as ready, check both paste paths in a browser:
 3. Switch the preview panel to `HTML`, click `원문 복사`, paste into DCInside's HTML mode, and confirm
    the same article renders after leaving HTML mode.
 4. Confirm code colors, box spacing, links, and body font size match the preview closely enough.
+5. Refresh the app after editing text and changing paste structure; confirm the draft comes back.
+6. Click `초기화`, refresh, and confirm the sample article comes back instead of the previous draft.
+7. In `DC 테이블`, confirm exported HTML contains `table`, `td`, and `bgcolor`.
+8. In `기본`, confirm exported HTML keeps the simpler root `div` structure.

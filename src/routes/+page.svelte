@@ -16,6 +16,7 @@
     Paintbrush,
     Quote,
     Rows3,
+    RotateCcw,
     SeparatorHorizontal,
     Sparkles,
     Type,
@@ -51,6 +52,13 @@
     selectedInlineRangeToCodeBlockCommand,
     selectedInlineRangeToLinkBoxCommand
   } from '$lib/editor/selection-commands';
+  import {
+    clearDraftSnapshot,
+    createDraftSnapshot,
+    readDraftSnapshot,
+    writeDraftSnapshot,
+    type DraftPreferences
+  } from '$lib/editor/draft-storage';
   import { normalizeEditableLinkHref } from '$lib/editor/link';
 
   const fontFamilies = [
@@ -76,7 +84,7 @@
 
   let editorHost = $state<HTMLDivElement>();
   let editor = $state<Editor>();
-  let documentJson = $state<JSONContent>(sampleDocument);
+  let documentJson = $state<JSONContent>(structuredClone(sampleDocument));
   let language = $state<DcLanguageId>(defaultLanguage);
   let theme = $state<DcThemeId>(defaultTheme);
   let bodyFontFamily = $state(fontFamilies[0].value);
@@ -95,11 +103,69 @@
   let linkDraft = $state('');
   let linkError = $state(false);
   let editorSignal = $state(0);
+  let canPersistDraft = $state(false);
   let renderTurn = 0;
 
   const htmlSize = $derived(`${Math.max(1, Math.ceil(html.length / 1024))}KB`);
   const copyLabel = $derived(copyState === 'copied' ? '복사됨' : '디씨 복사');
   const sourceCopyLabel = $derived(sourceCopyState === 'copied' ? '복사됨' : '원문 복사');
+  const exportStructureLabel = $derived(exportStructures.find((item) => item.value === exportStructure)?.label ?? 'DC 테이블');
+
+  function draftStorage() {
+    return typeof window === 'undefined' ? undefined : window.localStorage;
+  }
+
+  function defaultDraftPreferences(): DraftPreferences {
+    return {
+      language: defaultLanguage,
+      theme: defaultTheme,
+      bodyFontFamily: fontFamilies[0].value,
+      bodyFontSize: '15px',
+      selectionFontFamily: fontFamilies[0].value,
+      selectionFontSize: '15px',
+      codeFontSize: '14px',
+      showLineNumbers: false,
+      structure: 'dcTable'
+    };
+  }
+
+  function currentDraftPreferences(): DraftPreferences {
+    return {
+      language,
+      theme,
+      bodyFontFamily,
+      bodyFontSize,
+      selectionFontFamily,
+      selectionFontSize,
+      codeFontSize,
+      showLineNumbers,
+      structure: exportStructure
+    };
+  }
+
+  function isKnownFontFamily(value: string) {
+    return fontFamilies.some((font) => font.value === value);
+  }
+
+  function isKnownBodySize(value: string) {
+    return bodySizes.includes(value);
+  }
+
+  function isKnownCodeSize(value: string) {
+    return codeSizes.includes(value);
+  }
+
+  function applyDraftPreferences(preferences: DraftPreferences) {
+    language = preferences.language;
+    theme = preferences.theme;
+    bodyFontFamily = isKnownFontFamily(preferences.bodyFontFamily) ? preferences.bodyFontFamily : fontFamilies[0].value;
+    bodyFontSize = isKnownBodySize(preferences.bodyFontSize) ? preferences.bodyFontSize : '15px';
+    selectionFontFamily = isKnownFontFamily(preferences.selectionFontFamily) ? preferences.selectionFontFamily : fontFamilies[0].value;
+    selectionFontSize = isKnownBodySize(preferences.selectionFontSize) ? preferences.selectionFontSize : '15px';
+    codeFontSize = isKnownCodeSize(preferences.codeFontSize) ? preferences.codeFontSize : '14px';
+    showLineNumbers = preferences.showLineNumbers;
+    exportStructure = preferences.structure;
+  }
 
   function exportOptions(): DcExportOptions {
     return {
@@ -321,6 +387,23 @@
     runEditorCommand((current) => current.chain().focus().setFontSize(value).run());
   }
 
+  function resetDraft() {
+    const storage = draftStorage();
+    if (storage) {
+      clearDraftSnapshot(storage);
+    }
+
+    applyDraftPreferences(defaultDraftPreferences());
+    documentJson = structuredClone(sampleDocument);
+    editor?.commands.setContent(documentJson);
+    if (editor) {
+      refreshEditorState(editor);
+    }
+    isLinkPanelOpen = false;
+    linkDraft = '';
+    linkError = false;
+  }
+
   async function copyPreview() {
     copyState = 'idle';
 
@@ -352,6 +435,12 @@
   onMount(() => {
     let disposed = false;
     let mountedEditor: Editor | undefined;
+    const savedDraft = readDraftSnapshot(window.localStorage);
+
+    if (savedDraft) {
+      documentJson = savedDraft.document;
+      applyDraftPreferences(savedDraft.preferences);
+    }
 
     async function mountEditor() {
       const [{ Editor }, { createEditorExtensions }] = await Promise.all([
@@ -366,7 +455,7 @@
       mountedEditor = new Editor({
         element: editorHost,
         extensions: createEditorExtensions(),
-        content: sampleDocument,
+        content: documentJson,
         editorProps: {
           attributes: {
             class: 'article-editor',
@@ -376,6 +465,7 @@
         onCreate: ({ editor: current }) => {
           editor = current;
           refreshEditorState(current);
+          canPersistDraft = true;
         },
         onUpdate: ({ editor: current }) => {
           refreshEditorState(current);
@@ -415,6 +505,19 @@
 
   $effect(() => {
     void renderPreview(documentJson, exportOptions());
+  });
+
+  $effect(() => {
+    if (!canPersistDraft) {
+      return;
+    }
+
+    const storage = draftStorage();
+    if (!storage) {
+      return;
+    }
+
+    writeDraftSnapshot(storage, createDraftSnapshot(documentJson, currentDraftPreferences()));
   });
 </script>
 
@@ -456,6 +559,10 @@
         onclick={() => runEditorCommand((current) => current.chain().focus().redo().run())}
       >
         <Redo2 size={17} />
+      </button>
+      <button type="button" title="초기화" aria-label="초기화" onclick={resetDraft}>
+        <RotateCcw size={17} />
+        <span>초기화</span>
       </button>
     </div>
 
@@ -701,6 +808,7 @@
           <span>미리보기</span>
         </div>
         <div class="preview-tools">
+          <span class="status-pill" aria-label="현재 복붙 구조">{exportStructureLabel}</span>
           <div class="mode-switch" aria-label="미리보기 형식">
             <button
               class:active={previewMode === 'rendered'}
@@ -985,6 +1093,21 @@
     color: var(--muted);
     font-size: 13px;
     font-weight: 700;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 9px;
+    border: 1px solid color-mix(in oklch, var(--accent-2) 46%, var(--line));
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--accent-2) 13%, var(--panel-2));
+    color: color-mix(in oklch, var(--accent-2) 70%, var(--text));
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
   }
 
   .preview-tools {
