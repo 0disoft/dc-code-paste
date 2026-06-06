@@ -17,18 +17,22 @@
     Quote,
     Rows3,
     RotateCcw,
+    Save,
     SeparatorHorizontal,
     Sparkles,
     Type,
     Undo2,
     Unlink,
-    Redo2
+    Redo2,
+    Trash2
   } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import type { Editor, JSONContent } from '@tiptap/core';
   import { copyDcHtml, copyPlainText } from '$lib/dc/clipboard';
+  import { fontFamilyOptions } from '$lib/dc/font-stacks';
   import {
     exportDocumentToDcHtml,
+    type DcDocumentTheme,
     type DcExportOptions,
     type DcExportStructure
   } from '$lib/dc/export-document';
@@ -50,6 +54,8 @@
   import {
     selectedInlineRangeToCalloutCommand,
     selectedInlineRangeToCodeBlockCommand,
+    selectedInlineRangeToCtaButtonCommand,
+    selectedInlineRangeToSectionHeadingCommand,
     selectedInlineRangeToLinkBoxCommand
   } from '$lib/editor/selection-commands';
   import {
@@ -60,19 +66,33 @@
     type DraftPreferences
   } from '$lib/editor/draft-storage';
   import { normalizeEditableLinkHref } from '$lib/editor/link';
+  import {
+    createPresetSnapshot,
+    deletePresetSnapshot,
+    readPresetSnapshots,
+    writePresetSnapshots,
+    type PresetSnapshot
+  } from '$lib/editor/preset-storage';
 
-  const fontFamilies = [
-    { label: '맑은 고딕', value: 'Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif' },
-    { label: '고운 본문', value: 'Georgia, Times New Roman, serif' },
-    { label: '둥근 산스', value: 'Inter, Pretendard, Segoe UI, sans-serif' },
-    { label: '코드', value: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace' }
-  ];
-
+  const fontFamilies = fontFamilyOptions;
+  const legacyFontFamilies = new Map([
+    ['Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif', fontFamilies[0].value],
+    ['Georgia, Times New Roman, serif', fontFamilies[1].value],
+    ['Inter, Pretendard, Segoe UI, sans-serif', fontFamilies[2].value],
+    [
+      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      fontFamilies[3].value
+    ]
+  ]);
   const bodySizes = ['14px', '15px', '16px', '17px', '18px'];
   const codeSizes = ['13px', '14px', '15px', '16px'];
   const exportStructures: { label: string; value: DcExportStructure }[] = [
     { label: 'DC 테이블', value: 'dcTable' },
     { label: '기본', value: 'modern' }
+  ];
+  const documentThemes: { label: string; value: DcDocumentTheme }[] = [
+    { label: '강의 라이트', value: 'lightLecture' },
+    { label: '다크 에디토리얼', value: 'darkEditorial' }
   ];
   const swatches = [
     'oklch(23.39% 0.012 255.51)',
@@ -93,6 +113,7 @@
   let selectionFontSize = $state('15px');
   let codeFontSize = $state('14px');
   let showLineNumbers = $state(false);
+  let documentTheme = $state<DcDocumentTheme>('lightLecture');
   let exportStructure = $state<DcExportStructure>('dcTable');
   let html = $state('');
   let isRendering = $state(false);
@@ -102,6 +123,9 @@
   let isLinkPanelOpen = $state(false);
   let linkDraft = $state('');
   let linkError = $state(false);
+  let presetName = $state('');
+  let presets = $state<PresetSnapshot[]>([]);
+  let presetState = $state<'idle' | 'saved' | 'error'>('idle');
   let editorSignal = $state(0);
   let canPersistDraft = $state(false);
   let renderTurn = 0;
@@ -110,6 +134,8 @@
   const copyLabel = $derived(copyState === 'copied' ? '복사됨' : '디씨 복사');
   const sourceCopyLabel = $derived(sourceCopyState === 'copied' ? '복사됨' : '원문 복사');
   const exportStructureLabel = $derived(exportStructures.find((item) => item.value === exportStructure)?.label ?? 'DC 테이블');
+  const documentThemeLabel = $derived(documentThemes.find((item) => item.value === documentTheme)?.label ?? '강의 라이트');
+  const presetStateLabel = $derived(presetState === 'saved' ? '저장됨' : presetState === 'error' ? '저장 실패' : `${presets.length}개`);
 
   function draftStorage() {
     return typeof window === 'undefined' ? undefined : window.localStorage;
@@ -125,6 +151,7 @@
       selectionFontSize: '15px',
       codeFontSize: '14px',
       showLineNumbers: false,
+      documentTheme: 'lightLecture',
       structure: 'dcTable'
     };
   }
@@ -139,12 +166,17 @@
       selectionFontSize,
       codeFontSize,
       showLineNumbers,
+      documentTheme,
       structure: exportStructure
     };
   }
 
-  function isKnownFontFamily(value: string) {
-    return fontFamilies.some((font) => font.value === value);
+  function normalizeKnownFontFamily(value: string) {
+    if (fontFamilies.some((font) => font.value === value)) {
+      return value;
+    }
+
+    return legacyFontFamilies.get(value) ?? fontFamilies[0].value;
   }
 
   function isKnownBodySize(value: string) {
@@ -158,13 +190,81 @@
   function applyDraftPreferences(preferences: DraftPreferences) {
     language = preferences.language;
     theme = preferences.theme;
-    bodyFontFamily = isKnownFontFamily(preferences.bodyFontFamily) ? preferences.bodyFontFamily : fontFamilies[0].value;
+    bodyFontFamily = normalizeKnownFontFamily(preferences.bodyFontFamily);
     bodyFontSize = isKnownBodySize(preferences.bodyFontSize) ? preferences.bodyFontSize : '15px';
-    selectionFontFamily = isKnownFontFamily(preferences.selectionFontFamily) ? preferences.selectionFontFamily : fontFamilies[0].value;
+    selectionFontFamily = normalizeKnownFontFamily(preferences.selectionFontFamily);
     selectionFontSize = isKnownBodySize(preferences.selectionFontSize) ? preferences.selectionFontSize : '15px';
     codeFontSize = isKnownCodeSize(preferences.codeFontSize) ? preferences.codeFontSize : '14px';
     showLineNumbers = preferences.showLineNumbers;
+    documentTheme = preferences.documentTheme;
     exportStructure = preferences.structure;
+  }
+
+  function presetDateLabel(value: string) {
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    return new Intl.DateTimeFormat('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  }
+
+  function refreshPresetSnapshots() {
+    const storage = draftStorage();
+    presets = storage ? readPresetSnapshots(storage) : [];
+  }
+
+  function saveCurrentPreset() {
+    const storage = draftStorage();
+
+    if (!storage) {
+      presetState = 'error';
+      return;
+    }
+
+    const preset = createPresetSnapshot(presetName, documentJson, currentDraftPreferences());
+    const nextPresets = [preset, ...readPresetSnapshots(storage)].slice(0, 30);
+
+    if (!writePresetSnapshots(storage, nextPresets)) {
+      presetState = 'error';
+      return;
+    }
+
+    presets = nextPresets;
+    presetName = '';
+    presetState = 'saved';
+    window.setTimeout(() => {
+      presetState = 'idle';
+    }, 1300);
+  }
+
+  function applyPreset(preset: PresetSnapshot) {
+    applyDraftPreferences(preset.preferences);
+    documentJson = structuredClone(preset.document);
+    editor?.commands.setContent(documentJson);
+
+    if (editor) {
+      refreshEditorState(editor);
+    }
+
+    presetState = 'idle';
+  }
+
+  function deletePreset(id: string) {
+    const storage = draftStorage();
+
+    if (!storage) {
+      presetState = 'error';
+      return;
+    }
+
+    presets = deletePresetSnapshot(storage, id);
   }
 
   function exportOptions(): DcExportOptions {
@@ -174,6 +274,7 @@
       bodyFontSize,
       codeFontSize,
       showLineNumbers,
+      documentTheme,
       structure: exportStructure
     };
   }
@@ -342,6 +443,80 @@
     });
   }
 
+  function applySectionHeading() {
+    runEditorCommand((current) => {
+      if (current.chain().focus().command(selectedInlineRangeToSectionHeadingCommand()).run()) {
+        return true;
+      }
+
+      return current
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'sectionHeading',
+          content: [{ type: 'text', text: '새 섹션' }]
+        })
+        .run();
+    });
+  }
+
+  function retargetActiveCtaButton(current: Editor, href: string) {
+    const ctaButtonType = current.schema.nodes.ctaButton;
+
+    if (!ctaButtonType) {
+      return false;
+    }
+
+    const selectionFrom = current.state.selection.$from;
+
+    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
+      const node = selectionFrom.node(depth);
+
+      if (node.type.name === 'ctaButton') {
+        current.commands.focus();
+        current.view.dispatch(current.state.tr.setNodeMarkup(selectionFrom.before(depth), ctaButtonType, { href }).scrollIntoView());
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function applyCtaButton() {
+    const selection = selectedText();
+    const href = normalizeEditableLinkHref(linkDraft) ?? normalizeEditableLinkHref(selection);
+
+    if (!href) {
+      isLinkPanelOpen = true;
+      linkError = true;
+      return;
+    }
+
+    const fallbackLabel = normalizeEditableLinkHref(selection) ? '바로가기' : selection || '바로가기';
+
+    linkError = false;
+    linkDraft = href;
+    runEditorCommand((current) => {
+      if (retargetActiveCtaButton(current, href)) {
+        return true;
+      }
+
+      if (current.chain().focus().command(selectedInlineRangeToCtaButtonCommand(href, fallbackLabel)).run()) {
+        return true;
+      }
+
+      return current
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'ctaButton',
+          attrs: { href },
+          content: [{ type: 'text', text: fallbackLabel }]
+        })
+        .run();
+    });
+  }
+
   function setLink() {
     if (!editor) {
       return;
@@ -436,6 +611,7 @@
     let disposed = false;
     let mountedEditor: Editor | undefined;
     const savedDraft = readDraftSnapshot(window.localStorage);
+    refreshPresetSnapshots();
 
     if (savedDraft) {
       documentJson = savedDraft.document;
@@ -483,6 +659,10 @@
           const linkBoxAttrs = current.getAttributes('linkBox');
           if (typeof linkBoxAttrs.href === 'string') {
             linkDraft = linkBoxAttrs.href;
+          }
+          const ctaButtonAttrs = current.getAttributes('ctaButton');
+          if (typeof ctaButtonAttrs.href === 'string') {
+            linkDraft = ctaButtonAttrs.href;
           }
           const textStyleAttrs = current.getAttributes('textStyle');
           if (typeof textStyleAttrs.fontFamily === 'string') {
@@ -664,6 +844,10 @@
       >
         <Quote size={17} />
       </button>
+      <button class:active={isActive('sectionHeading')} type="button" title="섹션" aria-label="섹션" onclick={applySectionHeading}>
+        <Rows3 size={17} />
+        <span>섹션</span>
+      </button>
       <button
         type="button"
         title="구분선"
@@ -688,6 +872,10 @@
         <Highlighter size={17} />
         <span>강조</span>
       </button>
+      <button class:active={isActive('ctaButton')} type="button" title="CTA" aria-label="CTA" onclick={applyCtaButton}>
+        <LinkIcon size={17} />
+        <span>CTA</span>
+      </button>
     </div>
 
     <div class="tool-group tool-group-wide">
@@ -699,6 +887,14 @@
         <span><Rows3 size={15} /> 복붙</span>
         <select bind:value={exportStructure} aria-label="복붙 구조">
           {#each exportStructures as item}
+            <option value={item.value}>{item.label}</option>
+          {/each}
+        </select>
+      </label>
+      <label>
+        <span><Paintbrush size={15} /> 문서</span>
+        <select bind:value={documentTheme} aria-label="문서 테마">
+          {#each documentThemes as item}
             <option value={item.value}>{item.label}</option>
           {/each}
         </select>
@@ -785,6 +981,51 @@
     </div>
   </section>
 
+  <section class="preset-panel" aria-label="프리셋">
+    <div class="preset-save">
+      <label>
+        <span><Save size={15} /> 프리셋</span>
+        <input
+          type="text"
+          bind:value={presetName}
+          aria-label="프리셋 이름"
+          maxlength="60"
+          placeholder="강의글 구조"
+          oninput={() => (presetState = 'idle')}
+          onkeydown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              saveCurrentPreset();
+            }
+          }}
+        />
+      </label>
+      <button class="preset-save-button" type="button" aria-label="프리셋 저장" onclick={saveCurrentPreset}>
+        <Save size={16} />
+        <span>저장</span>
+      </button>
+      <span class:error={presetState === 'error'} class="preset-count">{presetStateLabel}</span>
+    </div>
+
+    <div class="preset-list" aria-label="저장된 프리셋">
+      {#if presets.length === 0}
+        <span class="preset-empty">프리셋 없음</span>
+      {:else}
+        {#each presets as preset (preset.id)}
+          <div class="preset-item">
+            <button type="button" class="preset-apply" onclick={() => applyPreset(preset)}>
+              <span>{preset.name}</span>
+              <small>{preset.preferences.documentTheme === 'darkEditorial' ? '다크' : '라이트'} · {presetDateLabel(preset.updatedAt)}</small>
+            </button>
+            <button type="button" class="preset-delete" aria-label={`${preset.name} 삭제`} title="삭제" onclick={() => deletePreset(preset.id)}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+        {/each}
+      {/if}
+    </div>
+  </section>
+
   <section class="workbench">
     <div class="editor-panel">
       <div class="panel-head">
@@ -794,7 +1035,7 @@
         </div>
         <span class="counter">{editor?.getText().length.toLocaleString() ?? 0}자</span>
       </div>
-      <div class="editor-surface" bind:this={editorHost}></div>
+      <div class="editor-surface" class:editor-surface-dark={documentTheme === 'darkEditorial'} bind:this={editorHost}></div>
     </div>
 
     <aside class="preview-panel" aria-live="polite">
@@ -809,6 +1050,7 @@
         </div>
         <div class="preview-tools">
           <span class="status-pill" aria-label="현재 복붙 구조">{exportStructureLabel}</span>
+          <span class="status-pill" aria-label="현재 문서 테마">{documentThemeLabel}</span>
           <div class="mode-switch" aria-label="미리보기 형식">
             <button
               class:active={previewMode === 'rendered'}
@@ -1026,6 +1268,21 @@
     background: color-mix(in oklch, var(--danger) 12%, var(--panel-2));
   }
 
+  input[type='text'] {
+    width: min(260px, 44vw);
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--panel-2);
+    color: var(--text);
+    padding: 0 10px;
+  }
+
+  input[type='text']:focus {
+    border-color: var(--accent);
+    outline: none;
+  }
+
   .link-tool {
     flex-wrap: wrap;
   }
@@ -1054,6 +1311,130 @@
     height: 24px;
     border-radius: 999px;
     background: var(--swatch);
+  }
+
+  .preset-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in oklch, var(--panel) 88%, transparent);
+  }
+
+  .preset-save {
+    display: flex;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .preset-save-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    border: 1px solid color-mix(in oklch, var(--accent) 66%, var(--line));
+    border-radius: 7px;
+    background: color-mix(in oklch, var(--accent) 18%, var(--panel-2));
+    color: var(--accent);
+    font-weight: 850;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .preset-count {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .preset-count.error {
+    color: var(--danger);
+  }
+
+  .preset-list {
+    display: flex;
+    flex: 1 1 360px;
+    gap: 8px;
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: 1px;
+    scrollbar-gutter: stable;
+  }
+
+  .preset-empty {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .preset-item {
+    display: inline-flex;
+    align-items: stretch;
+    flex: 0 0 auto;
+    max-width: 250px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--panel-2);
+  }
+
+  .preset-apply {
+    display: grid;
+    gap: 2px;
+    min-width: 150px;
+    max-width: 210px;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: transparent;
+    color: var(--text);
+    padding: 7px 10px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .preset-apply span,
+  .preset-apply small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .preset-apply span {
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .preset-apply small {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 750;
+  }
+
+  .preset-delete {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .preset-delete:hover {
+    color: var(--danger);
   }
 
   .workbench {
@@ -1175,10 +1556,26 @@
     color: oklch(21.18% 0.012 255.31);
   }
 
+  .editor-surface-dark {
+    background: oklch(7.2% 0.012 94.1);
+    color: oklch(94.12% 0.012 93.37);
+  }
+
   .editor-surface :global(.article-editor) {
     min-height: 640px;
     outline: none;
-    font-family: Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif;
+    font-family:
+      Malgun Gothic,
+      맑은 고딕,
+      Apple SD Gothic Neo,
+      AppleGothic,
+      Pretendard,
+      Noto Sans CJK KR,
+      Noto Sans KR,
+      Nanum Gothic,
+      Segoe UI,
+      Arial,
+      sans-serif;
     font-size: 15px;
     line-height: 1.7;
   }
@@ -1194,8 +1591,16 @@
     line-height: 1.22;
   }
 
+  .editor-surface-dark :global(.article-editor h1) {
+    color: oklch(98.32% 0.006 93.08);
+  }
+
   .editor-surface :global(.article-editor p) {
     margin: 0 0 14px;
+  }
+
+  .editor-surface-dark :global(.article-editor a) {
+    color: oklch(83.57% 0.141 84.66);
   }
 
   .editor-surface :global(.article-editor pre) {
@@ -1208,7 +1613,22 @@
   }
 
   .editor-surface :global(.article-editor code) {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family:
+      Consolas,
+      D2Coding,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Noto Sans Mono CJK KR,
+      Cascadia Mono,
+      Cascadia Code,
+      JetBrains Mono,
+      Fira Code,
+      Source Code Pro,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Courier New,
+      monospace;
   }
 
   .editor-surface :global(.article-editor :not(pre) > code) {
@@ -1216,6 +1636,76 @@
     background: oklch(94.93% 0.016 255.07);
     color: oklch(34.86% 0.087 278.64);
     padding: 1px 4px;
+  }
+
+  .editor-surface-dark :global(.article-editor :not(pre) > code) {
+    background: oklch(18.92% 0.02 83.18);
+    color: oklch(96.51% 0.015 91.73);
+  }
+
+  .editor-surface :global(.article-editor blockquote) {
+    position: relative;
+    margin: 0 0 18px;
+    padding: 13px 16px 13px 48px;
+    border-left: 3px solid oklch(61.2% 0.049 77.83);
+    border-top: 1px solid oklch(61.2% 0.049 77.83);
+    border-bottom: 1px solid oklch(61.2% 0.049 77.83);
+    color: oklch(37.24% 0.026 77.36);
+    font-style: italic;
+  }
+
+  .editor-surface :global(.article-editor blockquote::before) {
+    position: absolute;
+    top: 10px;
+    left: 16px;
+    color: oklch(74.61% 0.063 77.91);
+    content: '“';
+    font-size: 34px;
+    font-style: normal;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .editor-surface :global(.article-editor blockquote p) {
+    margin: 0 0 8px;
+    color: inherit;
+  }
+
+  .editor-surface :global(.article-editor blockquote > *:last-child) {
+    margin-bottom: 0;
+  }
+
+  .editor-surface :global(.dc-section-heading) {
+    margin: 24px 0 14px;
+    padding: 4px 0 4px 14px;
+    border-left: 4px solid oklch(61.2% 0.049 77.83);
+    color: oklch(25.72% 0.021 255.63);
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.35;
+  }
+
+  .editor-surface-dark :global(.dc-section-heading) {
+    border-left-color: oklch(88.91% 0.091 87.72);
+    color: oklch(97.22% 0.008 92.87);
+  }
+
+  .editor-surface :global(.dc-cta-button) {
+    display: inline-block;
+    margin: 0 10px 16px 0;
+    padding: 11px 22px;
+    border: 1px solid oklch(70.74% 0.08 82.27);
+    background: oklch(93.5% 0.044 88.16);
+    color: oklch(26.32% 0.03 80.84);
+    font-weight: 900;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+
+  .editor-surface-dark :global(.dc-cta-button) {
+    border-color: oklch(96.28% 0.022 90.84);
+    background: oklch(91.44% 0.064 90.52);
+    color: oklch(13.77% 0.018 87.82);
   }
 
   .editor-surface :global(.dc-callout) {
@@ -1230,10 +1720,22 @@
     color: oklch(30.18% 0.073 145.31);
   }
 
+  .editor-surface-dark :global(.dc-callout-tip) {
+    border-left-color: oklch(76.13% 0.153 142.04);
+    background: oklch(11.88% 0.018 142.78);
+    color: oklch(91.89% 0.026 143.2);
+  }
+
   .editor-surface :global(.dc-callout-warning) {
     border-left: 4px solid oklch(73.08% 0.151 60.74);
     background: oklch(96.87% 0.048 75.17);
     color: oklch(34.21% 0.082 52.58);
+  }
+
+  .editor-surface-dark :global(.dc-callout-warning) {
+    border-left-color: oklch(78.46% 0.145 69.41);
+    background: oklch(12.26% 0.018 58.76);
+    color: oklch(92.96% 0.03 76.33);
   }
 
   .editor-surface :global(.dc-callout-reference) {
@@ -1242,10 +1744,22 @@
     color: oklch(32.26% 0.07 249.42);
   }
 
+  .editor-surface-dark :global(.dc-callout-reference) {
+    border-left-color: oklch(72.52% 0.142 232.16);
+    background: oklch(11.62% 0.021 245.9);
+    color: oklch(91.87% 0.029 233.82);
+  }
+
   .editor-surface :global(.dc-callout-emphasis) {
     border-left: 4px solid oklch(64.73% 0.162 303.08);
     background: oklch(96.21% 0.036 302.35);
     color: oklch(33.84% 0.091 303.69);
+  }
+
+  .editor-surface-dark :global(.dc-callout-emphasis) {
+    border-left-color: oklch(73.79% 0.151 303.45);
+    background: oklch(12.04% 0.022 302.17);
+    color: oklch(93.04% 0.029 303.2);
   }
 
   .editor-surface :global(.dc-link-box) {
@@ -1256,6 +1770,13 @@
     border-radius: 7px;
     background: oklch(97.5% 0.025 247.64);
     color: oklch(28.43% 0.052 249.88);
+  }
+
+  .editor-surface-dark :global(.dc-link-box) {
+    border-color: oklch(34.06% 0.044 236.72);
+    border-left-color: oklch(74.22% 0.14 232.34);
+    background: oklch(10.35% 0.015 93.61);
+    color: oklch(90.9% 0.024 237.46);
   }
 
   .preview-surface {
@@ -1275,7 +1796,22 @@
     background: oklch(17.93% 0.016 257.1);
     color: oklch(91.18% 0.019 247.75);
     padding: 18px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family:
+      Consolas,
+      D2Coding,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Noto Sans Mono CJK KR,
+      Cascadia Mono,
+      Cascadia Code,
+      JetBrains Mono,
+      Fira Code,
+      Source Code Pro,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Courier New,
+      monospace;
     font-size: 13px;
     line-height: 1.6;
     outline: none;
@@ -1288,7 +1824,22 @@
 
   .empty {
     color: oklch(51.52% 0.02 87.11);
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-family:
+      Consolas,
+      D2Coding,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Noto Sans Mono CJK KR,
+      Cascadia Mono,
+      Cascadia Code,
+      JetBrains Mono,
+      Fira Code,
+      Source Code Pro,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Courier New,
+      monospace;
   }
 
   .copy-error {
@@ -1343,6 +1894,14 @@
     .tool-group:last-child {
       border-bottom: 0;
       padding-bottom: 0;
+    }
+
+    .preset-save {
+      width: 100%;
+    }
+
+    .preset-list {
+      flex-basis: 100%;
     }
 
     .editor-surface,

@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import type { DcExportStructure } from "$lib/dc/export-document";
+import type { DcDocumentTheme, DcExportStructure } from "$lib/dc/export-document";
 import {
   isSupportedLanguage,
   isSupportedTheme,
@@ -18,6 +18,7 @@ export type DraftPreferences = {
   selectionFontSize: string;
   codeFontSize: string;
   showLineNumbers: boolean;
+  documentTheme: DcDocumentTheme;
   structure: DcExportStructure;
 };
 
@@ -82,24 +83,43 @@ function isExportStructure(value: unknown): value is DcExportStructure {
   return value === "modern" || value === "dcTable";
 }
 
-function isDraftPreferences(value: unknown): value is DraftPreferences {
+function isDocumentTheme(value: unknown): value is DcDocumentTheme {
+  return value === "lightLecture" || value === "darkEditorial";
+}
+
+function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined {
   if (!isRecord(value)) {
-    return false;
+    return undefined;
   }
 
-  return (
-    typeof value.language === "string" &&
-    isSupportedLanguage(value.language) &&
-    typeof value.theme === "string" &&
-    isSupportedTheme(value.theme) &&
-    typeof value.bodyFontFamily === "string" &&
-    typeof value.bodyFontSize === "string" &&
-    typeof value.selectionFontFamily === "string" &&
-    typeof value.selectionFontSize === "string" &&
-    typeof value.codeFontSize === "string" &&
-    typeof value.showLineNumbers === "boolean" &&
-    isExportStructure(value.structure)
-  );
+  if (
+    typeof value.language !== "string" ||
+    !isSupportedLanguage(value.language) ||
+    typeof value.theme !== "string" ||
+    !isSupportedTheme(value.theme) ||
+    typeof value.bodyFontFamily !== "string" ||
+    typeof value.bodyFontSize !== "string" ||
+    typeof value.selectionFontFamily !== "string" ||
+    typeof value.selectionFontSize !== "string" ||
+    typeof value.codeFontSize !== "string" ||
+    typeof value.showLineNumbers !== "boolean" ||
+    !isExportStructure(value.structure)
+  ) {
+    return undefined;
+  }
+
+  return {
+    language: value.language,
+    theme: value.theme,
+    bodyFontFamily: value.bodyFontFamily,
+    bodyFontSize: value.bodyFontSize,
+    selectionFontFamily: value.selectionFontFamily,
+    selectionFontSize: value.selectionFontSize,
+    codeFontSize: value.codeFontSize,
+    showLineNumbers: value.showLineNumbers,
+    documentTheme: isDocumentTheme(value.documentTheme) ? value.documentTheme : "lightLecture",
+    structure: value.structure,
+  };
 }
 
 export function createDraftSnapshot(
@@ -131,7 +151,13 @@ export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
     return undefined;
   }
 
-  if (!isJsonContent(parsed.document) || !isDraftPreferences(parsed.preferences)) {
+  if (!isJsonContent(parsed.document)) {
+    return undefined;
+  }
+
+  const preferences = normalizeDraftPreferences(parsed.preferences);
+
+  if (!preferences) {
     return undefined;
   }
 
@@ -139,7 +165,7 @@ export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
     version: 1,
     updatedAt: parsed.updatedAt,
     document: parsed.document,
-    preferences: parsed.preferences,
+    preferences,
   };
 }
 

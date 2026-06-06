@@ -19,6 +19,7 @@ const preferences: DraftPreferences = {
   selectionFontSize: "15px",
   codeFontSize: "14px",
   showLineNumbers: true,
+  documentTheme: "darkEditorial",
   structure: "dcTable",
 };
 
@@ -89,6 +90,22 @@ describe("draft storage", () => {
         }),
       ),
     ).toBeUndefined();
+  });
+
+  it("restores legacy v1 drafts without a saved document theme", () => {
+    const snapshot = {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      document: sampleDocument,
+      preferences: {
+        ...preferences,
+        documentTheme: undefined,
+      },
+    };
+
+    const restored = parseDraftSnapshot(JSON.stringify(snapshot));
+
+    expect(restored?.preferences.documentTheme).toBe("lightLecture");
   });
 
   it("treats storage failures as non-fatal", () => {
