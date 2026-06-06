@@ -171,6 +171,40 @@ describe("selection commands", () => {
     });
   });
 
+  it("turns a selected range into an extended callout variant", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("challenge this claim")]),
+    ]);
+    const state = createState(doc, 11, 15);
+    let nextDoc = state.doc;
+
+    const handled = replaceSelectedInlineRangeWithCallout(
+      state,
+      (transaction) => {
+        nextDoc = transaction.doc;
+      },
+      "rebuttal",
+    );
+
+    expect(handled).toBe(true);
+    expect(nextDoc.toJSON()).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "challenge " }] },
+        {
+          type: "rebuttalBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "this" }],
+            },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: " claim" }] },
+      ],
+    });
+  });
+
   it("turns a selected range into a link box", () => {
     const doc = schema.node("doc", null, [
       schema.node("paragraph", null, [schema.text("read the reference")]),

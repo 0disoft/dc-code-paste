@@ -73,8 +73,17 @@
     type DraftHistorySnapshot,
     type DraftPreferences
   } from '$lib/editor/draft-storage';
+  import {
+    createDefaultCtaGroup,
+    ctaGroupLayoutOptions,
+    normalizeCtaGroupLayout,
+    type CtaGroupLayout
+  } from '$lib/editor/cta-group';
+  import { createDefaultReferenceList, createReferenceListFromText } from '$lib/editor/reference-list';
   import { normalizeEditableLinkHref } from '$lib/editor/link';
   import { parseMarkdownToDocument } from '$lib/editor/markdown-import';
+  import { normalizeQuoteStyle, quoteStyleOptions, type QuoteStyle } from '$lib/editor/quote-style';
+  import { createDefaultSummaryBox, createSummaryBoxFromText } from '$lib/editor/summary-box';
   import { normalizeCodeFilename } from '$lib/highlighter/code-block-metadata';
   import { normalizeHighlightLines } from '$lib/highlighter/highlight-lines';
   import {
@@ -123,6 +132,8 @@
   let bodyFontSize = $state('15px');
   let selectionFontFamily = $state(fontFamilies[0].value);
   let selectionFontSize = $state('15px');
+  let quoteStyle = $state<QuoteStyle>('literary');
+  let ctaGroupLayout = $state<CtaGroupLayout>('horizontal');
   let codeFontSize = $state('14px');
   let codeLineHighlights = $state('');
   let codeFilename = $state('');
@@ -658,6 +669,32 @@
     });
   }
 
+  function applyQuote() {
+    const nextQuoteStyle = normalizeQuoteStyle(quoteStyle);
+    quoteStyle = nextQuoteStyle;
+
+    runEditorCommand((current) => {
+      if (current.isActive('blockquote')) {
+        return current.chain().focus().updateAttributes('blockquote', { quoteStyle: nextQuoteStyle }).run();
+      }
+
+      return current.chain().focus().toggleBlockquote().updateAttributes('blockquote', { quoteStyle: nextQuoteStyle }).run();
+    });
+  }
+
+  function updateActiveQuoteStyle() {
+    const nextQuoteStyle = normalizeQuoteStyle(quoteStyle);
+    quoteStyle = nextQuoteStyle;
+
+    runEditorCommand((current) => {
+      if (!current.isActive('blockquote')) {
+        return true;
+      }
+
+      return current.chain().focus().updateAttributes('blockquote', { quoteStyle: nextQuoteStyle }).run();
+    });
+  }
+
   function retargetActiveCtaButton(current: Editor, href: string) {
     const ctaButtonType = current.schema.nodes.ctaButton;
 
@@ -713,6 +750,44 @@
         })
         .run();
     });
+  }
+
+  function applyCtaGroup() {
+    const layout = normalizeCtaGroupLayout(ctaGroupLayout);
+    ctaGroupLayout = layout;
+
+    runEditorCommand((current) => {
+      if (current.isActive('ctaGroup')) {
+        return current.chain().focus().updateAttributes('ctaGroup', { layout }).run();
+      }
+
+      return current.chain().focus().insertContent(createDefaultCtaGroup(layout)).run();
+    });
+  }
+
+  function updateActiveCtaGroupLayout() {
+    const layout = normalizeCtaGroupLayout(ctaGroupLayout);
+    ctaGroupLayout = layout;
+
+    runEditorCommand((current) => {
+      if (!current.isActive('ctaGroup')) {
+        return true;
+      }
+
+      return current.chain().focus().updateAttributes('ctaGroup', { layout }).run();
+    });
+  }
+
+  function applyReferenceList() {
+    const referenceList = createReferenceListFromText(selectedText()) ?? createDefaultReferenceList();
+
+    runEditorCommand((current) => current.chain().focus().insertContent(referenceList).run());
+  }
+
+  function applySummaryBox() {
+    const summaryBox = createSummaryBoxFromText(selectedText()) ?? createDefaultSummaryBox();
+
+    runEditorCommand((current) => current.chain().focus().insertContent(summaryBox).run());
   }
 
   function setLink() {
@@ -860,6 +935,8 @@
           }
           codeLineHighlights = normalizeHighlightLines(attrs.highlightLines);
           codeFilename = normalizeCodeFilename(attrs.filename);
+          const blockquoteAttrs = current.getAttributes('blockquote');
+          quoteStyle = normalizeQuoteStyle(blockquoteAttrs.quoteStyle);
           const linkAttrs = current.getAttributes('link');
           if (typeof linkAttrs.href === 'string') {
             linkDraft = linkAttrs.href;
@@ -872,6 +949,8 @@
           if (typeof ctaButtonAttrs.href === 'string') {
             linkDraft = ctaButtonAttrs.href;
           }
+          const ctaGroupAttrs = current.getAttributes('ctaGroup');
+          ctaGroupLayout = normalizeCtaGroupLayout(ctaGroupAttrs.layout);
           const textStyleAttrs = current.getAttributes('textStyle');
           if (typeof textStyleAttrs.fontFamily === 'string') {
             selectionFontFamily = textStyleAttrs.fontFamily;
@@ -1062,13 +1141,25 @@
         type="button"
         title="인용"
         aria-label="인용"
-        onclick={() => runEditorCommand((current) => current.chain().focus().toggleBlockquote().run())}
+        onclick={applyQuote}
       >
         <Quote size={17} />
       </button>
+      <label>
+        <span><Quote size={15} /> 인용</span>
+        <select bind:value={quoteStyle} aria-label="인용 스타일" onchange={updateActiveQuoteStyle}>
+          {#each quoteStyleOptions as item}
+            <option value={item.value}>{item.label}</option>
+          {/each}
+        </select>
+      </label>
       <button class:active={isActive('sectionHeading')} type="button" title="섹션" aria-label="섹션" onclick={applySectionHeading}>
         <Rows3 size={17} />
         <span>섹션</span>
+      </button>
+      <button class:active={isActive('summaryBox')} type="button" title="요약" aria-label="요약" onclick={applySummaryBox}>
+        <FileText size={17} />
+        <span>요약</span>
       </button>
       <button
         type="button"
@@ -1094,10 +1185,46 @@
         <Highlighter size={17} />
         <span>강조</span>
       </button>
+      <button class:active={isActive('successBox')} type="button" onclick={() => applyCallout('success')}>
+        <Check size={17} />
+        <span>성공</span>
+      </button>
+      <button class:active={isActive('failureBox')} type="button" onclick={() => applyCallout('failure')}>
+        <AlertTriangle size={17} />
+        <span>실패</span>
+      </button>
+      <button class:active={isActive('experimentBox')} type="button" onclick={() => applyCallout('experiment')}>
+        <Sparkles size={17} />
+        <span>실험</span>
+      </button>
+      <button class:active={isActive('conclusionBox')} type="button" onclick={() => applyCallout('conclusion')}>
+        <BookOpen size={17} />
+        <span>결론</span>
+      </button>
+      <button class:active={isActive('rebuttalBox')} type="button" onclick={() => applyCallout('rebuttal')}>
+        <Highlighter size={17} />
+        <span>반박</span>
+      </button>
       <button class:active={isActive('ctaButton')} type="button" title="CTA" aria-label="CTA" onclick={applyCtaButton}>
         <LinkIcon size={17} />
         <span>CTA</span>
       </button>
+      <button class:active={isActive('ctaGroup')} type="button" title="버튼묶음" aria-label="버튼묶음" onclick={applyCtaGroup}>
+        <Rows3 size={17} />
+        <span>버튼묶음</span>
+      </button>
+      <button class:active={isActive('referenceList')} type="button" title="자료목록" aria-label="자료목록" onclick={applyReferenceList}>
+        <BookOpen size={17} />
+        <span>자료목록</span>
+      </button>
+      <label>
+        <span><Rows3 size={15} /> 버튼</span>
+        <select bind:value={ctaGroupLayout} aria-label="버튼묶음 정렬" onchange={updateActiveCtaGroupLayout}>
+          {#each ctaGroupLayoutOptions as item}
+            <option value={item.value}>{item.label}</option>
+          {/each}
+        </select>
+      </label>
     </div>
 
     <div class="tool-group tool-group-wide">
@@ -2093,6 +2220,82 @@
     font-style: italic;
   }
 
+  .editor-surface :global(.article-editor blockquote[data-quote-style='academic']) {
+    padding: 12px 16px;
+    border-left: 4px solid oklch(61.2% 0.049 77.83);
+    border-top: 1px solid oklch(83.11% 0.026 78.4);
+    border-bottom: 1px solid oklch(83.11% 0.026 78.4);
+    color: oklch(37.24% 0.026 77.36);
+    font-style: normal;
+  }
+
+  .editor-surface :global(.article-editor blockquote[data-quote-style='academic']::before) {
+    position: static;
+    display: block;
+    margin: 0 0 7px;
+    color: oklch(43.22% 0.022 255.32);
+    content: 'QUOTE';
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .editor-surface :global(.article-editor blockquote[data-quote-style='pull']) {
+    margin: 20px 0;
+    padding: 18px 20px;
+    border: 0;
+    border-top: 1px solid oklch(86.22% 0.014 255.48);
+    border-bottom: 1px solid oklch(86.22% 0.014 255.48);
+    color: oklch(24.19% 0.019 255.77);
+    font-size: 21px;
+    font-style: normal;
+    font-weight: 900;
+    line-height: 1.48;
+    text-align: center;
+  }
+
+  .editor-surface :global(.article-editor blockquote[data-quote-style='pull']::before) {
+    display: none;
+  }
+
+  .editor-surface :global(.article-editor blockquote[data-quote-style='bigQuote']) {
+    padding: 18px 18px 16px;
+    border: 1px solid oklch(61.2% 0.049 77.83);
+    border-left: 4px solid oklch(61.2% 0.049 77.83);
+    background: oklch(98.38% 0.01 97.33);
+  }
+
+  .editor-surface :global(.article-editor blockquote[data-quote-style='bigQuote']::before) {
+    position: static;
+    display: block;
+    margin: 0 0 4px;
+    font-size: 56px;
+    line-height: 0.82;
+  }
+
+  .editor-surface-dark :global(.article-editor blockquote[data-quote-style='academic']) {
+    border-left-color: oklch(84.08% 0.11 84.51);
+    border-top-color: oklch(35.04% 0.033 84.06);
+    border-bottom-color: oklch(35.04% 0.033 84.06);
+    color: oklch(87.91% 0.018 86.38);
+  }
+
+  .editor-surface-dark :global(.article-editor blockquote[data-quote-style='academic']::before) {
+    color: oklch(71.26% 0.021 84.88);
+  }
+
+  .editor-surface-dark :global(.article-editor blockquote[data-quote-style='pull']) {
+    border-top-color: oklch(34.91% 0.033 83.29);
+    border-bottom-color: oklch(34.91% 0.033 83.29);
+    color: oklch(98.32% 0.006 93.08);
+  }
+
+  .editor-surface-dark :global(.article-editor blockquote[data-quote-style='bigQuote']) {
+    border-color: oklch(84.08% 0.11 84.51);
+    border-left-color: oklch(84.08% 0.11 84.51);
+    background: oklch(9.76% 0.011 94.84);
+  }
+
   .editor-surface :global(.article-editor blockquote::before) {
     position: absolute;
     top: 10px;
@@ -2147,6 +2350,143 @@
     color: oklch(13.77% 0.018 87.82);
   }
 
+  .editor-surface :global(.dc-cta-group) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 16px;
+  }
+
+  .editor-surface :global(.dc-cta-group[data-layout='vertical']) {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .editor-surface :global(.dc-cta-group .dc-cta-button) {
+    margin: 0;
+  }
+
+  .editor-surface :global(.dc-reference-list) {
+    margin: 0 0 16px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid oklch(78.06% 0.088 247.23);
+    border-left: 4px solid oklch(56.77% 0.154 252.96);
+    border-radius: 7px;
+    background: oklch(97.5% 0.025 247.64);
+    color: oklch(28.43% 0.052 249.88);
+    list-style: none;
+  }
+
+  .editor-surface :global(.dc-reference-item) {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px;
+    margin: 0;
+    padding: 11px 14px 11px 12px;
+    border-bottom: 1px solid oklch(88.91% 0.035 247.16);
+    line-height: 1.62;
+  }
+
+  .editor-surface :global(.dc-reference-item:last-child) {
+    border-bottom: 0;
+  }
+
+  .editor-surface :global(.dc-reference-item::before) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    height: 18px;
+    border-radius: 999px;
+    background: oklch(56.77% 0.154 252.96);
+    color: oklch(99.21% 0.006 247.8);
+    content: counter(list-item, decimal-leading-zero);
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .editor-surface-dark :global(.dc-reference-list) {
+    border-color: oklch(34.06% 0.044 236.72);
+    border-left-color: oklch(74.22% 0.14 232.34);
+    background: oklch(9.8% 0.014 94.7);
+    color: oklch(91.87% 0.029 233.82);
+  }
+
+  .editor-surface-dark :global(.dc-reference-item) {
+    border-bottom-color: oklch(24.21% 0.025 236.68);
+  }
+
+  .editor-surface-dark :global(.dc-reference-item::before) {
+    background: oklch(74.22% 0.14 232.34);
+    color: oklch(8.61% 0.019 237.62);
+  }
+
+  .editor-surface :global(.dc-summary-box) {
+    margin: 0 0 18px;
+    padding: 14px 16px;
+    border: 1px solid oklch(84.22% 0.041 88.36);
+    border-top: 4px solid oklch(61.2% 0.049 77.83);
+    border-radius: 7px;
+    background: oklch(97.68% 0.02 91.92);
+    color: oklch(25.72% 0.021 255.63);
+  }
+
+  .editor-surface :global(.dc-summary-box::before) {
+    display: block;
+    margin: 0 0 9px;
+    color: oklch(36.42% 0.042 78.12);
+    content: '핵심 요약';
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .editor-surface :global(.dc-summary-list) {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .editor-surface :global(.dc-summary-item) {
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    gap: 0;
+    margin: 0 0 7px;
+    line-height: 1.62;
+    list-style: none;
+  }
+
+  .editor-surface :global(.dc-summary-item:last-child) {
+    margin-bottom: 0;
+  }
+
+  .editor-surface :global(.dc-summary-item::before) {
+    width: 8px;
+    height: 8px;
+    margin-top: 8px;
+    border-radius: 999px;
+    background: oklch(61.2% 0.049 77.83);
+    content: '';
+  }
+
+  .editor-surface-dark :global(.dc-summary-box) {
+    border-color: oklch(36.21% 0.032 84.68);
+    border-top-color: oklch(84.08% 0.11 84.51);
+    background: oklch(10.18% 0.015 94.76);
+    color: oklch(94.12% 0.012 93.37);
+  }
+
+  .editor-surface-dark :global(.dc-summary-box::before) {
+    color: oklch(88.91% 0.091 87.72);
+  }
+
+  .editor-surface-dark :global(.dc-summary-item::before) {
+    background: oklch(84.08% 0.11 84.51);
+  }
+
   .editor-surface :global(.dc-callout) {
     margin: 0 0 16px;
     padding: 12px 14px;
@@ -2199,6 +2539,66 @@
     border-left-color: oklch(73.79% 0.151 303.45);
     background: oklch(12.04% 0.022 302.17);
     color: oklch(93.04% 0.029 303.2);
+  }
+
+  .editor-surface :global(.dc-callout-success) {
+    border-left: 4px solid oklch(66.42% 0.152 154.12);
+    background: oklch(96.12% 0.041 152.76);
+    color: oklch(29.24% 0.08 154.12);
+  }
+
+  .editor-surface-dark :global(.dc-callout-success) {
+    border-left-color: oklch(76.71% 0.151 154.54);
+    background: oklch(11.76% 0.02 154.8);
+    color: oklch(92.34% 0.029 154.17);
+  }
+
+  .editor-surface :global(.dc-callout-failure) {
+    border-left: 4px solid oklch(62.42% 0.178 24.04);
+    background: oklch(96.23% 0.039 24.18);
+    color: oklch(34.1% 0.098 24.62);
+  }
+
+  .editor-surface-dark :global(.dc-callout-failure) {
+    border-left-color: oklch(75.02% 0.17 24.82);
+    background: oklch(12.02% 0.021 24.58);
+    color: oklch(93.14% 0.03 24.92);
+  }
+
+  .editor-surface :global(.dc-callout-experiment) {
+    border-left: 4px solid oklch(62.11% 0.15 263.9);
+    background: oklch(96.2% 0.032 264.42);
+    color: oklch(31.56% 0.081 264.1);
+  }
+
+  .editor-surface-dark :global(.dc-callout-experiment) {
+    border-left-color: oklch(73.44% 0.145 264.2);
+    background: oklch(11.48% 0.022 264.32);
+    color: oklch(92.52% 0.031 264.14);
+  }
+
+  .editor-surface :global(.dc-callout-conclusion) {
+    border-left: 4px solid oklch(72.44% 0.119 91.73);
+    background: oklch(96.87% 0.042 94.2);
+    color: oklch(34.5% 0.065 88.3);
+  }
+
+  .editor-surface-dark :global(.dc-callout-conclusion) {
+    border-left-color: oklch(80.18% 0.126 91.43);
+    background: oklch(12.18% 0.018 91.22);
+    color: oklch(93.56% 0.027 91.42);
+  }
+
+  .editor-surface :global(.dc-callout-rebuttal) {
+    border-left: 4px solid oklch(64.8% 0.157 330.2);
+    background: oklch(96.1% 0.038 330.12);
+    color: oklch(34.4% 0.096 329.55);
+  }
+
+  .editor-surface-dark :global(.dc-callout-rebuttal) {
+    border-left-color: oklch(75.91% 0.154 330.36);
+    background: oklch(12.11% 0.023 330.24);
+    color: oklch(93.11% 0.031 330.24);
   }
 
   .editor-surface :global(.dc-link-box) {

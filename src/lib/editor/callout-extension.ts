@@ -30,5 +30,20 @@ export const TipBox = createCalloutExtension("tip", "tipBox");
 export const WarningBox = createCalloutExtension("warning", "warningBox");
 export const ReferenceBox = createCalloutExtension("reference", "referenceBox");
 export const EmphasisBox = createCalloutExtension("emphasis", "emphasisBox");
+export const SuccessBox = createCalloutExtension("success", "successBox");
+export const FailureBox = createCalloutExtension("failure", "failureBox");
+export const ExperimentBox = createCalloutExtension("experiment", "experimentBox");
+export const ConclusionBox = createCalloutExtension("conclusion", "conclusionBox");
+export const RebuttalBox = createCalloutExtension("rebuttal", "rebuttalBox");
 
-export const calloutExtensions = [TipBox, WarningBox, ReferenceBox, EmphasisBox];
+export const calloutExtensions = [
+  TipBox,
+  WarningBox,
+  ReferenceBox,
+  EmphasisBox,
+  SuccessBox,
+  FailureBox,
+  ExperimentBox,
+  ConclusionBox,
+  RebuttalBox,
+];

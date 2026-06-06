@@ -1,4 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
+import { createDefaultCtaGroup } from "$lib/editor/cta-group";
+import { createDefaultReferenceList } from "$lib/editor/reference-list";
+import { createDefaultSummaryBox } from "$lib/editor/summary-box";
 import { defaultLanguage } from "$lib/highlighter/catalog";
 
 export const sampleDocument: JSONContent = {
@@ -9,6 +12,7 @@ export const sampleDocument: JSONContent = {
       attrs: { level: 1 },
       content: [{ type: "text", text: "C++로 보는 입력 최적화" }],
     },
+    createDefaultSummaryBox(),
     {
       type: "paragraph",
       content: [
@@ -60,7 +64,71 @@ export const sampleDocument: JSONContent = {
       ],
     },
     {
+      type: "successBox",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "입출력 계열을 하나로 고정하면 디버깅 포인트가 확 줄어." },
+          ],
+        },
+      ],
+    },
+    {
+      type: "failureBox",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "endl을 반복문 안에서 계속 쓰면 flush 때문에 시간이 새기 쉽다." },
+          ],
+        },
+      ],
+    },
+    {
+      type: "experimentBox",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "정말 병목인지 모르겠으면 " },
+            { type: "text", text: "입력만 읽는 버전", marks: [{ type: "code" }] },
+            { type: "text", text: "으로 먼저 재보면 돼." },
+          ],
+        },
+      ],
+    },
+    {
+      type: "conclusionBox",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "빠른 입출력은 마법이 아니라 불필요한 기다림을 줄이는 기본 세팅이야.",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "rebuttalBox",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "그래도 느리면 입출력보다 알고리즘이나 자료구조가 문제일 가능성이 더 커.",
+            },
+          ],
+        },
+      ],
+    },
+    {
       type: "blockquote",
+      attrs: { quoteStyle: "pull" },
       content: [
         {
           type: "paragraph",
@@ -145,6 +213,8 @@ export const sampleDocument: JSONContent = {
       attrs: { href: "https://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio" },
       content: [{ type: "text", text: "cppreference 열기" }],
     },
+    createDefaultCtaGroup("horizontal"),
+    createDefaultReferenceList(),
     {
       type: "referenceBox",
       content: [

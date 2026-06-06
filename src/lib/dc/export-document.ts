@@ -9,7 +9,9 @@ import {
 } from "$lib/highlighter/catalog";
 import type { CalloutKind } from "$lib/editor/callout";
 import { calloutKindFromNodeName, normalizeCalloutKind } from "$lib/editor/callout";
+import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
 import { normalizeEditableLinkHref } from "$lib/editor/link";
+import { normalizeQuoteStyle, type QuoteStyle } from "$lib/editor/quote-style";
 import { safeCodeFontFamily, safeProseFontFamily } from "./font-stacks";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
@@ -122,6 +124,11 @@ const dcTableFallbackColors = {
   warningBackground: "#fff1cf",
   referenceBackground: "#e5f6ff",
   emphasisBackground: "#f4eaff",
+  successBackground: "#e7faee",
+  failureBackground: "#ffe8e5",
+  experimentBackground: "#eaf1ff",
+  conclusionBackground: "#fff7d9",
+  rebuttalBackground: "#ffe9f5",
   quoteBackground: "#fbfaf2",
 };
 
@@ -158,6 +165,36 @@ const calloutStyles: Record<
     border: "oklch(64.73% 0.162 303.08)",
     text: "oklch(33.84% 0.091 303.69)",
   },
+  success: {
+    label: "성공",
+    background: "oklch(96.12% 0.041 152.76)",
+    border: "oklch(66.42% 0.152 154.12)",
+    text: "oklch(29.24% 0.08 154.12)",
+  },
+  failure: {
+    label: "실패",
+    background: "oklch(96.23% 0.039 24.18)",
+    border: "oklch(62.42% 0.178 24.04)",
+    text: "oklch(34.1% 0.098 24.62)",
+  },
+  experiment: {
+    label: "실험",
+    background: "oklch(96.2% 0.032 264.42)",
+    border: "oklch(62.11% 0.15 263.9)",
+    text: "oklch(31.56% 0.081 264.1)",
+  },
+  conclusion: {
+    label: "결론",
+    background: "oklch(96.87% 0.042 94.2)",
+    border: "oklch(72.44% 0.119 91.73)",
+    text: "oklch(34.5% 0.065 88.3)",
+  },
+  rebuttal: {
+    label: "반박",
+    background: "oklch(96.1% 0.038 330.12)",
+    border: "oklch(64.8% 0.157 330.2)",
+    text: "oklch(34.4% 0.096 329.55)",
+  },
 };
 
 const darkCalloutStyles: Record<
@@ -192,6 +229,36 @@ const darkCalloutStyles: Record<
     background: "oklch(12.04% 0.022 302.17)",
     border: "oklch(73.79% 0.151 303.45)",
     text: "oklch(93.04% 0.029 303.2)",
+  },
+  success: {
+    label: "성공",
+    background: "oklch(11.76% 0.02 154.8)",
+    border: "oklch(76.71% 0.151 154.54)",
+    text: "oklch(92.34% 0.029 154.17)",
+  },
+  failure: {
+    label: "실패",
+    background: "oklch(12.02% 0.021 24.58)",
+    border: "oklch(75.02% 0.17 24.82)",
+    text: "oklch(93.14% 0.03 24.92)",
+  },
+  experiment: {
+    label: "실험",
+    background: "oklch(11.48% 0.022 264.32)",
+    border: "oklch(73.44% 0.145 264.2)",
+    text: "oklch(92.52% 0.031 264.14)",
+  },
+  conclusion: {
+    label: "결론",
+    background: "oklch(12.18% 0.018 91.22)",
+    border: "oklch(80.18% 0.126 91.43)",
+    text: "oklch(93.56% 0.027 91.42)",
+  },
+  rebuttal: {
+    label: "반박",
+    background: "oklch(12.11% 0.023 330.24)",
+    border: "oklch(75.91% 0.154 330.36)",
+    text: "oklch(93.11% 0.031 330.24)",
   },
 };
 
@@ -231,6 +298,26 @@ const calloutInlineCodeStyles: Record<
   emphasis: {
     background: "oklch(36.58% 0.112 303.92)",
     text: "oklch(98.29% 0.012 303.21)",
+  },
+  success: {
+    background: "oklch(33.92% 0.103 154.72)",
+    text: "oklch(98.12% 0.011 154.48)",
+  },
+  failure: {
+    background: "oklch(36.31% 0.116 24.62)",
+    text: "oklch(98.44% 0.013 25.04)",
+  },
+  experiment: {
+    background: "oklch(34.92% 0.104 264.18)",
+    text: "oklch(98.18% 0.012 264.12)",
+  },
+  conclusion: {
+    background: "oklch(39.22% 0.092 91.72)",
+    text: "oklch(98.48% 0.013 91.12)",
+  },
+  rebuttal: {
+    background: "oklch(36.14% 0.108 330.22)",
+    text: "oklch(98.26% 0.012 330.18)",
   },
 };
 
@@ -634,13 +721,16 @@ async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Pro
 
 async function renderBlockquote(node: JSONContent, options: DcExportOptions): Promise<string> {
   const palette = documentPalette(options);
+  const quoteStyle = normalizeQuoteStyle(node.attrs?.quoteStyle);
   const quoteParagraphStyle = joinStyle({
-    margin: "0 0 8px",
-    color: palette.quoteText,
+    margin: quoteStyle === "pull" ? 0 : "0 0 8px",
+    color: quoteStyle === "pull" ? palette.heading : palette.quoteText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
-    "font-style": "italic",
-    "line-height": 1.78,
+    "font-size": quoteStyle === "pull" ? "21px" : safeSize(options.bodyFontSize, "15px"),
+    "font-style": quoteStyle === "academic" || quoteStyle === "pull" ? undefined : "italic",
+    "font-weight": quoteStyle === "pull" ? 900 : undefined,
+    "line-height": quoteStyle === "pull" ? 1.48 : 1.78,
+    "text-align": quoteStyle === "pull" ? "center" : undefined,
   });
   const children = await Promise.all(
     childrenOf(node).map((child) => {
@@ -652,6 +742,76 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
     }),
   );
   const body = children.join("");
+  const content = renderQuoteContent(quoteStyle, body, palette, options);
+
+  if (isDcTableStructure(options)) {
+    return renderDcTableBlock({
+      body: content,
+      backgroundColor: quoteBackground(quoteStyle, palette),
+      fallbackBackground: quoteFallbackBackground(options),
+      border: quoteTableBorder(quoteStyle, palette),
+      borderColor: quoteTableAccent(quoteStyle, palette),
+      padding: quotePadding(quoteStyle),
+    });
+  }
+
+  const style = quoteWrapperStyle(quoteStyle, palette, options);
+  const tag = quoteStyle === "pull" ? "div" : "blockquote";
+  return `<${tag} style="${style}">${content}</${tag}>`;
+}
+
+function quoteFallbackBackground(options: DcExportOptions): string {
+  return normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
+    ? documentPalette(options).fallbackBackground
+    : dcTableFallbackColors.quoteBackground;
+}
+
+function quoteBackground(quoteStyle: QuoteStyle, palette: DocumentPalette): string {
+  if (quoteStyle === "bigQuote") {
+    return palette.quoteBackground;
+  }
+
+  if (quoteStyle === "academic") {
+    return "transparent";
+  }
+
+  return quoteStyle === "pull" ? palette.articleBackground : palette.quoteBackground;
+}
+
+function quoteTableAccent(quoteStyle: QuoteStyle, palette: DocumentPalette): string | undefined {
+  return quoteStyle === "pull" ? undefined : palette.quoteAccent;
+}
+
+function quoteTableBorder(quoteStyle: QuoteStyle, palette: DocumentPalette): string | undefined {
+  if (quoteStyle === "academic") {
+    return `1px solid ${palette.sectionBorder}`;
+  }
+
+  if (quoteStyle === "bigQuote" || quoteStyle === "literary") {
+    return `1px solid ${palette.quoteAccent}`;
+  }
+
+  return `1px solid ${palette.divider}`;
+}
+
+function quotePadding(quoteStyle: QuoteStyle): string {
+  if (quoteStyle === "pull") {
+    return "18px 20px";
+  }
+
+  if (quoteStyle === "bigQuote") {
+    return "18px 18px 16px";
+  }
+
+  return quoteStyle === "academic" ? "12px 16px" : "14px 16px";
+}
+
+function renderQuoteContent(
+  quoteStyle: QuoteStyle,
+  body: string,
+  palette: DocumentPalette,
+  options: DcExportOptions,
+): string {
   const quoteMarkStyle = joinStyle({
     display: "inline-block",
     color: palette.quoteMark,
@@ -667,23 +827,95 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
     width: "calc(100% - 46px)",
     "vertical-align": "top",
   });
-  const content = `<span style="${quoteMarkStyle}">&ldquo;</span><div style="${contentStyle}">${body}</div>`;
 
-  if (isDcTableStructure(options)) {
-    return renderDcTableBlock({
-      body: content,
-      backgroundColor: palette.quoteBackground,
-      fallbackBackground:
-        normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
-          ? palette.fallbackBackground
-          : dcTableFallbackColors.quoteBackground,
-      border: `1px solid ${palette.quoteAccent}`,
-      borderColor: palette.quoteAccent,
-      padding: "14px 16px",
+  if (quoteStyle === "literary") {
+    return `<span style="${quoteMarkStyle}">&ldquo;</span><div style="${contentStyle}">${body}</div>`;
+  }
+
+  if (quoteStyle === "bigQuote") {
+    const bigMarkStyle = joinStyle({
+      display: "block",
+      color: palette.quoteMark,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": "56px",
+      "font-weight": 900,
+      "line-height": 0.82,
+      margin: "0 0 4px",
+    });
+
+    return `<span style="${bigMarkStyle}">&ldquo;</span>${body}`;
+  }
+
+  if (quoteStyle === "academic") {
+    const labelStyle = joinStyle({
+      display: "block",
+      margin: "0 0 7px",
+      color: palette.mutedText,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": "12px",
+      "font-weight": 900,
+      "letter-spacing": "0",
+    });
+
+    return `<span style="${labelStyle}">QUOTE</span>${body}`;
+  }
+
+  return body;
+}
+
+function quoteWrapperStyle(
+  quoteStyle: QuoteStyle,
+  palette: DocumentPalette,
+  options: DcExportOptions,
+): string {
+  if (quoteStyle === "academic") {
+    return joinStyle({
+      margin: "0 0 18px",
+      padding: "12px 16px",
+      "border-left": `4px solid ${palette.quoteAccent}`,
+      "border-top": `1px solid ${palette.sectionBorder}`,
+      "border-bottom": `1px solid ${palette.sectionBorder}`,
+      color: palette.quoteText,
+      "background-color": "transparent",
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "line-height": 1.78,
     });
   }
 
-  const style = joinStyle({
+  if (quoteStyle === "pull") {
+    return joinStyle({
+      margin: "20px 0",
+      padding: "18px 20px",
+      border: `1px solid ${palette.divider}`,
+      "border-left": 0,
+      "border-right": 0,
+      color: palette.heading,
+      "background-color": "transparent",
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": "21px",
+      "font-weight": 900,
+      "line-height": 1.48,
+      "text-align": "center",
+    });
+  }
+
+  if (quoteStyle === "bigQuote") {
+    return joinStyle({
+      margin: "0 0 18px",
+      padding: "18px 18px 16px",
+      border: `1px solid ${palette.quoteAccent}`,
+      "border-left": `4px solid ${palette.quoteAccent}`,
+      color: palette.quoteText,
+      "background-color": palette.quoteBackground,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-style": "italic",
+      "line-height": 1.78,
+    });
+  }
+
+  return joinStyle({
     margin: "0 0 18px",
     padding: "13px 16px",
     "border-left": `3px solid ${palette.quoteAccent}`,
@@ -696,7 +928,6 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
     "font-style": "italic",
     "line-height": 1.78,
   });
-  return `<blockquote style="${style}">${content}</blockquote>`;
 }
 
 async function renderSectionHeading(node: JSONContent, options: DcExportOptions): Promise<string> {
@@ -734,7 +965,11 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
   return `<div style="${style}">${content || "&nbsp;"}</div>`;
 }
 
-function renderCtaButton(node: JSONContent, options: DcExportOptions): string {
+function renderCtaButtonAnchor(
+  node: JSONContent,
+  options: DcExportOptions,
+  overrides: Record<string, string | number | undefined> = {},
+): string {
   const palette = documentPalette(options);
   const href = safeHref(node.attrs?.href);
   const label = renderInlineChildren(node, options, { text: palette.ctaText }) || "바로가기";
@@ -755,9 +990,445 @@ function renderCtaButton(node: JSONContent, options: DcExportOptions): string {
     "font-weight": 900,
     "line-height": 1.2,
     "text-decoration": "none",
+    ...overrides,
   });
 
   return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="${style}">${label}</a>`;
+}
+
+function renderCtaButton(node: JSONContent, options: DcExportOptions): string {
+  return renderCtaButtonAnchor(node, options);
+}
+
+async function renderCtaGroup(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const layout = normalizeCtaGroupLayout(node.attrs?.layout);
+  const buttons = childrenOf(node).filter((child) => child.type === "ctaButton");
+
+  if (buttons.length === 0) {
+    return "";
+  }
+
+  if (isDcTableStructure(options)) {
+    return renderCtaGroupTable(buttons, options, layout);
+  }
+
+  const wrapperStyle = joinStyle({
+    margin: "0 0 16px",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.2,
+  });
+  const body =
+    layout === "vertical"
+      ? buttons
+          .map(
+            (button) =>
+              `<div style="margin:0 0 8px">${renderCtaButtonAnchor(button, options, { margin: 0 })}</div>`,
+          )
+          .join("")
+      : buttons
+          .map((button) => renderCtaButtonAnchor(button, options, { margin: "0 8px 8px 0" }))
+          .join("");
+
+  return `<div style="${wrapperStyle}">${body}</div>`;
+}
+
+function renderCtaGroupTable(
+  buttons: JSONContent[],
+  options: DcExportOptions,
+  layout: CtaGroupLayout,
+): string {
+  const palette = documentPalette(options);
+  const tableStyle = joinStyle({
+    width: layout === "vertical" ? undefined : "auto",
+    margin: "0 0 16px",
+    "border-collapse": "separate",
+    "border-spacing": layout === "vertical" ? "0 8px" : "0",
+    "background-color": "transparent",
+  });
+
+  if (layout === "vertical") {
+    const rows = buttons
+      .map(
+        (button) =>
+          `<tr><td style="padding:0">${renderCtaButtonAnchor(button, options, { display: "inline-block", margin: 0 })}</td></tr>`,
+      )
+      .join("");
+
+    return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`;
+  }
+
+  const cells = buttons
+    .map(
+      (button) =>
+        `<td style="padding:0 8px 8px 0">${renderCtaButtonAnchor(button, options, { margin: 0 })}</td>`,
+    )
+    .join("");
+
+  return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells}</tr></tbody></table>`;
+}
+
+function referenceListPalette(options: DcExportOptions) {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      background: "oklch(9.8% 0.014 94.7)",
+      fallbackBackground: "#090909",
+      border: "oklch(34.06% 0.044 236.72)",
+      badgeBackground: "oklch(74.22% 0.14 232.34)",
+      badgeText: "oklch(8.61% 0.019 237.62)",
+      itemDivider: "oklch(24.21% 0.025 236.68)",
+      text: "oklch(91.87% 0.029 233.82)",
+      mutedText: "oklch(70.88% 0.035 235.94)",
+    };
+  }
+
+  return {
+    background: "oklch(97.5% 0.025 247.64)",
+    fallbackBackground: dcTableFallbackColors.referenceBackground,
+    border: "oklch(78.06% 0.088 247.23)",
+    badgeBackground: "oklch(56.77% 0.154 252.96)",
+    badgeText: "oklch(99.21% 0.006 247.8)",
+    itemDivider: "oklch(88.91% 0.035 247.16)",
+    text: "oklch(28.43% 0.052 249.88)",
+    mutedText: "oklch(47.08% 0.048 249.16)",
+  };
+}
+
+function renderReferenceItemBody(
+  node: JSONContent,
+  options: DcExportOptions,
+  textColor: string,
+): string {
+  const documentColors = documentPalette(options);
+  const href = safeHref(node.attrs?.href);
+  const normalizedLinkHref = normalizedHref(node.attrs?.href);
+  const fallbackLabel = normalizedLinkHref ? visibleLinkLabel(normalizedLinkHref) : "참고 자료";
+  const label =
+    renderInlineChildren(node, options, { text: textColor }) || escapeHtml(fallbackLabel);
+  const linkStyle = joinStyle({
+    color: documentColors.link,
+    "font-weight": 850,
+    "text-decoration": "underline",
+    "text-underline-offset": "2px",
+  });
+
+  return href
+    ? `<a href="${href}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${label}</a>`
+    : label;
+}
+
+async function renderReferenceList(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const items = childrenOf(node).filter((child) => child.type === "referenceItem");
+
+  if (items.length === 0) {
+    return "";
+  }
+
+  return isDcTableStructure(options)
+    ? renderReferenceListTable(items, options)
+    : renderReferenceListModern(items, options);
+}
+
+function renderReferenceListModern(items: JSONContent[], options: DcExportOptions): string {
+  const palette = referenceListPalette(options);
+  const listStyle = joinStyle({
+    margin: "0 0 16px",
+    padding: "0",
+    "list-style": "none",
+    border: `1px solid ${palette.border}`,
+    "border-left": `4px solid ${palette.badgeBackground}`,
+    "border-radius": "7px",
+    "background-color": palette.background,
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+  });
+  const itemStyle = joinStyle({
+    display: "table",
+    width: "100%",
+    margin: "0",
+    padding: "0",
+    "border-bottom": `1px solid ${palette.itemDivider}`,
+    "box-sizing": "border-box",
+  });
+  const lastItemStyle = joinStyle({
+    display: "table",
+    width: "100%",
+    margin: "0",
+    padding: "0",
+    "box-sizing": "border-box",
+  });
+  const badgeCellStyle = joinStyle({
+    display: "table-cell",
+    width: "42px",
+    padding: "12px 0 12px 12px",
+    "vertical-align": "top",
+  });
+  const badgeStyle = joinStyle({
+    display: "inline-block",
+    "min-width": "26px",
+    padding: "2px 0",
+    "border-radius": "999px",
+    "background-color": palette.badgeBackground,
+    color: palette.badgeText,
+    "font-size": "11px",
+    "font-weight": 900,
+    "line-height": 1.2,
+    "text-align": "center",
+  });
+  const labelCellStyle = joinStyle({
+    display: "table-cell",
+    padding: "11px 14px 11px 0",
+    color: palette.text,
+    "vertical-align": "top",
+  });
+  const body = items
+    .map((item, index) => {
+      const rowStyle = index === items.length - 1 ? lastItemStyle : itemStyle;
+      const number = String(index + 1).padStart(2, "0");
+      const content = renderReferenceItemBody(item, options, palette.text);
+
+      return `<li style="${rowStyle}"><span style="${badgeCellStyle}"><span style="${badgeStyle}">${number}</span></span><span style="${labelCellStyle}">${content}</span></li>`;
+    })
+    .join("");
+
+  return `<ol style="${listStyle}">${body}</ol>`;
+}
+
+function renderReferenceListTable(items: JSONContent[], options: DcExportOptions): string {
+  const palette = referenceListPalette(options);
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 16px",
+    "border-collapse": "collapse",
+    "background-color": palette.background,
+    border: `1px solid ${palette.border}`,
+    "border-left": `4px solid ${palette.badgeBackground}`,
+  });
+  const badgeCellStyle = joinStyle({
+    width: "42px",
+    padding: "10px 0 10px 12px",
+    "border-bottom": `1px solid ${palette.itemDivider}`,
+    "vertical-align": "top",
+  });
+  const lastBadgeCellStyle = joinStyle({
+    width: "42px",
+    padding: "10px 0 10px 12px",
+    "vertical-align": "top",
+  });
+  const badgeStyle = joinStyle({
+    display: "inline-block",
+    "min-width": "26px",
+    padding: "2px 0",
+    "border-radius": "999px",
+    "background-color": palette.badgeBackground,
+    color: palette.badgeText,
+    "font-size": "11px",
+    "font-weight": 900,
+    "line-height": 1.2,
+    "text-align": "center",
+  });
+  const itemCellStyle = joinStyle({
+    padding: "10px 14px 10px 0",
+    "border-bottom": `1px solid ${palette.itemDivider}`,
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+    "vertical-align": "top",
+  });
+  const lastItemCellStyle = joinStyle({
+    padding: "10px 14px 10px 0",
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+    "vertical-align": "top",
+  });
+  const rows = items
+    .map((item, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      const badgeTdStyle = index === items.length - 1 ? lastBadgeCellStyle : badgeCellStyle;
+      const itemTdStyle = index === items.length - 1 ? lastItemCellStyle : itemCellStyle;
+      const content = renderReferenceItemBody(item, options, palette.text);
+
+      return `<tr><td style="${badgeTdStyle}"><span style="${badgeStyle}">${number}</span></td><td style="${itemTdStyle}">${content}</td></tr>`;
+    })
+    .join("");
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`;
+}
+
+function summaryBoxPalette(options: DcExportOptions) {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      background: "oklch(10.18% 0.015 94.76)",
+      fallbackBackground: "#090909",
+      border: "oklch(36.21% 0.032 84.68)",
+      accent: "oklch(84.08% 0.11 84.51)",
+      label: "oklch(88.91% 0.091 87.72)",
+      text: "oklch(94.12% 0.012 93.37)",
+      mutedText: "oklch(72.14% 0.024 86.7)",
+      bulletBackground: "oklch(84.08% 0.11 84.51)",
+      bulletText: "oklch(10.18% 0.015 94.76)",
+    };
+  }
+
+  return {
+    background: "oklch(97.68% 0.02 91.92)",
+    fallbackBackground: "#fbf6e6",
+    border: "oklch(84.22% 0.041 88.36)",
+    accent: "oklch(61.2% 0.049 77.83)",
+    label: "oklch(36.42% 0.042 78.12)",
+    text: "oklch(25.72% 0.021 255.63)",
+    mutedText: "oklch(45.61% 0.026 79.44)",
+    bulletBackground: "oklch(61.2% 0.049 77.83)",
+    bulletText: "oklch(99.1% 0.006 93.08)",
+  };
+}
+
+async function renderSummaryBox(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const items = childrenOf(node).filter((child) => child.type === "summaryItem");
+
+  if (items.length === 0) {
+    return "";
+  }
+
+  return isDcTableStructure(options)
+    ? renderSummaryBoxTable(items, options)
+    : renderSummaryBoxModern(items, options);
+}
+
+function renderSummaryItemContent(
+  node: JSONContent,
+  options: DcExportOptions,
+  textColor: string,
+): string {
+  return renderInlineChildren(node, options, { text: textColor }) || "&nbsp;";
+}
+
+function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions): string {
+  const palette = summaryBoxPalette(options);
+  const wrapperStyle = joinStyle({
+    margin: "0 0 18px",
+    padding: "14px 16px",
+    border: `1px solid ${palette.border}`,
+    "border-top": `4px solid ${palette.accent}`,
+    "background-color": palette.background,
+    color: palette.text,
+    "border-radius": "7px",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+  });
+  const labelStyle = joinStyle({
+    display: "block",
+    margin: "0 0 9px",
+    color: palette.label,
+    "font-size": "12px",
+    "font-weight": 900,
+    "letter-spacing": "0",
+  });
+  const listStyle = joinStyle({
+    margin: "0",
+    padding: "0",
+    "list-style": "none",
+  });
+  const itemStyle = joinStyle({
+    display: "table",
+    width: "100%",
+    margin: "0 0 7px",
+  });
+  const bulletCellStyle = joinStyle({
+    display: "table-cell",
+    width: "22px",
+    "vertical-align": "top",
+  });
+  const bulletStyle = joinStyle({
+    display: "inline-block",
+    width: "8px",
+    height: "8px",
+    margin: "8px 0 0",
+    "border-radius": "999px",
+    "background-color": palette.bulletBackground,
+  });
+  const contentCellStyle = joinStyle({
+    display: "table-cell",
+    color: palette.text,
+    "vertical-align": "top",
+  });
+  const body = items
+    .map((item) => {
+      const content = renderSummaryItemContent(item, options, palette.text);
+      return `<li style="${itemStyle}"><span style="${bulletCellStyle}"><span style="${bulletStyle}"></span></span><span style="${contentCellStyle}">${content}</span></li>`;
+    })
+    .join("");
+
+  return `<section style="${wrapperStyle}"><span style="${labelStyle}">핵심 요약</span><ul style="${listStyle}">${body}</ul></section>`;
+}
+
+function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): string {
+  const palette = summaryBoxPalette(options);
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 18px",
+    "border-collapse": "collapse",
+    "background-color": palette.background,
+    border: `1px solid ${palette.border}`,
+    "border-top": `4px solid ${palette.accent}`,
+  });
+  const labelCellStyle = joinStyle({
+    padding: "12px 16px 5px",
+    color: palette.label,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "12px",
+    "font-weight": 900,
+    "line-height": 1.2,
+  });
+  const bulletCellStyle = joinStyle({
+    width: "30px",
+    padding: "6px 0 6px 16px",
+    "vertical-align": "top",
+  });
+  const lastBulletCellStyle = joinStyle({
+    width: "30px",
+    padding: "6px 0 14px 16px",
+    "vertical-align": "top",
+  });
+  const bulletStyle = joinStyle({
+    display: "inline-block",
+    width: "8px",
+    height: "8px",
+    margin: "8px 0 0",
+    "border-radius": "999px",
+    "background-color": palette.bulletBackground,
+  });
+  const itemCellStyle = joinStyle({
+    padding: "5px 16px 5px 0",
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+    "vertical-align": "top",
+  });
+  const lastItemCellStyle = joinStyle({
+    padding: "5px 16px 13px 0",
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.62,
+    "vertical-align": "top",
+  });
+  const rows = items
+    .map((item, index) => {
+      const content = renderSummaryItemContent(item, options, palette.text);
+      const isLast = index === items.length - 1;
+      return `<tr><td style="${isLast ? lastBulletCellStyle : bulletCellStyle}"><span style="${bulletStyle}"></span></td><td style="${isLast ? lastItemCellStyle : itemCellStyle}">${content}</td></tr>`;
+    })
+    .join("");
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td colspan="2" style="${labelCellStyle}">핵심 요약</td></tr>${rows}</tbody></table>`;
 }
 
 async function renderBlockAsync(
@@ -786,6 +1457,11 @@ async function renderBlockAsync(
     case "warningBox":
     case "referenceBox":
     case "emphasisBox":
+    case "successBox":
+    case "failureBox":
+    case "experimentBox":
+    case "conclusionBox":
+    case "rebuttalBox":
       return renderCallout(node, options, calloutKindFromNodeName(node.type));
     case "linkBox":
       return renderLinkBox(node, options);
@@ -793,6 +1469,12 @@ async function renderBlockAsync(
       return renderSectionHeading(node, options);
     case "ctaButton":
       return renderCtaButton(node, options);
+    case "ctaGroup":
+      return renderCtaGroup(node, options);
+    case "referenceList":
+      return renderReferenceList(node, options);
+    case "summaryBox":
+      return renderSummaryBox(node, options);
     case "codeBlock":
       return renderCodeBlock(node, options);
     case "blockquote":

@@ -191,6 +191,88 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("이전 문서도 버리지 않는다.");
   });
 
+  it("exports extended callout variants with distinct labels and table fallbacks", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "successBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "성공 케이스" }],
+            },
+          ],
+        },
+        {
+          type: "failureBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "실패 케이스" }],
+            },
+          ],
+        },
+        {
+          type: "experimentBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "실험 값은 " },
+                { type: "text", text: "n=1000", marks: [{ type: "code" }] },
+                { type: "text", text: "부터 본다." },
+              ],
+            },
+          ],
+        },
+        {
+          type: "conclusionBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "결론 문장" }],
+            },
+          ],
+        },
+        {
+          type: "rebuttalBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "반박 문장" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("성공");
+    expect(html).toContain("실패");
+    expect(html).toContain("실험");
+    expect(html).toContain("결론");
+    expect(html).toContain("반박");
+    expect(html).toContain("성공 케이스");
+    expect(html).toContain("실패 케이스");
+    expect(html).toContain("결론 문장");
+    expect(html).toContain("반박 문장");
+    expect(html).toContain('bgcolor="#e7faee"');
+    expect(html).toContain('bgcolor="#ffe8e5"');
+    expect(html).toContain('bgcolor="#eaf1ff"');
+    expect(html).toContain('bgcolor="#fff7d9"');
+    expect(html).toContain('bgcolor="#ffe9f5"');
+    expect(html).toContain("background-color:oklch(34.92% 0.104 264.18)");
+    expect(html).toContain("color:oklch(98.18% 0.012 264.12)");
+    expect(html).not.toContain("<aside");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+  });
+
   it("keeps selected font family and size scoped to textStyle spans", async () => {
     const document: JSONContent = {
       type: "doc",
@@ -225,6 +307,140 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(
       `<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:${fontFamilyOptions[0].value};font-size:15px`,
     );
+  });
+
+  it("exports CTA button groups with horizontal and vertical table layouts", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "ctaGroup",
+          attrs: { layout: "horizontal" },
+          content: [
+            {
+              type: "ctaButton",
+              attrs: { href: "https://github.com/0disoft/dc-code-paste" },
+              content: [{ type: "text", text: "GitHub" }],
+            },
+            {
+              type: "ctaButton",
+              attrs: { href: "https://example.com/source" },
+              content: [{ type: "text", text: "원문" }],
+            },
+          ],
+        },
+        {
+          type: "ctaGroup",
+          attrs: { layout: "vertical" },
+          content: [
+            {
+              type: "ctaButton",
+              attrs: { href: "https://example.com/download" },
+              content: [{ type: "text", text: "다운로드" }],
+            },
+            {
+              type: "ctaButton",
+              attrs: { href: "https://example.com/run" },
+              content: [{ type: "text", text: "실행하기" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("GitHub");
+    expect(html).toContain("원문");
+    expect(html).toContain("다운로드");
+    expect(html).toContain("실행하기");
+    expect(html).toContain('href="https://github.com/0disoft/dc-code-paste"');
+    expect(html).toContain('href="https://example.com/download"');
+    expect(html).toContain("<tr><td");
+    expect(html).toContain("border-spacing:0 8px");
+    expect(html).toContain("padding:0 8px 8px 0");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports reference lists as numbered paste-safe link tables", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "referenceList",
+          content: [
+            {
+              type: "referenceItem",
+              attrs: { href: "https://example.com/guide" },
+              content: [{ type: "text", text: "가이드 원문" }],
+            },
+            {
+              type: "referenceItem",
+              attrs: { href: "https://github.com/0disoft/dc-code-paste" },
+              content: [{ type: "text", text: "구현 저장소" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('bgcolor="#e5f6ff"');
+    expect(html).toContain(">01</span>");
+    expect(html).toContain(">02</span>");
+    expect(html).toContain("가이드 원문");
+    expect(html).toContain("구현 저장소");
+    expect(html).toContain('href="https://example.com/guide"');
+    expect(html).toContain('href="https://github.com/0disoft/dc-code-paste"');
+    expect(html).toContain("border-left:4px solid");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports summary boxes as compact bullet blocks", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "summaryBox",
+          content: [
+            {
+              type: "summaryItem",
+              content: [{ type: "text", text: "핵심만 먼저 보여준다." }],
+            },
+            {
+              type: "summaryItem",
+              content: [{ type: "text", text: "본문은 아래에서 천천히 풀어낸다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('bgcolor="#fbf6e6"');
+    expect(html).toContain("핵심 요약");
+    expect(html).toContain("핵심만 먼저 보여준다.");
+    expect(html).toContain("본문은 아래에서 천천히 풀어낸다.");
+    expect(html).toContain("border-top:4px solid");
+    expect(html).toContain("border-radius:999px");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
   it("adds viewer-safe fallback stacks to prose and code font declarations", async () => {
@@ -434,6 +650,72 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toContain("REF");
     expect(html).not.toContain("POINT");
     expect(html).not.toContain('bgcolor="#e5f6ff"');
+  });
+
+  it("exports quote style variants as distinct paste-safe blocks", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "blockquote",
+          attrs: { quoteStyle: "literary" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "문학적 인용" }],
+            },
+          ],
+        },
+        {
+          type: "blockquote",
+          attrs: { quoteStyle: "academic" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "논문식 인용" }],
+            },
+          ],
+        },
+        {
+          type: "blockquote",
+          attrs: { quoteStyle: "pull" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "한 줄 강조 인용" }],
+            },
+          ],
+        },
+        {
+          type: "blockquote",
+          attrs: { quoteStyle: "bigQuote" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "큰따옴표 인용" }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("문학적 인용");
+    expect(html).toContain("논문식 인용");
+    expect(html).toContain("한 줄 강조 인용");
+    expect(html).toContain("큰따옴표 인용");
+    expect(html).toContain("&ldquo;");
+    expect(html).toContain(">QUOTE</span>");
+    expect(html).toContain("font-size:21px");
+    expect(html).toContain("text-align:center");
+    expect(html).toContain("font-size:56px");
+    expect(html).toContain("background-color:transparent");
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\sclass=/);
   });
 
   it("exports DC paste HTML without app-owned attributes or unsafe links", async () => {

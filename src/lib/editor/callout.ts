@@ -1,8 +1,28 @@
-export const calloutKinds = ["tip", "warning", "reference", "emphasis"] as const;
+export const calloutKinds = [
+  "tip",
+  "warning",
+  "reference",
+  "emphasis",
+  "success",
+  "failure",
+  "experiment",
+  "conclusion",
+  "rebuttal",
+] as const;
 
 export type CalloutKind = (typeof calloutKinds)[number];
 
-export const calloutNodeNames = ["tipBox", "warningBox", "referenceBox", "emphasisBox"] as const;
+export const calloutNodeNames = [
+  "tipBox",
+  "warningBox",
+  "referenceBox",
+  "emphasisBox",
+  "successBox",
+  "failureBox",
+  "experimentBox",
+  "conclusionBox",
+  "rebuttalBox",
+] as const;
 
 export type CalloutNodeName = (typeof calloutNodeNames)[number];
 
@@ -11,6 +31,11 @@ export const calloutNodeNameByKind: Record<CalloutKind, CalloutNodeName> = {
   warning: "warningBox",
   reference: "referenceBox",
   emphasis: "emphasisBox",
+  success: "successBox",
+  failure: "failureBox",
+  experiment: "experimentBox",
+  conclusion: "conclusionBox",
+  rebuttal: "rebuttalBox",
 };
 
 export const calloutKindByNodeName: Record<CalloutNodeName, CalloutKind> = {
@@ -18,6 +43,11 @@ export const calloutKindByNodeName: Record<CalloutNodeName, CalloutKind> = {
   warningBox: "warning",
   referenceBox: "reference",
   emphasisBox: "emphasis",
+  successBox: "success",
+  failureBox: "failure",
+  experimentBox: "experiment",
+  conclusionBox: "conclusion",
+  rebuttalBox: "rebuttal",
 };
 
 export function isCalloutKind(value: unknown): value is CalloutKind {

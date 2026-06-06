@@ -3,8 +3,10 @@ import Color from "@tiptap/extension-color";
 import FontFamily from "@tiptap/extension-font-family";
 import Link from "@tiptap/extension-link";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
+import { Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { defaultLanguage } from "$lib/highlighter/catalog";
+import { normalizeQuoteStyle } from "$lib/editor/quote-style";
 import { calloutExtensions } from "./callout-extension";
 import { editorialExtensions } from "./editorial-extension";
 import { LinkBox } from "./link-box-extension";
@@ -37,11 +39,35 @@ const DcCodeBlock = CodeBlock.extend({
   },
 });
 
+const QuoteStyleAttributes = Extension.create({
+  name: "quoteStyleAttributes",
+
+  addGlobalAttributes() {
+    return [
+      {
+        types: ["blockquote"],
+        attributes: {
+          quoteStyle: {
+            default: "literary",
+            parseHTML: (element) => normalizeQuoteStyle(element.getAttribute("data-quote-style")),
+            renderHTML: (attributes) => {
+              const quoteStyle = normalizeQuoteStyle(attributes.quoteStyle);
+
+              return quoteStyle === "literary" ? {} : { "data-quote-style": quoteStyle };
+            },
+          },
+        },
+      },
+    ];
+  },
+});
+
 export function createEditorExtensions() {
   return [
     StarterKit.configure({
       codeBlock: false,
     }),
+    QuoteStyleAttributes,
     DcCodeBlock.configure({
       defaultLanguage,
       enableTabIndentation: true,
