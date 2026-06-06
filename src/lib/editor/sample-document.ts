@@ -123,6 +123,14 @@ export const sampleDocument: JSONContent = {
       type: "horizontalRule",
     },
     {
+      type: "sectionHeading",
+      content: [{ type: "text", text: "사용 방법 및 예시" }],
+    },
+    {
+      type: "paragraph",
+      content: [{ type: "text", text: "아래 코드는 입력 설정을 한 번에 모아 둔 최소 예시야." }],
+    },
+    {
       type: "codeBlock",
       attrs: { language: defaultLanguage },
       content: [
@@ -131,6 +139,11 @@ export const sampleDocument: JSONContent = {
           text: '#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    int n;\n    cin >> n;\n    cout << n << "\\n";\n}',
         },
       ],
+    },
+    {
+      type: "ctaButton",
+      attrs: { href: "https://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio" },
+      content: [{ type: "text", text: "cppreference 열기" }],
     },
     {
       type: "referenceBox",

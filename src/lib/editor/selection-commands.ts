@@ -149,6 +149,45 @@ export function replaceSelectedInlineRangeWithLinkBox(
   );
 }
 
+export function replaceSelectedInlineRangeWithSectionHeading(
+  state: EditorState,
+  dispatch: Dispatch | undefined,
+): boolean {
+  const sectionHeadingType = state.schema.nodes.sectionHeading;
+  const inlineContent = selectedInlineContent(state);
+
+  if (!sectionHeadingType || !inlineContent) {
+    return false;
+  }
+
+  return dispatchReplacement(state, dispatch, sectionHeadingType.create(null, inlineContent));
+}
+
+export function replaceSelectedInlineRangeWithCtaButton(
+  state: EditorState,
+  dispatch: Dispatch | undefined,
+  href: string,
+  fallbackLabel = "바로가기",
+): boolean {
+  const ctaButtonType = state.schema.nodes.ctaButton;
+
+  if (!ctaButtonType || !href) {
+    return false;
+  }
+
+  const inlineContent = selectedInlineContent(state);
+
+  if (!inlineContent) {
+    return false;
+  }
+
+  return dispatchReplacement(
+    state,
+    dispatch,
+    ctaButtonType.create({ href }, inlineContent || state.schema.text(fallbackLabel)),
+  );
+}
+
 export function selectedInlineRangeToCalloutCommand(kind: CalloutKind): Command {
   return ({ state, dispatch }) => replaceSelectedInlineRangeWithCallout(state, dispatch, kind);
 }
@@ -160,4 +199,16 @@ export function selectedInlineRangeToCodeBlockCommand(language: string): Command
 
 export function selectedInlineRangeToLinkBoxCommand(href: string): Command {
   return ({ state, dispatch }) => replaceSelectedInlineRangeWithLinkBox(state, dispatch, href);
+}
+
+export function selectedInlineRangeToSectionHeadingCommand(): Command {
+  return ({ state, dispatch }) => replaceSelectedInlineRangeWithSectionHeading(state, dispatch);
+}
+
+export function selectedInlineRangeToCtaButtonCommand(
+  href: string,
+  fallbackLabel?: string,
+): Command {
+  return ({ state, dispatch }) =>
+    replaceSelectedInlineRangeWithCtaButton(state, dispatch, href, fallbackLabel);
 }

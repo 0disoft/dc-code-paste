@@ -10,6 +10,7 @@ import {
 import type { CalloutKind } from "$lib/editor/callout";
 import { calloutKindFromNodeName, normalizeCalloutKind } from "$lib/editor/callout";
 import { normalizeEditableLinkHref } from "$lib/editor/link";
+import { safeCodeFontFamily, safeProseFontFamily } from "./font-stacks";
 
 export type DcExportOptions = {
   theme: DcThemeId;
@@ -17,17 +18,101 @@ export type DcExportOptions = {
   bodyFontSize: string;
   codeFontSize: string;
   showLineNumbers: boolean;
+  documentTheme?: DcDocumentTheme;
   structure?: DcExportStructure;
 };
 
 export type DcExportStructure = "modern" | "dcTable";
+export type DcDocumentTheme = "lightLecture" | "darkEditorial";
 
 const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
-const mutedTextColor = "oklch(49.23% 0.026 255.79)";
 const linkColor = "oklch(56.77% 0.154 252.96)";
 const articleBackground = "oklch(98.38% 0.01 97.33)";
 const inlineCodeBackground = "oklch(94.93% 0.016 255.07)";
 const inlineCodeText = "oklch(34.86% 0.087 278.64)";
+const quoteAccentColor = "oklch(61.2% 0.049 77.83)";
+const quoteTextColor = "oklch(37.24% 0.026 77.36)";
+const quoteMarkColor = "oklch(74.61% 0.063 77.91)";
+
+type DocumentPalette = {
+  articleBackground: string;
+  fallbackBackground: string;
+  text: string;
+  mutedText: string;
+  heading: string;
+  link: string;
+  divider: string;
+  inlineCodeBackground: string;
+  inlineCodeText: string;
+  quoteBackground: string;
+  quoteText: string;
+  quoteAccent: string;
+  quoteMark: string;
+  sectionText: string;
+  sectionAccent: string;
+  sectionBorder: string;
+  ctaBackground: string;
+  ctaBorder: string;
+  ctaText: string;
+};
+
+type RenderContext = {
+  text?: string;
+  inlineCodeBackground?: string;
+  inlineCodeText?: string;
+};
+
+function normalizeDocumentTheme(value: DcDocumentTheme | undefined): DcDocumentTheme {
+  return value === "darkEditorial" ? "darkEditorial" : "lightLecture";
+}
+
+function documentPalette(options: DcExportOptions): DocumentPalette {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      articleBackground: "oklch(7.2% 0.012 94.1)",
+      fallbackBackground: "#050505",
+      text: "oklch(94.12% 0.012 93.37)",
+      mutedText: "oklch(71.26% 0.021 84.88)",
+      heading: "oklch(98.32% 0.006 93.08)",
+      link: "oklch(83.57% 0.141 84.66)",
+      divider: "oklch(34.91% 0.033 83.29)",
+      inlineCodeBackground: "oklch(18.92% 0.02 83.18)",
+      inlineCodeText: "oklch(96.51% 0.015 91.73)",
+      quoteBackground: "oklch(9.76% 0.011 94.84)",
+      quoteText: "oklch(87.91% 0.018 86.38)",
+      quoteAccent: "oklch(84.08% 0.11 84.51)",
+      quoteMark: "oklch(80.12% 0.097 84.88)",
+      sectionText: "oklch(97.22% 0.008 92.87)",
+      sectionAccent: "oklch(88.91% 0.091 87.72)",
+      sectionBorder: "oklch(35.04% 0.033 84.06)",
+      ctaBackground: "oklch(91.44% 0.064 90.52)",
+      ctaBorder: "oklch(96.28% 0.022 90.84)",
+      ctaText: "oklch(13.77% 0.018 87.82)",
+    };
+  }
+
+  return {
+    articleBackground,
+    fallbackBackground: dcTableFallbackColors.articleBackground,
+    text: fallbackTextColor,
+    mutedText: "oklch(43.22% 0.022 255.32)",
+    heading: "oklch(24.19% 0.019 255.77)",
+    link: linkColor,
+    divider: "oklch(86.22% 0.014 255.48)",
+    inlineCodeBackground,
+    inlineCodeText,
+    quoteBackground: articleBackground,
+    quoteText: quoteTextColor,
+    quoteAccent: quoteAccentColor,
+    quoteMark: quoteMarkColor,
+    sectionText: "oklch(25.72% 0.021 255.63)",
+    sectionAccent: quoteAccentColor,
+    sectionBorder: "oklch(83.11% 0.026 78.4)",
+    ctaBackground: "oklch(93.5% 0.044 88.16)",
+    ctaBorder: "oklch(70.74% 0.08 82.27)",
+    ctaText: "oklch(26.32% 0.03 80.84)",
+  };
+}
 
 const dcTableFallbackColors = {
   articleBackground: "#fbfaf2",
@@ -35,7 +120,7 @@ const dcTableFallbackColors = {
   warningBackground: "#fff1cf",
   referenceBackground: "#e5f6ff",
   emphasisBackground: "#f4eaff",
-  quoteBackground: "#edf7ff",
+  quoteBackground: "#fbfaf2",
 };
 
 const calloutStyles: Record<
@@ -73,6 +158,80 @@ const calloutStyles: Record<
   },
 };
 
+const darkCalloutStyles: Record<
+  CalloutKind,
+  {
+    label: string;
+    background: string;
+    border: string;
+    text: string;
+  }
+> = {
+  tip: {
+    label: "TIP",
+    background: "oklch(11.88% 0.018 142.78)",
+    border: "oklch(76.13% 0.153 142.04)",
+    text: "oklch(91.89% 0.026 143.2)",
+  },
+  warning: {
+    label: "주의",
+    background: "oklch(12.26% 0.018 58.76)",
+    border: "oklch(78.46% 0.145 69.41)",
+    text: "oklch(92.96% 0.03 76.33)",
+  },
+  reference: {
+    label: "REF",
+    background: "oklch(11.62% 0.021 245.9)",
+    border: "oklch(72.52% 0.142 232.16)",
+    text: "oklch(91.87% 0.029 233.82)",
+  },
+  emphasis: {
+    label: "POINT",
+    background: "oklch(12.04% 0.022 302.17)",
+    border: "oklch(73.79% 0.151 303.45)",
+    text: "oklch(93.04% 0.029 303.2)",
+  },
+};
+
+function calloutStyleFor(kind: CalloutKind, options: DcExportOptions) {
+  return normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
+    ? darkCalloutStyles[kind]
+    : calloutStyles[kind];
+}
+
+function calloutFallbackBackground(kind: CalloutKind, options: DcExportOptions): string {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return "#0c0c0c";
+  }
+
+  return dcTableFallbackColors[`${kind}Background`];
+}
+
+const calloutInlineCodeStyles: Record<
+  CalloutKind,
+  {
+    background: string;
+    text: string;
+  }
+> = {
+  tip: {
+    background: "oklch(34.32% 0.101 145.21)",
+    text: "oklch(98.1% 0.011 143.87)",
+  },
+  warning: {
+    background: "oklch(39.74% 0.105 54.78)",
+    text: "oklch(98.68% 0.013 76.42)",
+  },
+  reference: {
+    background: "oklch(34.82% 0.092 249.7)",
+    text: "oklch(98.22% 0.011 245.12)",
+  },
+  emphasis: {
+    background: "oklch(36.58% 0.112 303.92)",
+    text: "oklch(98.29% 0.012 303.21)",
+  },
+};
+
 function childrenOf(node: JSONContent): JSONContent[] {
   return Array.isArray(node.content) ? node.content : [];
 }
@@ -83,20 +242,6 @@ function textOf(node: JSONContent): string {
   }
 
   return childrenOf(node).map(textOf).join("");
-}
-
-function safeFontFamily(value: string): string {
-  const normalized = value.trim();
-
-  if (!normalized) {
-    return "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif";
-  }
-
-  return normalized
-    .split(",")
-    .map((part) => part.trim().replace(/[;"<>]/g, ""))
-    .filter(Boolean)
-    .join(", ");
 }
 
 function safeSize(value: string, fallback: string): string {
@@ -179,12 +324,15 @@ function isOnlyHrefText(text: string, href: string): boolean {
   return normalizedText === href;
 }
 
-function renderTextStyle(mark: JSONContent): Record<string, string | undefined> {
+function renderTextStyle(
+  mark: JSONContent,
+  palette: DocumentPalette,
+): Record<string, string | undefined> {
   const attrs = mark.attrs ?? {};
   const color =
-    typeof attrs.color === "string" ? sanitizeColor(attrs.color, fallbackTextColor) : undefined;
+    typeof attrs.color === "string" ? sanitizeColor(attrs.color, palette.text) : undefined;
   const fontFamily =
-    typeof attrs.fontFamily === "string" ? safeFontFamily(attrs.fontFamily) : undefined;
+    typeof attrs.fontFamily === "string" ? safeProseFontFamily(attrs.fontFamily) : undefined;
   const fontSize = typeof attrs.fontSize === "string" ? safeSize(attrs.fontSize, "") : undefined;
 
   return {
@@ -194,7 +342,13 @@ function renderTextStyle(mark: JSONContent): Record<string, string | undefined> 
   };
 }
 
-function applyMarks(text: string, marks: readonly JSONContent[] | undefined): string {
+function applyMarks(
+  text: string,
+  marks: readonly JSONContent[] | undefined,
+  options: DcExportOptions,
+  context: RenderContext = {},
+): string {
+  const palette = documentPalette(options);
   let html = escapeHtml(text).replace(/\n/g, "<br>");
 
   for (const mark of marks ?? []) {
@@ -210,10 +364,9 @@ function applyMarks(text: string, marks: readonly JSONContent[] | undefined): st
 
     if (mark.type === "code") {
       const style = joinStyle({
-        "background-color": inlineCodeBackground,
-        color: inlineCodeText,
-        "font-family":
-          'ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace',
+        "background-color": context.inlineCodeBackground ?? palette.inlineCodeBackground,
+        color: context.inlineCodeText ?? palette.inlineCodeText,
+        "font-family": safeCodeFontFamily(),
         "font-size": "0.92em",
         padding: "1px 4px",
         "border-radius": "4px",
@@ -225,7 +378,7 @@ function applyMarks(text: string, marks: readonly JSONContent[] | undefined): st
     if (mark.type === "link") {
       const href = safeHref(mark.attrs?.href);
       const style = joinStyle({
-        color: linkColor,
+        color: palette.link,
         "font-weight": 700,
         "text-decoration": "underline",
         "text-underline-offset": "2px",
@@ -238,7 +391,7 @@ function applyMarks(text: string, marks: readonly JSONContent[] | undefined): st
     }
 
     if (mark.type === "textStyle") {
-      const style = joinStyle(renderTextStyle(mark));
+      const style = joinStyle(renderTextStyle(mark, palette));
       if (style) {
         html = `<span style="${style}">${html}</span>`;
       }
@@ -248,47 +401,65 @@ function applyMarks(text: string, marks: readonly JSONContent[] | undefined): st
   return html;
 }
 
-function renderInline(node: JSONContent): string {
+function renderInline(
+  node: JSONContent,
+  options: DcExportOptions,
+  context: RenderContext = {},
+): string {
   if (node.type === "text") {
-    return applyMarks(node.text ?? "", node.marks);
+    return applyMarks(node.text ?? "", node.marks, options, context);
   }
 
   if (node.type === "hardBreak") {
     return "<br>";
   }
 
-  return childrenOf(node).map(renderInline).join("");
+  return childrenOf(node)
+    .map((child) => renderInline(child, options, context))
+    .join("");
 }
 
-function renderInlineChildren(node: JSONContent): string {
-  return childrenOf(node).map(renderInline).join("");
+function renderInlineChildren(
+  node: JSONContent,
+  options: DcExportOptions,
+  context: RenderContext = {},
+): string {
+  return childrenOf(node)
+    .map((child) => renderInline(child, options, context))
+    .join("");
 }
 
-function renderParagraph(node: JSONContent, options: DcExportOptions): string {
+function renderParagraph(
+  node: JSONContent,
+  options: DcExportOptions,
+  context: RenderContext = {},
+): string {
+  const palette = documentPalette(options);
   const style = joinStyle({
     margin: "0 0 14px",
-    color: fallbackTextColor,
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    color: context.text ?? palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
     "line-height": 1.72,
   });
 
-  return `<p style="${style}">${renderInlineChildren(node) || "&nbsp;"}</p>`;
+  return `<p style="${style}">${renderInlineChildren(node, options, context) || "&nbsp;"}</p>`;
 }
 
 function renderHeading(node: JSONContent, options: DcExportOptions): string {
+  const palette = documentPalette(options);
   const level = safeHeadingLevel(node.attrs?.level);
   const size = level === 1 ? "24px" : level === 2 ? "20px" : "17px";
   const style = joinStyle({
     margin: "22px 0 12px",
-    color: "oklch(24.19% 0.019 255.77)",
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    color: palette.heading,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": size,
     "font-weight": 900,
     "line-height": 1.28,
   });
 
-  return `<h${level} style="${style}">${renderInlineChildren(node)}</h${level}>`;
+  return `<h${level} style="${style}">${renderInlineChildren(node, options)}</h${level}>`;
 }
 
 async function renderList(
@@ -296,12 +467,13 @@ async function renderList(
   options: DcExportOptions,
   ordered: boolean,
 ): Promise<string> {
+  const palette = documentPalette(options);
   const tag = ordered ? "ol" : "ul";
   const listStyle = joinStyle({
     margin: "0 0 14px",
     padding: "0 0 0 24px",
-    color: fallbackTextColor,
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
     "line-height": 1.7,
   });
@@ -323,7 +495,13 @@ async function renderCallout(
   explicitKind?: CalloutKind,
 ): Promise<string> {
   const kind = explicitKind ?? normalizeCalloutKind(node.attrs?.kind);
-  const palette = calloutStyles[kind];
+  const palette = calloutStyleFor(kind, options);
+  const codePalette = calloutInlineCodeStyles[kind];
+  const childContext: RenderContext = {
+    text: palette.text,
+    inlineCodeBackground: codePalette.background,
+    inlineCodeText: codePalette.text,
+  };
   const labelStyle = joinStyle({
     display: "block",
     margin: "0 0 6px",
@@ -332,14 +510,16 @@ async function renderCallout(
     "font-weight": 900,
     "letter-spacing": "0",
   });
-  const body = await Promise.all(childrenOf(node).map((child) => renderBlockAsync(child, options)));
+  const body = await Promise.all(
+    childrenOf(node).map((child) => renderBlockAsync(child, options, childContext)),
+  );
   const content = `<span style="${labelStyle}">${palette.label}</span>${body.join("")}`;
 
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body: content,
       backgroundColor: palette.background,
-      fallbackBackground: dcTableFallbackColors[`${kind}Background`],
+      fallbackBackground: calloutFallbackBackground(kind, options),
       borderColor: palette.border,
     });
   }
@@ -351,7 +531,7 @@ async function renderCallout(
     "background-color": palette.background,
     color: palette.text,
     "border-radius": "7px",
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
     "line-height": 1.68,
   });
@@ -360,6 +540,12 @@ async function renderCallout(
 }
 
 async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const palette = documentPalette(options);
+  const isDarkEditorial = normalizeDocumentTheme(options.documentTheme) === "darkEditorial";
+  const boxBackground = isDarkEditorial ? "oklch(10.35% 0.015 93.61)" : "oklch(97.5% 0.025 247.64)";
+  const boxText = isDarkEditorial ? "oklch(90.9% 0.024 237.46)" : "oklch(28.43% 0.052 249.88)";
+  const boxBorder = isDarkEditorial ? "oklch(34.06% 0.044 236.72)" : "oklch(78.06% 0.088 247.23)";
+  const boxAccent = isDarkEditorial ? "oklch(74.22% 0.14 232.34)" : "oklch(56.77% 0.154 252.96)";
   const href = safeHref(node.attrs?.href);
   const normalizedLinkHref = normalizedHref(node.attrs?.href);
   const plainBodyText = textOf(node).trim();
@@ -371,19 +557,19 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
   const wrapperStyle = joinStyle({
     margin: "0 0 16px",
     padding: "12px 14px",
-    border: "1px solid oklch(78.06% 0.088 247.23)",
-    "border-left": "4px solid oklch(56.77% 0.154 252.96)",
-    "background-color": "oklch(97.5% 0.025 247.64)",
-    color: "oklch(28.43% 0.052 249.88)",
+    border: `1px solid ${boxBorder}`,
+    "border-left": `4px solid ${boxAccent}`,
+    "background-color": boxBackground,
+    color: boxText,
     "border-radius": "7px",
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
     "line-height": 1.68,
   });
   const labelStyle = joinStyle({
     display: "block",
     margin: "0 0 6px",
-    color: "oklch(32.26% 0.07 249.42)",
+    color: isDarkEditorial ? "oklch(79.74% 0.124 233.36)" : "oklch(32.26% 0.07 249.42)",
     "font-size": "12px",
     "font-weight": 900,
     "letter-spacing": "0",
@@ -391,7 +577,7 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
   const linkStyle = joinStyle({
     display: "inline-block",
     margin: "2px 0 0",
-    color: linkColor,
+    color: palette.link,
     "font-weight": 800,
     "text-decoration": "underline",
     "text-underline-offset": "2px",
@@ -414,10 +600,10 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body: content,
-      backgroundColor: "oklch(97.5% 0.025 247.64)",
-      fallbackBackground: dcTableFallbackColors.referenceBackground,
-      border: "1px solid oklch(78.06% 0.088 247.23)",
-      borderColor: "oklch(56.77% 0.154 252.96)",
+      backgroundColor: boxBackground,
+      fallbackBackground: isDarkEditorial ? "#0b0b0b" : dcTableFallbackColors.referenceBackground,
+      border: `1px solid ${boxBorder}`,
+      borderColor: boxAccent,
     });
   }
 
@@ -440,16 +626,148 @@ async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Pro
   });
 }
 
-async function renderBlockAsync(node: JSONContent, options: DcExportOptions): Promise<string> {
+async function renderBlockquote(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const palette = documentPalette(options);
+  const quoteParagraphStyle = joinStyle({
+    margin: "0 0 8px",
+    color: palette.quoteText,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-style": "italic",
+    "line-height": 1.78,
+  });
+  const children = await Promise.all(
+    childrenOf(node).map((child) => {
+      if (child.type === "paragraph") {
+        return `<p style="${quoteParagraphStyle}">${renderInlineChildren(child, options, { text: palette.quoteText }) || "&nbsp;"}</p>`;
+      }
+
+      return renderBlockAsync(child, options, { text: palette.quoteText });
+    }),
+  );
+  const body = children.join("");
+  const quoteMarkStyle = joinStyle({
+    display: "inline-block",
+    color: palette.quoteMark,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "34px",
+    "font-weight": 900,
+    "line-height": 1,
+    "vertical-align": "top",
+    margin: "0 8px 0 0",
+  });
+  const contentStyle = joinStyle({
+    display: "inline-block",
+    width: "calc(100% - 46px)",
+    "vertical-align": "top",
+  });
+  const content = `<span style="${quoteMarkStyle}">&ldquo;</span><div style="${contentStyle}">${body}</div>`;
+
+  if (isDcTableStructure(options)) {
+    return renderDcTableBlock({
+      body: content,
+      backgroundColor: palette.quoteBackground,
+      fallbackBackground:
+        normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
+          ? palette.fallbackBackground
+          : dcTableFallbackColors.quoteBackground,
+      border: `1px solid ${palette.quoteAccent}`,
+      borderColor: palette.quoteAccent,
+      padding: "14px 16px",
+    });
+  }
+
+  const style = joinStyle({
+    margin: "0 0 18px",
+    padding: "13px 16px",
+    "border-left": `3px solid ${palette.quoteAccent}`,
+    "border-top": `1px solid ${palette.quoteAccent}`,
+    "border-bottom": `1px solid ${palette.quoteAccent}`,
+    color: palette.quoteText,
+    "background-color": "transparent",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-style": "italic",
+    "line-height": 1.78,
+  });
+  return `<blockquote style="${style}">${content}</blockquote>`;
+}
+
+async function renderSectionHeading(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const palette = documentPalette(options);
+  const content = renderInlineChildren(node, options, { text: palette.sectionText });
+  const body = `<strong style="${joinStyle({
+    color: palette.sectionText,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "20px",
+    "font-weight": 900,
+    "line-height": 1.35,
+  })}">${content || "&nbsp;"}</strong>`;
+
+  if (isDcTableStructure(options)) {
+    return renderDcTableBlock({
+      body,
+      backgroundColor: palette.articleBackground,
+      fallbackBackground: palette.fallbackBackground,
+      borderColor: palette.sectionAccent,
+      padding: "4px 0 4px 14px",
+    });
+  }
+
+  const style = joinStyle({
+    margin: "24px 0 14px",
+    padding: "4px 0 4px 14px",
+    "border-left": `4px solid ${palette.sectionAccent}`,
+    color: palette.sectionText,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "20px",
+    "font-weight": 900,
+    "line-height": 1.35,
+  });
+
+  return `<div style="${style}">${content || "&nbsp;"}</div>`;
+}
+
+function renderCtaButton(node: JSONContent, options: DcExportOptions): string {
+  const palette = documentPalette(options);
+  const href = safeHref(node.attrs?.href);
+  const label = renderInlineChildren(node, options, { text: palette.ctaText }) || "바로가기";
+
+  if (!href) {
+    return "";
+  }
+
+  const style = joinStyle({
+    display: "inline-block",
+    margin: "0 10px 16px 0",
+    padding: "11px 22px",
+    border: `1px solid ${palette.ctaBorder}`,
+    "background-color": palette.ctaBackground,
+    color: palette.ctaText,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-weight": 900,
+    "line-height": 1.2,
+    "text-decoration": "none",
+  });
+
+  return `<a href="${href}" target="_blank" rel="noopener noreferrer" style="${style}">${label}</a>`;
+}
+
+async function renderBlockAsync(
+  node: JSONContent,
+  options: DcExportOptions,
+  context: RenderContext = {},
+): Promise<string> {
   switch (node.type) {
     case "doc": {
       const children = await Promise.all(
-        childrenOf(node).map((child) => renderBlockAsync(child, options)),
+        childrenOf(node).map((child) => renderBlockAsync(child, options, context)),
       );
       return children.join("");
     }
     case "paragraph":
-      return renderParagraph(node, options);
+      return renderParagraph(node, options, context);
     case "heading":
       return renderHeading(node, options);
     case "bulletList":
@@ -465,36 +783,18 @@ async function renderBlockAsync(node: JSONContent, options: DcExportOptions): Pr
       return renderCallout(node, options, calloutKindFromNodeName(node.type));
     case "linkBox":
       return renderLinkBox(node, options);
+    case "sectionHeading":
+      return renderSectionHeading(node, options);
+    case "ctaButton":
+      return renderCtaButton(node, options);
     case "codeBlock":
       return renderCodeBlock(node, options);
-    case "blockquote": {
-      const children = await Promise.all(
-        childrenOf(node).map((child) => renderBlockAsync(child, options)),
-      );
-
-      if (isDcTableStructure(options)) {
-        return renderDcTableBlock({
-          body: children.join(""),
-          backgroundColor: "oklch(96.27% 0.036 247.39)",
-          fallbackBackground: dcTableFallbackColors.quoteBackground,
-          borderColor: "oklch(68.74% 0.127 246.28)",
-          padding: "8px 12px",
-        });
-      }
-
-      const style = joinStyle({
-        margin: "0 0 14px",
-        padding: "8px 12px",
-        "border-left": "3px solid oklch(68.74% 0.127 246.28)",
-        color: mutedTextColor,
-        "background-color": "oklch(96.27% 0.036 247.39)",
-      });
-      return `<blockquote style="${style}">${children.join("")}</blockquote>`;
-    }
+    case "blockquote":
+      return renderBlockquote(node, options);
     case "horizontalRule":
-      return `<hr style="${joinStyle({ margin: "18px 0", border: 0, "border-top": "1px solid oklch(86.22% 0.014 255.48)" })}">`;
+      return `<hr style="${joinStyle({ margin: "18px 0", border: 0, "border-top": `1px solid ${documentPalette(options).divider}` })}">`;
     default:
-      return renderInlineChildren(node);
+      return renderInlineChildren(node, options, context);
   }
 }
 
@@ -502,12 +802,13 @@ export async function exportDocumentToDcHtml(
   document: JSONContent,
   options: DcExportOptions,
 ): Promise<string> {
+  const palette = documentPalette(options);
   const body = await renderBlockAsync(document, options);
   const wrapperStyle = joinStyle({
     display: "block",
-    "background-color": articleBackground,
-    color: fallbackTextColor,
-    "font-family": safeFontFamily(options.bodyFontFamily),
+    "background-color": palette.articleBackground,
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
     "line-height": 1.7,
     padding: "18px",
@@ -518,23 +819,23 @@ export async function exportDocumentToDcHtml(
     const tableStyle = joinStyle({
       width: "100%",
       "border-collapse": "collapse",
-      "background-color": articleBackground,
-      color: fallbackTextColor,
-      "font-family": safeFontFamily(options.bodyFontFamily),
+      "background-color": palette.articleBackground,
+      color: palette.text,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": safeSize(options.bodyFontSize, "15px"),
       "line-height": 1.7,
     });
     const cellStyle = joinStyle({
       padding: "18px",
-      "background-color": articleBackground,
-      color: fallbackTextColor,
-      "font-family": safeFontFamily(options.bodyFontFamily),
+      "background-color": palette.articleBackground,
+      color: palette.text,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": safeSize(options.bodyFontSize, "15px"),
       "line-height": 1.7,
       "box-sizing": "border-box",
     });
 
-    return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${dcTableFallbackColors.articleBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
+    return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
   }
 
   return `<div style="${wrapperStyle}">${body}</div>`;

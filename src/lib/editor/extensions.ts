@@ -6,6 +6,7 @@ import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import StarterKit from "@tiptap/starter-kit";
 import { defaultLanguage } from "$lib/highlighter/catalog";
 import { calloutExtensions } from "./callout-extension";
+import { editorialExtensions } from "./editorial-extension";
 import { LinkBox } from "./link-box-extension";
 
 export function createEditorExtensions() {
@@ -22,6 +23,7 @@ export function createEditorExtensions() {
       },
     }),
     ...calloutExtensions,
+    ...editorialExtensions,
     LinkBox,
     TextStyle,
     Color,

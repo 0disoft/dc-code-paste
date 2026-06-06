@@ -11,6 +11,8 @@ const requiredManualCheckNodes = [
   "emphasisBox",
   "linkBox",
   "blockquote",
+  "sectionHeading",
+  "ctaButton",
   "bulletList",
   "orderedList",
   "horizontalRule",

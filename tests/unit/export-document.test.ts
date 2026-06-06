@@ -1,10 +1,15 @@
 import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 import { exportDocumentToDcHtml } from "../../src/lib/dc/export-document";
+import {
+  codeFallbackFonts,
+  fontFamilyOptions,
+  safeProseFontFamily,
+} from "../../src/lib/dc/font-stacks";
 
 const exportOptions = {
   theme: "github-dark",
-  bodyFontFamily: "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif",
+  bodyFontFamily: fontFamilyOptions[0].value,
   bodyFontSize: "15px",
   codeFontSize: "14px",
   showLineNumbers: false,
@@ -88,6 +93,15 @@ describe("exportDocumentToDcHtml", () => {
           ],
         },
         {
+          type: "sectionHeading",
+          content: [{ type: "text", text: "사용 방법 및 예시" }],
+        },
+        {
+          type: "ctaButton",
+          attrs: { href: "https://example.com/start" },
+          content: [{ type: "text", text: "바로가기" }],
+        },
+        {
           type: "bulletList",
           content: [
             {
@@ -139,6 +153,12 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain('href="https://example.com/reference"');
     expect(html).toContain("<blockquote");
     expect(html).toContain("인용문도 글 흐름 안에서 살아야 한다.");
+    expect(html).toContain("&ldquo;");
+    expect(html).toContain("font-style:italic");
+    expect(html).toContain("background-color:transparent");
+    expect(html).toContain("사용 방법 및 예시");
+    expect(html).toContain('href="https://example.com/start"');
+    expect(html).toContain("바로가기");
     expect(html).toContain("<ul");
     expect(html).toContain("<ol");
     expect(html).toContain("<li");
@@ -200,12 +220,51 @@ describe("exportDocumentToDcHtml", () => {
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
     expect(html).toContain(
-      '<span style="font-family:Georgia, Times New Roman, serif;font-size:18px">선택 스타일</span>',
+      `<span style="font-family:${safeProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
     );
     expect(html).toContain(
-      '<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif;font-size:15px',
+      `<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:${fontFamilyOptions[0].value};font-size:15px`,
     );
   });
+
+  it("adds viewer-safe fallback stacks to prose and code font declarations", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "폰트 없는 사람도 읽힌다.",
+              marks: [
+                {
+                  type: "textStyle",
+                  attrs: {
+                    fontFamily: "Pretendard",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "codeBlock",
+          attrs: { language: "cpp" },
+          content: [{ type: "text", text: "int main() { return 0; }" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      bodyFontFamily: "Inter",
+    });
+
+    expect(html).toContain(`font-family:${safeProseFontFamily("Inter")}`);
+    expect(html).toContain(`font-family:${safeProseFontFamily("Pretendard")}`);
+    expect(html).toContain(`font-family:${codeFallbackFonts.join(", ")}`);
+  }, 15_000);
 
   it("exports an article canvas so dark DC editor backgrounds do not swallow prose", async () => {
     const document: JSONContent = {
@@ -281,6 +340,100 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toContain("<aside");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("can export a dark editorial document theme with table fallbacks", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "heading",
+          attrs: { level: 1 },
+          content: [{ type: "text", text: "만물큐레이션" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "검은 캔버스에서 읽히는 본문" }],
+        },
+        {
+          type: "sectionHeading",
+          content: [{ type: "text", text: "사용 방법 및 예시" }],
+        },
+        {
+          type: "referenceBox",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "인라인 " },
+                { type: "text", text: "code", marks: [{ type: "code" }] },
+                { type: "text", text: " 색상도 박스에 맞춘다." },
+              ],
+            },
+          ],
+        },
+        {
+          type: "ctaButton",
+          attrs: { href: "https://example.com/archive" },
+          content: [{ type: "text", text: "아카이브 보기" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      documentTheme: "darkEditorial",
+      structure: "dcTable",
+    });
+
+    expect(html).toMatch(
+      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050505"/,
+    );
+    expect(html).toContain("background-color:oklch(7.2% 0.012 94.1)");
+    expect(html).toContain("color:oklch(94.12% 0.012 93.37)");
+    expect(html).toContain("만물큐레이션");
+    expect(html).toContain("사용 방법 및 예시");
+    expect(html).toContain("아카이브 보기");
+    expect(html).toContain('href="https://example.com/archive"');
+    expect(html).toContain('bgcolor="#0c0c0c"');
+    expect(html).toContain("background-color:oklch(34.82% 0.092 249.7)");
+    expect(html).toContain("color:oklch(98.22% 0.011 245.12)");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("keeps blockquotes visually distinct from callout boxes in DC table mode", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "blockquote",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "느린 코드는 자료 흐름에서 먼저 걸린다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('bgcolor="#fbfaf2"');
+    expect(html).toContain("&ldquo;");
+    expect(html).toContain("font-style:italic");
+    expect(html).toContain("border:1px solid oklch(61.2% 0.049 77.83)");
+    expect(html).toContain("느린 코드는 자료 흐름에서 먼저 걸린다.");
+    expect(html).not.toContain("TIP");
+    expect(html).not.toContain("주의");
+    expect(html).not.toContain("REF");
+    expect(html).not.toContain("POINT");
+    expect(html).not.toContain('bgcolor="#e5f6ff"');
   });
 
   it("exports DC paste HTML without app-owned attributes or unsafe links", async () => {

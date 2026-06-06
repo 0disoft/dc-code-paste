@@ -5,17 +5,21 @@ import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { EditorState, TextSelection } from "@tiptap/pm/state";
 import { describe, expect, it } from "vitest";
 import { calloutExtensions } from "../../src/lib/editor/callout-extension";
+import { editorialExtensions } from "../../src/lib/editor/editorial-extension";
 import { LinkBox } from "../../src/lib/editor/link-box-extension";
 import {
   replaceSelectedInlineRangeWithCallout,
   replaceSelectedInlineRangeWithCodeBlock,
+  replaceSelectedInlineRangeWithCtaButton,
   replaceSelectedInlineRangeWithLinkBox,
+  replaceSelectedInlineRangeWithSectionHeading,
 } from "../../src/lib/editor/selection-commands";
 
 const schema = getSchema([
   StarterKit.configure({ codeBlock: false }),
   CodeBlock,
   ...calloutExtensions,
+  ...editorialExtensions,
   LinkBox,
 ]);
 
@@ -201,6 +205,61 @@ describe("selection commands", () => {
     });
   });
 
+  it("turns a selected range into an editorial section heading", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("before 사용 방법 및 예시 after")]),
+    ]);
+    const state = createState(doc, 8, 18);
+    let nextDoc = state.doc;
+
+    const handled = replaceSelectedInlineRangeWithSectionHeading(state, (transaction) => {
+      nextDoc = transaction.doc;
+    });
+
+    expect(handled).toBe(true);
+    expect(nextDoc.toJSON()).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "before " }] },
+        {
+          type: "sectionHeading",
+          content: [{ type: "text", text: "사용 방법 및 예시" }],
+        },
+        { type: "paragraph", content: [{ type: "text", text: " after" }] },
+      ],
+    });
+  });
+
+  it("turns a selected range into a CTA button", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("open archive now")]),
+    ]);
+    const state = createState(doc, 6, 13);
+    let nextDoc = state.doc;
+
+    const handled = replaceSelectedInlineRangeWithCtaButton(
+      state,
+      (transaction) => {
+        nextDoc = transaction.doc;
+      },
+      "https://example.com/archive",
+    );
+
+    expect(handled).toBe(true);
+    expect(nextDoc.toJSON()).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "open " }] },
+        {
+          type: "ctaButton",
+          attrs: { href: "https://example.com/archive", variant: "primary" },
+          content: [{ type: "text", text: "archive" }],
+        },
+        { type: "paragraph", content: [{ type: "text", text: " now" }] },
+      ],
+    });
+  });
+
   it("turns a partial multi-paragraph selection into one code block", () => {
     const doc = schema.node("doc", null, [
       schema.node("paragraph", null, [schema.text("alpha beta")]),
@@ -239,6 +298,10 @@ describe("selection commands", () => {
     expect(replaceSelectedInlineRangeWithCallout(state, undefined, "warning")).toBe(false);
     expect(replaceSelectedInlineRangeWithCodeBlock(state, undefined, "cpp")).toBe(false);
     expect(replaceSelectedInlineRangeWithLinkBox(state, undefined, "https://example.com")).toBe(
+      false,
+    );
+    expect(replaceSelectedInlineRangeWithSectionHeading(state, undefined)).toBe(false);
+    expect(replaceSelectedInlineRangeWithCtaButton(state, undefined, "https://example.com")).toBe(
       false,
     );
   });
