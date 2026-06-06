@@ -6,8 +6,10 @@
     Check,
     Clipboard,
     Code2,
+    FileText,
     Heading1,
     Highlighter,
+    History,
     Italic,
     Link2,
     LinkIcon,
@@ -59,13 +61,22 @@
     selectedInlineRangeToLinkBoxCommand
   } from '$lib/editor/selection-commands';
   import {
+    appendDraftHistorySnapshot,
     clearDraftSnapshot,
+    createDraftHistorySnapshot,
     createDraftSnapshot,
+    deleteDraftHistorySnapshot,
+    maxDraftHistoryCount,
+    readDraftHistorySnapshots,
     readDraftSnapshot,
     writeDraftSnapshot,
+    type DraftHistorySnapshot,
     type DraftPreferences
   } from '$lib/editor/draft-storage';
   import { normalizeEditableLinkHref } from '$lib/editor/link';
+  import { parseMarkdownToDocument } from '$lib/editor/markdown-import';
+  import { normalizeCodeFilename } from '$lib/highlighter/code-block-metadata';
+  import { normalizeHighlightLines } from '$lib/highlighter/highlight-lines';
   import {
     createPresetSnapshot,
     deletePresetSnapshot,
@@ -90,6 +101,7 @@
     { label: 'DC 테이블', value: 'dcTable' },
     { label: '기본', value: 'modern' }
   ];
+  const draftHistoryAutoIntervalMs = 30_000;
   const documentThemes: { label: string; value: DcDocumentTheme }[] = [
     { label: '강의 라이트', value: 'lightLecture' },
     { label: '다크 에디토리얼', value: 'darkEditorial' }
@@ -112,6 +124,8 @@
   let selectionFontFamily = $state(fontFamilies[0].value);
   let selectionFontSize = $state('15px');
   let codeFontSize = $state('14px');
+  let codeLineHighlights = $state('');
+  let codeFilename = $state('');
   let showLineNumbers = $state(false);
   let documentTheme = $state<DcDocumentTheme>('lightLecture');
   let exportStructure = $state<DcExportStructure>('dcTable');
@@ -123,11 +137,18 @@
   let isLinkPanelOpen = $state(false);
   let linkDraft = $state('');
   let linkError = $state(false);
+  let isMarkdownPanelOpen = $state(false);
+  let markdownDraft = $state('');
+  let markdownImportState = $state<'idle' | 'imported' | 'error'>('idle');
   let presetName = $state('');
   let presets = $state<PresetSnapshot[]>([]);
   let presetState = $state<'idle' | 'saved' | 'error'>('idle');
+  let draftHistory = $state<DraftHistorySnapshot[]>([]);
+  let draftHistoryState = $state<'idle' | 'saved' | 'error'>('idle');
   let editorSignal = $state(0);
   let canPersistDraft = $state(false);
+  let lastDraftHistoryFingerprint = '';
+  let lastDraftHistorySavedAt = 0;
   let renderTurn = 0;
 
   const htmlSize = $derived(`${Math.max(1, Math.ceil(html.length / 1024))}KB`);
@@ -136,6 +157,10 @@
   const exportStructureLabel = $derived(exportStructures.find((item) => item.value === exportStructure)?.label ?? 'DC 테이블');
   const documentThemeLabel = $derived(documentThemes.find((item) => item.value === documentTheme)?.label ?? '강의 라이트');
   const presetStateLabel = $derived(presetState === 'saved' ? '저장됨' : presetState === 'error' ? '저장 실패' : `${presets.length}개`);
+  const draftHistoryStateLabel = $derived(
+    draftHistoryState === 'saved' ? '저장됨' : draftHistoryState === 'error' ? '저장 실패' : `${draftHistory.length}/${maxDraftHistoryCount}`
+  );
+  const markdownImportStateLabel = $derived(markdownImportState === 'imported' ? '가져옴' : markdownImportState === 'error' ? '비어 있음' : '대기');
 
   function draftStorage() {
     return typeof window === 'undefined' ? undefined : window.localStorage;
@@ -200,6 +225,21 @@
     exportStructure = preferences.structure;
   }
 
+  function firstCodeBlockLanguage(value: JSONContent): DcLanguageId | undefined {
+    if (value.type === 'codeBlock' && typeof value.attrs?.language === 'string' && isSupportedLanguage(value.attrs.language)) {
+      return value.attrs.language;
+    }
+
+    for (const child of value.content ?? []) {
+      const found = firstCodeBlockLanguage(child);
+      if (found) {
+        return found;
+      }
+    }
+
+    return undefined;
+  }
+
   function presetDateLabel(value: string) {
     const date = new Date(value);
 
@@ -215,9 +255,150 @@
     }).format(date);
   }
 
+  function countDocumentText(value: JSONContent): number {
+    const ownTextLength = typeof value.text === 'string' ? value.text.length : 0;
+    const childTextLength = value.content?.reduce((total, child) => total + countDocumentText(child), 0) ?? 0;
+
+    return ownTextLength + childTextLength;
+  }
+
+  function languageLabel(value: DcLanguageId) {
+    return supportedLanguages.find((item) => item.id === value)?.label ?? value;
+  }
+
+  function draftHistoryFingerprint(document: JSONContent, preferences: DraftPreferences) {
+    return JSON.stringify({ document, preferences });
+  }
+
+  function currentDraftHistoryFingerprint() {
+    return draftHistoryFingerprint(documentJson, currentDraftPreferences());
+  }
+
+  function draftHistorySummary(snapshot: DraftHistorySnapshot) {
+    const themeLabel = snapshot.preferences.documentTheme === 'darkEditorial' ? '다크' : '라이트';
+    const textLength = countDocumentText(snapshot.document).toLocaleString();
+
+    return `${themeLabel} · ${languageLabel(snapshot.preferences.language)} · ${textLength}자`;
+  }
+
   function refreshPresetSnapshots() {
     const storage = draftStorage();
     presets = storage ? readPresetSnapshots(storage) : [];
+  }
+
+  function refreshDraftHistorySnapshots() {
+    const storage = draftStorage();
+    draftHistory = storage ? readDraftHistorySnapshots(storage) : [];
+  }
+
+  function setDraftHistorySavedState() {
+    draftHistoryState = 'saved';
+    window.setTimeout(() => {
+      draftHistoryState = 'idle';
+    }, 1300);
+  }
+
+  function saveDraftHistorySnapshot(options: { automatic: boolean }) {
+    const storage = draftStorage();
+
+    if (!storage) {
+      draftHistoryState = 'error';
+      return false;
+    }
+
+    const preferences = currentDraftPreferences();
+    const fingerprint = draftHistoryFingerprint(documentJson, preferences);
+
+    if (fingerprint === lastDraftHistoryFingerprint) {
+      return false;
+    }
+
+    const snapshot = createDraftHistorySnapshot(documentJson, preferences);
+    const nextHistory = appendDraftHistorySnapshot(storage, snapshot);
+
+    if (nextHistory[0]?.id !== snapshot.id) {
+      draftHistoryState = 'error';
+      return false;
+    }
+
+    draftHistory = nextHistory;
+    lastDraftHistoryFingerprint = fingerprint;
+    lastDraftHistorySavedAt = Date.now();
+
+    if (!options.automatic) {
+      setDraftHistorySavedState();
+    }
+
+    return true;
+  }
+
+  function maybeSaveAutomaticDraftHistory() {
+    const now = Date.now();
+
+    if (now - lastDraftHistorySavedAt < draftHistoryAutoIntervalMs) {
+      return;
+    }
+
+    void saveDraftHistorySnapshot({ automatic: true });
+  }
+
+  function restoreDraftHistorySnapshot(snapshot: DraftHistorySnapshot) {
+    applyDraftPreferences(snapshot.preferences);
+    documentJson = structuredClone(snapshot.document);
+    editor?.commands.setContent(documentJson);
+
+    if (editor) {
+      refreshEditorState(editor);
+    }
+
+    lastDraftHistoryFingerprint = draftHistoryFingerprint(snapshot.document, snapshot.preferences);
+    lastDraftHistorySavedAt = Date.now();
+    draftHistoryState = 'idle';
+  }
+
+  function deleteDraftHistory(id: string) {
+    const storage = draftStorage();
+
+    if (!storage) {
+      draftHistoryState = 'error';
+      return;
+    }
+
+    draftHistory = deleteDraftHistorySnapshot(storage, id);
+  }
+
+  function importMarkdownDraft() {
+    if (!markdownDraft.trim()) {
+      markdownImportState = 'error';
+      return;
+    }
+
+    saveDraftHistorySnapshot({ automatic: true });
+
+    const nextDocument = parseMarkdownToDocument(markdownDraft, { defaultLanguage: language });
+    const importedLanguage = firstCodeBlockLanguage(nextDocument);
+
+    if (importedLanguage) {
+      language = importedLanguage;
+    }
+
+    documentJson = nextDocument;
+    editor?.commands.setContent(documentJson);
+
+    if (editor) {
+      refreshEditorState(editor);
+    }
+
+    markdownImportState = 'imported';
+    isMarkdownPanelOpen = false;
+    window.setTimeout(() => {
+      markdownImportState = 'idle';
+    }, 1300);
+  }
+
+  function clearMarkdownDraft() {
+    markdownDraft = '';
+    markdownImportState = 'idle';
   }
 
   function saveCurrentPreset() {
@@ -326,17 +507,34 @@
   }
 
   function applyCodeBlock() {
+    const highlightLines = normalizeHighlightLines(codeLineHighlights);
+    const filename = normalizeCodeFilename(codeFilename);
+    codeLineHighlights = highlightLines;
+    codeFilename = filename;
+
     runEditorCommand((current) => {
       if (current.isActive('codeBlock')) {
         return current.chain().focus().toggleCodeBlock({ language }).run();
       }
 
-      if (current.chain().focus().command(selectedInlineRangeToCodeBlockCommand(language)).run()) {
+      if (current.chain().focus().command(selectedInlineRangeToCodeBlockCommand(language, highlightLines, filename)).run()) {
         return true;
       }
 
-      return current.chain().focus().setCodeBlock({ language }).run();
+      return current.chain().focus().setCodeBlock({ language }).updateAttributes('codeBlock', { highlightLines, filename }).run();
     });
+  }
+
+  function applyCodeFilename() {
+    const filename = normalizeCodeFilename(codeFilename);
+    codeFilename = filename;
+    runEditorCommand((current) => current.chain().focus().updateAttributes('codeBlock', { filename }).run());
+  }
+
+  function applyCodeLineHighlights() {
+    const highlightLines = normalizeHighlightLines(codeLineHighlights);
+    codeLineHighlights = highlightLines;
+    runEditorCommand((current) => current.chain().focus().updateAttributes('codeBlock', { highlightLines }).run());
   }
 
   function retargetActiveCallout(current: Editor, kind: CalloutKind) {
@@ -577,6 +775,8 @@
     isLinkPanelOpen = false;
     linkDraft = '';
     linkError = false;
+    lastDraftHistoryFingerprint = currentDraftHistoryFingerprint();
+    lastDraftHistorySavedAt = Date.now();
   }
 
   async function copyPreview() {
@@ -612,11 +812,17 @@
     let mountedEditor: Editor | undefined;
     const savedDraft = readDraftSnapshot(window.localStorage);
     refreshPresetSnapshots();
+    refreshDraftHistorySnapshots();
 
     if (savedDraft) {
       documentJson = savedDraft.document;
       applyDraftPreferences(savedDraft.preferences);
     }
+
+    lastDraftHistoryFingerprint = draftHistory[0]
+      ? draftHistoryFingerprint(draftHistory[0].document, draftHistory[0].preferences)
+      : '';
+    lastDraftHistorySavedAt = Date.now();
 
     async function mountEditor() {
       const [{ Editor }, { createEditorExtensions }] = await Promise.all([
@@ -652,6 +858,8 @@
           if (typeof attrs.language === 'string' && isSupportedLanguage(attrs.language)) {
             language = attrs.language;
           }
+          codeLineHighlights = normalizeHighlightLines(attrs.highlightLines);
+          codeFilename = normalizeCodeFilename(attrs.filename);
           const linkAttrs = current.getAttributes('link');
           if (typeof linkAttrs.href === 'string') {
             linkDraft = linkAttrs.href;
@@ -698,6 +906,7 @@
     }
 
     writeDraftSnapshot(storage, createDraftSnapshot(documentJson, currentDraftPreferences()));
+    maybeSaveAutomaticDraftHistory();
   });
 </script>
 
@@ -743,6 +952,19 @@
       <button type="button" title="초기화" aria-label="초기화" onclick={resetDraft}>
         <RotateCcw size={17} />
         <span>초기화</span>
+      </button>
+      <button
+        class:active={isMarkdownPanelOpen}
+        type="button"
+        title="Markdown"
+        aria-label="Markdown"
+        onclick={() => {
+          isMarkdownPanelOpen = !isMarkdownPanelOpen;
+          markdownImportState = 'idle';
+        }}
+      >
+        <FileText size={17} />
+        <span>Markdown</span>
       </button>
     </div>
 
@@ -912,6 +1134,38 @@
         </select>
       </label>
       <label>
+        <span><FileText size={15} /> 파일명</span>
+        <input
+          class="code-filename-input"
+          type="text"
+          bind:value={codeFilename}
+          aria-label="코드 파일명"
+          placeholder="main.cpp"
+          onblur={applyCodeFilename}
+          onkeydown={(event) => {
+            if (event.key === 'Enter') {
+              applyCodeFilename();
+            }
+          }}
+        />
+      </label>
+      <label>
+        <span><Highlighter size={15} /> 강조줄</span>
+        <input
+          class="line-highlight-input"
+          type="text"
+          bind:value={codeLineHighlights}
+          aria-label="코드 강조 줄"
+          placeholder="2,4-6"
+          onblur={applyCodeLineHighlights}
+          onkeydown={(event) => {
+            if (event.key === 'Enter') {
+              applyCodeLineHighlights();
+            }
+          }}
+        />
+      </label>
+      <label>
         <span><Paintbrush size={15} /> 테마</span>
         <select bind:value={theme} aria-label="코드 테마">
           {#each supportedThemes as item}
@@ -981,6 +1235,30 @@
     </div>
   </section>
 
+  {#if isMarkdownPanelOpen}
+    <section class="markdown-panel" aria-label="Markdown import">
+      <textarea
+        class="markdown-input"
+        bind:value={markdownDraft}
+        aria-label="Markdown 원문"
+        spellcheck="false"
+        placeholder={`# 제목\n\n본문과 [링크](https://example.com)\n\n\`\`\`cpp\nint main() {}\n\`\`\``}
+        oninput={() => (markdownImportState = 'idle')}
+      ></textarea>
+      <div class="markdown-actions">
+        <button class="markdown-import-button" type="button" aria-label="Markdown 가져오기" onclick={importMarkdownDraft}>
+          <FileText size={16} />
+          <span>가져오기</span>
+        </button>
+        <button class="markdown-clear-button" type="button" aria-label="Markdown 비우기" onclick={clearMarkdownDraft}>
+          <Trash2 size={15} />
+          <span>비우기</span>
+        </button>
+        <span class:error={markdownImportState === 'error'} class="markdown-status">{markdownImportStateLabel}</span>
+      </div>
+    </section>
+  {/if}
+
   <section class="preset-panel" aria-label="프리셋">
     <div class="preset-save">
       <label>
@@ -1018,6 +1296,49 @@
               <small>{preset.preferences.documentTheme === 'darkEditorial' ? '다크' : '라이트'} · {presetDateLabel(preset.updatedAt)}</small>
             </button>
             <button type="button" class="preset-delete" aria-label={`${preset.name} 삭제`} title="삭제" onclick={() => deletePreset(preset.id)}>
+              <Trash2 size={15} />
+            </button>
+          </div>
+        {/each}
+      {/if}
+    </div>
+  </section>
+
+  <section class="draft-history-panel" aria-label="초안 히스토리">
+    <div class="draft-history-save">
+      <div class="draft-history-title">
+        <History size={15} />
+        <span>초안 히스토리</span>
+      </div>
+      <button
+        class="draft-history-save-button"
+        type="button"
+        aria-label="초안 스냅샷 저장"
+        onclick={() => saveDraftHistorySnapshot({ automatic: false })}
+      >
+        <Save size={16} />
+        <span>스냅샷</span>
+      </button>
+      <span class:error={draftHistoryState === 'error'} class="draft-history-count" aria-label="초안 히스토리 개수">{draftHistoryStateLabel}</span>
+    </div>
+
+    <div class="draft-history-list" aria-label="저장된 초안">
+      {#if draftHistory.length === 0}
+        <span class="draft-history-empty">초안 없음</span>
+      {:else}
+        {#each draftHistory as snapshot (snapshot.id)}
+          <div class="draft-history-item">
+            <button type="button" class="draft-history-apply" onclick={() => restoreDraftHistorySnapshot(snapshot)}>
+              <span>초안 {presetDateLabel(snapshot.updatedAt)}</span>
+              <small>{draftHistorySummary(snapshot)}</small>
+            </button>
+            <button
+              type="button"
+              class="draft-history-delete"
+              aria-label={`초안 ${presetDateLabel(snapshot.updatedAt)} 삭제`}
+              title="삭제"
+              onclick={() => deleteDraftHistory(snapshot.id)}
+            >
               <Trash2 size={15} />
             </button>
           </div>
@@ -1283,6 +1604,11 @@
     outline: none;
   }
 
+  .code-filename-input,
+  .line-highlight-input {
+    width: 150px;
+  }
+
   .link-tool {
     flex-wrap: wrap;
   }
@@ -1313,7 +1639,96 @@
     background: var(--swatch);
   }
 
-  .preset-panel {
+  .markdown-panel {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: color-mix(in oklch, var(--panel) 88%, transparent);
+  }
+
+  .markdown-input {
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: oklch(15.78% 0.014 257.58);
+    color: oklch(92.14% 0.017 247.64);
+    padding: 12px;
+    font-family:
+      Consolas,
+      D2Coding,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Noto Sans Mono CJK KR,
+      Cascadia Mono,
+      Cascadia Code,
+      JetBrains Mono,
+      Fira Code,
+      Source Code Pro,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Courier New,
+      monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    outline: none;
+  }
+
+  .markdown-input:focus {
+    border-color: var(--accent);
+  }
+
+  .markdown-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .markdown-import-button,
+  .markdown-clear-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 34px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--panel-2);
+    color: var(--text);
+    font-weight: 850;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .markdown-import-button {
+    border-color: color-mix(in oklch, var(--accent) 66%, var(--line));
+    background: color-mix(in oklch, var(--accent) 18%, var(--panel-2));
+    color: var(--accent);
+  }
+
+  .markdown-clear-button:hover {
+    color: var(--danger);
+  }
+
+  .markdown-status {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .markdown-status.error {
+    color: var(--danger);
+  }
+
+  .preset-panel,
+  .draft-history-panel {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -1325,7 +1740,8 @@
     background: color-mix(in oklch, var(--panel) 88%, transparent);
   }
 
-  .preset-save {
+  .preset-save,
+  .draft-history-save {
     display: flex;
     flex: 0 1 auto;
     flex-wrap: wrap;
@@ -1334,7 +1750,18 @@
     min-width: 0;
   }
 
-  .preset-save-button {
+  .draft-history-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 850;
+    white-space: nowrap;
+  }
+
+  .preset-save-button,
+  .draft-history-save-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1349,18 +1776,21 @@
     white-space: nowrap;
   }
 
-  .preset-count {
+  .preset-count,
+  .draft-history-count {
     color: var(--muted);
     font-size: 12px;
     font-weight: 850;
     white-space: nowrap;
   }
 
-  .preset-count.error {
+  .preset-count.error,
+  .draft-history-count.error {
     color: var(--danger);
   }
 
-  .preset-list {
+  .preset-list,
+  .draft-history-list {
     display: flex;
     flex: 1 1 360px;
     gap: 8px;
@@ -1370,7 +1800,8 @@
     scrollbar-gutter: stable;
   }
 
-  .preset-empty {
+  .preset-empty,
+  .draft-history-empty {
     display: inline-flex;
     align-items: center;
     min-height: 34px;
@@ -1379,7 +1810,8 @@
     font-weight: 800;
   }
 
-  .preset-item {
+  .preset-item,
+  .draft-history-item {
     display: inline-flex;
     align-items: stretch;
     flex: 0 0 auto;
@@ -1390,7 +1822,8 @@
     background: var(--panel-2);
   }
 
-  .preset-apply {
+  .preset-apply,
+  .draft-history-apply {
     display: grid;
     gap: 2px;
     min-width: 150px;
@@ -1405,24 +1838,29 @@
   }
 
   .preset-apply span,
-  .preset-apply small {
+  .preset-apply small,
+  .draft-history-apply span,
+  .draft-history-apply small {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .preset-apply span {
+  .preset-apply span,
+  .draft-history-apply span {
     font-size: 13px;
     font-weight: 900;
   }
 
-  .preset-apply small {
+  .preset-apply small,
+  .draft-history-apply small {
     color: var(--muted);
     font-size: 11px;
     font-weight: 750;
   }
 
-  .preset-delete {
+  .preset-delete,
+  .draft-history-delete {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1433,7 +1871,8 @@
     cursor: pointer;
   }
 
-  .preset-delete:hover {
+  .preset-delete:hover,
+  .draft-history-delete:hover {
     color: var(--danger);
   }
 
@@ -1896,11 +2335,13 @@
       padding-bottom: 0;
     }
 
-    .preset-save {
+    .preset-save,
+    .draft-history-save {
       width: 100%;
     }
 
-    .preset-list {
+    .preset-list,
+    .draft-history-list {
       flex-basis: 100%;
     }
 

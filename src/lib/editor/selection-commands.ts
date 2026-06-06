@@ -104,6 +104,8 @@ export function replaceSelectedInlineRangeWithCodeBlock(
   state: EditorState,
   dispatch: Dispatch | undefined,
   language: string,
+  highlightLines = "",
+  filename = "",
 ): boolean {
   const codeBlockType = state.schema.nodes.codeBlock;
   const text = selectedInlineText(state);
@@ -115,7 +117,7 @@ export function replaceSelectedInlineRangeWithCodeBlock(
   return dispatchReplacement(
     state,
     dispatch,
-    codeBlockType.create({ language }, state.schema.text(text)),
+    codeBlockType.create({ language, highlightLines, filename }, state.schema.text(text)),
   );
 }
 
@@ -192,9 +194,13 @@ export function selectedInlineRangeToCalloutCommand(kind: CalloutKind): Command 
   return ({ state, dispatch }) => replaceSelectedInlineRangeWithCallout(state, dispatch, kind);
 }
 
-export function selectedInlineRangeToCodeBlockCommand(language: string): Command {
+export function selectedInlineRangeToCodeBlockCommand(
+  language: string,
+  highlightLines = "",
+  filename = "",
+): Command {
   return ({ state, dispatch }) =>
-    replaceSelectedInlineRangeWithCodeBlock(state, dispatch, language);
+    replaceSelectedInlineRangeWithCodeBlock(state, dispatch, language, highlightLines, filename);
 }
 
 export function selectedInlineRangeToLinkBoxCommand(href: string): Command {

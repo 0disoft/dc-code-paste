@@ -525,4 +525,54 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toContain(">https://example.com/reference</");
     expect(html.match(/LINK/g)).toHaveLength(1);
   });
+
+  it("exports code block line highlights from code block attrs", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "javascript", highlightLines: "2,4-5" },
+          content: [
+            {
+              type: "text",
+              text: "const a = 1;\nconst b = 2;\nconst c = 3;\nconst d = 4;\nconst e = 5;",
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      showLineNumbers: true,
+    });
+
+    expect(html).toContain(">2</span>");
+    expect(html).toContain(">5</span>");
+    expect(html).toContain(">b</span>");
+    expect(html).toContain(">d</span>");
+    expect(html).toContain(">e</span>");
+    expect(html).toContain("background-color:oklch(31.14% 0.076 83.12 / 0.82)");
+    expect(html).toContain("border-left:4px solid oklch(79.43% 0.129 84.28)");
+  }, 15_000);
+
+  it("exports code block filenames from code block attrs", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "typescript", filename: "vite.config.ts" },
+          content: [{ type: "text", text: "export default {};" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain("vite.config.ts");
+    expect(html).toContain("border-bottom:1px solid oklch(");
+    expect(html).toContain("export");
+  }, 15_000);
 });

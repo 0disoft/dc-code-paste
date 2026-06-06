@@ -5,7 +5,8 @@ import {
   type ThemeInput,
 } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
-import { renderDcHtml } from "$lib/dc/render-dc-html";
+import { renderDcHtml, type DcLineDecoration } from "$lib/dc/render-dc-html";
+import { highlightedLineIndexes } from "$lib/highlighter/highlight-lines";
 import { shikiLanguageFor, type DcLanguageId, type DcThemeId } from "./catalog";
 
 const languageInputs: Record<DcLanguageId, LanguageInput> = {
@@ -24,6 +25,8 @@ const languageInputs: Record<DcLanguageId, LanguageInput> = {
   unocss: () => import("@shikijs/langs/html").then((module) => module.default),
   php: () => import("@shikijs/langs/php").then((module) => module.default),
   json: () => import("@shikijs/langs/json").then((module) => module.default),
+  diff: () => import("@shikijs/langs/diff").then((module) => module.default),
+  patch: () => import("@shikijs/langs/diff").then((module) => module.default),
   bash: () => import("@shikijs/langs/bash").then((module) => module.default),
   python: () => import("@shikijs/langs/python").then((module) => module.default),
   java: () => import("@shikijs/langs/java").then((module) => module.default),
@@ -145,28 +148,154 @@ export type HighlightOptions = {
   theme: DcThemeId;
   showBackground: boolean;
   showLineNumbers: boolean;
+  filename?: string;
   fontSize?: string;
+  highlightLines?: string;
 };
+
+function isLightTheme(theme: DcThemeId) {
+  return (
+    theme.includes("light") ||
+    theme.includes("latte") ||
+    theme.includes("dawn") ||
+    theme.includes("lotus")
+  );
+}
+
+function diffLineDecorations(code: string, theme: DcThemeId) {
+  const light = isLightTheme(theme);
+  const palette = light
+    ? {
+        additionBackground: "oklch(93.52% 0.05 145.61 / 0.72)",
+        additionForeground: "oklch(36.62% 0.116 145.55)",
+        additionBorder: "oklch(61.08% 0.148 145.6)",
+        deletionBackground: "oklch(93.29% 0.052 24.96 / 0.78)",
+        deletionForeground: "oklch(40.87% 0.133 25.14)",
+        deletionBorder: "oklch(62.14% 0.173 26.28)",
+        hunkBackground: "oklch(92.31% 0.039 255.19 / 0.78)",
+        hunkForeground: "oklch(39.24% 0.095 256.91)",
+        hunkBorder: "oklch(61.12% 0.13 254.74)",
+      }
+    : {
+        additionBackground: "oklch(24.12% 0.055 145.21 / 0.86)",
+        additionForeground: "oklch(86.72% 0.112 144.92)",
+        additionBorder: "oklch(71.44% 0.151 145.1)",
+        deletionBackground: "oklch(23.68% 0.056 25.43 / 0.88)",
+        deletionForeground: "oklch(85.14% 0.108 25.75)",
+        deletionBorder: "oklch(68.76% 0.166 25.64)",
+        hunkBackground: "oklch(24.92% 0.045 257.32 / 0.84)",
+        hunkForeground: "oklch(84.11% 0.09 254.12)",
+        hunkBorder: "oklch(66.24% 0.136 253.1)",
+      };
+
+  return code.split("\n").map((line) => {
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      return {
+        background: palette.additionBackground,
+        foreground: palette.additionForeground,
+        borderColor: palette.additionBorder,
+      };
+    }
+
+    if (line.startsWith("-") && !line.startsWith("---")) {
+      return {
+        background: palette.deletionBackground,
+        foreground: palette.deletionForeground,
+        borderColor: palette.deletionBorder,
+      };
+    }
+
+    if (line.startsWith("@@")) {
+      return {
+        background: palette.hunkBackground,
+        foreground: palette.hunkForeground,
+        borderColor: palette.hunkBorder,
+      };
+    }
+
+    return undefined;
+  });
+}
+
+function highlightedLineDecorations(
+  code: string,
+  theme: DcThemeId,
+  highlightLines: string | undefined,
+) {
+  const lines = code.split("\n");
+  const lineIndexes = highlightedLineIndexes(highlightLines, lines.length);
+
+  if (lineIndexes.size === 0) {
+    return undefined;
+  }
+
+  const light = isLightTheme(theme);
+  const palette = light
+    ? {
+        background: "oklch(95.4% 0.072 84.61 / 0.82)",
+        border: "oklch(73.05% 0.141 83.41)",
+      }
+    : {
+        background: "oklch(31.14% 0.076 83.12 / 0.82)",
+        border: "oklch(79.43% 0.129 84.28)",
+      };
+
+  return lines.map((_, index) =>
+    lineIndexes.has(index)
+      ? {
+          background: palette.background,
+          borderColor: palette.border,
+        }
+      : undefined,
+  );
+}
+
+function mergeLineDecorations(
+  primary: readonly (DcLineDecoration | undefined)[] | undefined,
+  secondary: readonly (DcLineDecoration | undefined)[] | undefined,
+) {
+  if (!primary) {
+    return secondary;
+  }
+
+  if (!secondary) {
+    return primary;
+  }
+
+  return Array.from({ length: Math.max(primary.length, secondary.length) }, (_, index) => {
+    return primary[index] ?? secondary[index];
+  });
+}
 
 export async function highlightForDcHtml(code: string, options: HighlightOptions): Promise<string> {
   const highlighter = await getHighlighter();
   const shikiLanguage = shikiLanguageFor(options.language);
+  const sourceCode = code || " ";
   await Promise.all([
     loadLanguage(highlighter, options.language),
     loadTheme(highlighter, options.theme),
   ]);
 
-  const highlighted = highlighter.codeToTokens(code || " ", {
+  const highlighted = highlighter.codeToTokens(sourceCode, {
     lang: shikiLanguage,
     theme: options.theme,
   });
+  const diffDecorations =
+    shikiLanguage === "diff" ? diffLineDecorations(sourceCode, options.theme) : undefined;
+  const lineHighlights = highlightedLineDecorations(
+    sourceCode,
+    options.theme,
+    options.highlightLines,
+  );
 
   return renderDcHtml({
     lines: highlighted.tokens,
     background: highlighted.bg ?? "oklch(18.22% 0.017 258.21)",
     foreground: highlighted.fg ?? "oklch(83.86% 0.011 258.34)",
+    filename: options.filename,
     fontSize: options.fontSize,
     showBackground: options.showBackground,
     showLineNumbers: options.showLineNumbers,
+    lineDecorations: mergeLineDecorations(diffDecorations, lineHighlights),
   });
 }

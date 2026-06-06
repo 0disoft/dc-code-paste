@@ -8,6 +8,8 @@ import {
 } from "$lib/highlighter/catalog";
 
 export const draftStorageKey = "dc-code-paste:draft:v1";
+export const draftHistoryStorageKey = "dc-code-paste:draft-history:v1";
+export const maxDraftHistoryCount = 10;
 
 export type DraftPreferences = {
   language: DcLanguageId;
@@ -27,6 +29,11 @@ export type DraftSnapshot = {
   updatedAt: string;
   document: JSONContent;
   preferences: DraftPreferences;
+};
+
+export type DraftHistorySnapshot = DraftSnapshot & {
+  id: string;
+  createdAt: string;
 };
 
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -122,6 +129,59 @@ function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined
   };
 }
 
+function createSnapshotId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `draft_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  if (value.version !== 1 || typeof value.updatedAt !== "string") {
+    return undefined;
+  }
+
+  if (!isJsonContent(value.document)) {
+    return undefined;
+  }
+
+  const preferences = normalizeDraftPreferences(value.preferences);
+
+  if (!preferences) {
+    return undefined;
+  }
+
+  return {
+    version: 1,
+    updatedAt: value.updatedAt,
+    document: value.document,
+    preferences,
+  };
+}
+
+function normalizeDraftHistorySnapshot(value: unknown): DraftHistorySnapshot | undefined {
+  if (!isRecord(value) || typeof value.id !== "string" || typeof value.createdAt !== "string") {
+    return undefined;
+  }
+
+  const snapshot = normalizeDraftSnapshot(value);
+
+  if (!snapshot) {
+    return undefined;
+  }
+
+  return {
+    ...snapshot,
+    id: value.id,
+    createdAt: value.createdAt,
+  };
+}
+
 export function createDraftSnapshot(
   document: JSONContent,
   preferences: DraftPreferences,
@@ -129,6 +189,22 @@ export function createDraftSnapshot(
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
+    document,
+    preferences,
+  };
+}
+
+export function createDraftHistorySnapshot(
+  document: JSONContent,
+  preferences: DraftPreferences,
+): DraftHistorySnapshot {
+  const timestamp = new Date().toISOString();
+
+  return {
+    version: 1,
+    id: createSnapshotId(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
     document,
     preferences,
   };
@@ -143,30 +219,26 @@ export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
     return undefined;
   }
 
-  if (!isRecord(parsed)) {
-    return undefined;
+  return normalizeDraftSnapshot(parsed);
+}
+
+export function parseDraftHistorySnapshots(value: string): DraftHistorySnapshot[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    return [];
   }
 
-  if (parsed.version !== 1 || typeof parsed.updatedAt !== "string") {
-    return undefined;
+  if (!Array.isArray(parsed)) {
+    return [];
   }
 
-  if (!isJsonContent(parsed.document)) {
-    return undefined;
-  }
-
-  const preferences = normalizeDraftPreferences(parsed.preferences);
-
-  if (!preferences) {
-    return undefined;
-  }
-
-  return {
-    version: 1,
-    updatedAt: parsed.updatedAt,
-    document: parsed.document,
-    preferences,
-  };
+  return parsed
+    .map((item) => normalizeDraftHistorySnapshot(item))
+    .filter((item): item is DraftHistorySnapshot => Boolean(item))
+    .slice(0, maxDraftHistoryCount);
 }
 
 export function readDraftSnapshot(storage: DraftStorage): DraftSnapshot | undefined {
@@ -175,6 +247,15 @@ export function readDraftSnapshot(storage: DraftStorage): DraftSnapshot | undefi
     return stored ? parseDraftSnapshot(stored) : undefined;
   } catch {
     return undefined;
+  }
+}
+
+export function readDraftHistorySnapshots(storage: DraftStorage): DraftHistorySnapshot[] {
+  try {
+    const stored = storage.getItem(draftHistoryStorageKey);
+    return stored ? parseDraftHistorySnapshots(stored) : [];
+  } catch {
+    return [];
   }
 }
 
@@ -187,9 +268,56 @@ export function writeDraftSnapshot(storage: DraftStorage, snapshot: DraftSnapsho
   }
 }
 
+export function writeDraftHistorySnapshots(
+  storage: DraftStorage,
+  snapshots: DraftHistorySnapshot[],
+): boolean {
+  try {
+    storage.setItem(
+      draftHistoryStorageKey,
+      JSON.stringify(snapshots.slice(0, maxDraftHistoryCount)),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function appendDraftHistorySnapshot(
+  storage: DraftStorage,
+  snapshot: DraftHistorySnapshot,
+): DraftHistorySnapshot[] {
+  const current = readDraftHistorySnapshots(storage);
+  const next = [snapshot, ...current.filter((item) => item.id !== snapshot.id)].slice(
+    0,
+    maxDraftHistoryCount,
+  );
+
+  return writeDraftHistorySnapshots(storage, next) ? next : current;
+}
+
+export function deleteDraftHistorySnapshot(
+  storage: DraftStorage,
+  id: string,
+): DraftHistorySnapshot[] {
+  const current = readDraftHistorySnapshots(storage);
+  const next = current.filter((item) => item.id !== id);
+
+  return writeDraftHistorySnapshots(storage, next) ? next : current;
+}
+
 export function clearDraftSnapshot(storage: DraftStorage): boolean {
   try {
     storage.removeItem(draftStorageKey);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearDraftHistorySnapshots(storage: DraftStorage): boolean {
+  try {
+    storage.removeItem(draftHistoryStorageKey);
     return true;
   } catch {
     return false;

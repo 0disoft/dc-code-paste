@@ -8,13 +8,41 @@ import { defaultLanguage } from "$lib/highlighter/catalog";
 import { calloutExtensions } from "./callout-extension";
 import { editorialExtensions } from "./editorial-extension";
 import { LinkBox } from "./link-box-extension";
+import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
+import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+
+const DcCodeBlock = CodeBlock.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      highlightLines: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-highlight-lines") ?? "",
+        renderHTML: (attributes) => {
+          const highlightLines = normalizeHighlightLines(attributes.highlightLines);
+
+          return highlightLines ? { "data-highlight-lines": highlightLines } : {};
+        },
+      },
+      filename: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-filename") ?? "",
+        renderHTML: (attributes) => {
+          const filename = normalizeCodeFilename(attributes.filename);
+
+          return filename ? { "data-filename": filename } : {};
+        },
+      },
+    };
+  },
+});
 
 export function createEditorExtensions() {
   return [
     StarterKit.configure({
       codeBlock: false,
     }),
-    CodeBlock.configure({
+    DcCodeBlock.configure({
       defaultLanguage,
       enableTabIndentation: true,
       tabSize: 4,

@@ -60,4 +60,50 @@ describe("renderDcHtml", () => {
     expect(html).toContain("margin:0 0 16px");
     expect(html).not.toContain("margin:0;");
   });
+
+  it("renders optional line decorations as inline styles", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      showBackground: true,
+      showLineNumbers: true,
+      lines: [[{ content: "-old" }], [{ content: "+new" }]],
+      lineDecorations: [
+        {
+          background: "oklch(24% 0.05 25 / 0.8)",
+          foreground: "oklch(85% 0.1 25)",
+          borderColor: "oklch(68% 0.16 25)",
+        },
+        {
+          background: "oklch(24% 0.05 145 / 0.8)",
+          foreground: "oklch(86% 0.1 145)",
+          borderColor: "oklch(70% 0.15 145)",
+        },
+      ],
+    });
+
+    expect(html).toContain("background-color:oklch(24% 0.05 25 / 0.8)");
+    expect(html).toContain("background-color:oklch(24% 0.05 145 / 0.8)");
+    expect(html).toContain("border-left:4px solid oklch(68% 0.16 25)");
+    expect(html).toContain("border-left:4px solid oklch(70% 0.15 145)");
+    expect(html).toContain("-old");
+    expect(html).toContain("+new");
+  });
+
+  it("renders an optional escaped filename header above the code block", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      filename: "main<unsafe>.cpp",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [[{ content: "int main() { return 0; }" }]],
+    });
+
+    expect(html).toContain("<div style=");
+    expect(html).toContain("main&lt;unsafe&gt;.cpp");
+    expect(html).toContain("border-bottom:1px solid oklch(");
+    expect(html).toContain("<pre");
+    expect(html).toContain("margin:0");
+  });
 });

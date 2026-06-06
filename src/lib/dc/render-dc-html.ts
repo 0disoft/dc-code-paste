@@ -12,9 +12,17 @@ export type DcRenderInput = {
   lines: readonly (readonly DcToken[])[];
   background: string;
   foreground: string;
+  filename?: string;
   fontSize?: string;
   showBackground: boolean;
   showLineNumbers: boolean;
+  lineDecorations?: readonly (DcLineDecoration | undefined)[];
+};
+
+export type DcLineDecoration = {
+  background?: string;
+  foreground?: string;
+  borderColor?: string;
 };
 
 const fallbackBackground = "oklch(18.22% 0.017 258.21)";
@@ -66,13 +74,15 @@ function renderLineNumber(index: number, foreground: string, width: string): str
 export function renderDcHtml(input: DcRenderInput): string {
   const background = sanitizeColor(input.background, fallbackBackground);
   const foreground = sanitizeColor(input.foreground, fallbackForeground);
+  const filename = input.filename?.trim();
+  const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
   const preStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
     color: foreground,
     "font-family": safeCodeFontFamily(),
     "font-size": input.fontSize ?? "14px",
     "line-height": "1.58",
-    margin: "0 0 16px",
+    margin: filename ? 0 : "0 0 16px",
     padding: input.showBackground ? "14px 16px" : 0,
     "white-space": "pre-wrap",
     "word-break": "normal",
@@ -82,12 +92,69 @@ export function renderDcHtml(input: DcRenderInput): string {
 
   const lineNumberWidth = `${Math.max(2, String(input.lines.length).length)}ch`;
   const renderedLines = input.lines.map((line, index) => {
+    const decoration = input.lineDecorations?.[index];
+    const lineForeground = sanitizeColor(decoration?.foreground, foreground);
     const prefix = input.showLineNumbers
-      ? renderLineNumber(index, foreground, lineNumberWidth)
+      ? renderLineNumber(index, lineForeground, lineNumberWidth)
       : "";
-    const body = line.map((token) => renderToken(token, foreground)).join("");
-    return `${prefix}${body || "&nbsp;"}`;
+    const body = line.map((token) => renderToken(token, lineForeground)).join("");
+    const content = `${prefix}${body || "&nbsp;"}`;
+
+    if (!decoration) {
+      if (!hasDecorations) {
+        return content;
+      }
+
+      const neutralLineStyle = joinStyle({
+        display: "block",
+        margin: input.showBackground ? "0 -16px" : undefined,
+        padding: input.showBackground ? "0 16px" : undefined,
+        "box-sizing": "border-box",
+      });
+
+      return `<span style="${neutralLineStyle}">${content}</span>`;
+    }
+
+    const lineStyle = joinStyle({
+      display: "block",
+      margin: input.showBackground ? "0 -16px" : undefined,
+      padding: input.showBackground ? "0 16px 0 12px" : "0 0 0 8px",
+      "background-color": sanitizeColor(decoration.background, "transparent"),
+      color: lineForeground,
+      "border-left": `4px solid ${sanitizeColor(decoration.borderColor, lineForeground)}`,
+      "box-sizing": "border-box",
+    });
+
+    return `<span style="${lineStyle}">${content}</span>`;
   });
 
-  return `<pre style="${preStyle}"><code>${renderedLines.join("\n")}</code></pre>`;
+  const code = `<pre style="${preStyle}"><code>${renderedLines.join("\n")}</code></pre>`;
+
+  if (!filename) {
+    return code;
+  }
+
+  const wrapperStyle = joinStyle({
+    margin: "0 0 16px",
+    "border-radius": "7px",
+    overflow: "hidden",
+    "background-color": input.showBackground ? background : undefined,
+  });
+  const headerStyle = joinStyle({
+    display: "block",
+    "background-color": "oklch(20.16% 0.018 257.49)",
+    color: "oklch(89.72% 0.019 247.91)",
+    "font-family": safeCodeFontFamily(),
+    "font-size": "12px",
+    "font-weight": 800,
+    "line-height": 1.2,
+    padding: "8px 12px",
+    "border-bottom": "1px solid oklch(32.15% 0.026 257.34)",
+    "box-sizing": "border-box",
+    "white-space": "nowrap",
+    overflow: "hidden",
+    "text-overflow": "ellipsis",
+  });
+
+  return `<div style="${wrapperStyle}"><div style="${headerStyle}">${escapeHtml(filename)}</div>${code}</div>`;
 }

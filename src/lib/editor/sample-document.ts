@@ -132,7 +132,7 @@ export const sampleDocument: JSONContent = {
     },
     {
       type: "codeBlock",
-      attrs: { language: defaultLanguage },
+      attrs: { language: defaultLanguage, highlightLines: "5-6", filename: "main.cpp" },
       content: [
         {
           type: "text",

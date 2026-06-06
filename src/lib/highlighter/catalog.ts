@@ -20,6 +20,8 @@ export const supportedLanguages = [
   { id: "unocss", label: "UnoCSS", shikiLanguage: "html" },
   { id: "php", label: "PHP" },
   { id: "json", label: "JSON" },
+  { id: "diff", label: "Diff" },
+  { id: "patch", label: "Patch", shikiLanguage: "diff" },
   { id: "bash", label: "Bash" },
   { id: "python", label: "Python" },
   { id: "java", label: "Java" },

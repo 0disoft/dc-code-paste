@@ -26,6 +26,16 @@ const requestedLanguageSamples = [
     token: "i-carbon-send",
   },
   { language: "php", code: "<?php echo strlen('dc');", token: "strlen" },
+  {
+    language: "diff",
+    code: "-const oldValue = 1;\n+const newValue = 2;",
+    token: "newValue",
+  },
+  {
+    language: "patch",
+    code: "@@ -1 +1 @@\n-old\n+new",
+    token: "new",
+  },
   { language: "csharp", code: "public class App { static void Main() {} }", token: "class" },
   { language: "haskell", code: 'main = putStrLn "dc"', token: "putStrLn" },
   { language: "scala", code: 'object Main extends App { println("dc") }', token: "object" },
@@ -91,4 +101,51 @@ describe("highlightForDcHtml", () => {
       expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     }
   }, 60_000);
+
+  it("adds diff line colors for patch-style blocks", async () => {
+    const html = await highlightForDcHtml("@@ -1 +1 @@\n-old value\n+new value", {
+      language: "diff",
+      theme: "github-dark",
+      showBackground: true,
+      showLineNumbers: false,
+    });
+
+    expect(html).toContain("old value");
+    expect(html).toContain("new value");
+    expect(html).toContain("border-left:4px solid");
+    expect(html).toContain("oklch(23.68% 0.056 25.43 / 0.88)");
+    expect(html).toContain("oklch(24.12% 0.055 145.21 / 0.86)");
+    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  }, 15_000);
+
+  it("adds manual line highlight colors to selected code lines", async () => {
+    const html = await highlightForDcHtml("const a = 1;\nconst b = 2;\nconst c = 3;", {
+      language: "typescript",
+      theme: "github-dark",
+      showBackground: true,
+      showLineNumbers: true,
+      highlightLines: "2",
+    });
+
+    expect(html).toContain(">2</span>");
+    expect(html).toContain(">b</span>");
+    expect(html).toContain("background-color:oklch(31.14% 0.076 83.12 / 0.82)");
+    expect(html).toContain("border-left:4px solid oklch(79.43% 0.129 84.28)");
+    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  }, 15_000);
+
+  it("renders a filename header for code blocks", async () => {
+    const html = await highlightForDcHtml("export const value = 1;", {
+      language: "typescript",
+      theme: "github-dark",
+      showBackground: true,
+      showLineNumbers: false,
+      filename: "app.ts",
+    });
+
+    expect(html).toContain("app.ts");
+    expect(html).toContain("border-bottom:1px solid oklch(");
+    expect(html).toContain("<pre");
+    expect(html).toContain("export");
+  }, 15_000);
 });

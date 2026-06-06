@@ -11,6 +11,8 @@ import type { CalloutKind } from "$lib/editor/callout";
 import { calloutKindFromNodeName, normalizeCalloutKind } from "$lib/editor/callout";
 import { normalizeEditableLinkHref } from "$lib/editor/link";
 import { safeCodeFontFamily, safeProseFontFamily } from "./font-stacks";
+import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
+import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 
 export type DcExportOptions = {
   theme: DcThemeId;
@@ -616,13 +618,17 @@ async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Pro
     typeof node.attrs?.language === "string" && isSupportedLanguage(node.attrs.language)
       ? node.attrs.language
       : defaultLanguage;
+  const highlightLines = normalizeHighlightLines(node.attrs?.highlightLines);
+  const filename = normalizeCodeFilename(node.attrs?.filename);
 
   return highlightForDcHtml(textOf(node), {
     language,
     theme: options.theme || defaultTheme,
     showBackground: true,
     showLineNumbers: options.showLineNumbers,
+    filename,
     fontSize: safeSize(options.codeFontSize, "14px"),
+    highlightLines,
   });
 }
 

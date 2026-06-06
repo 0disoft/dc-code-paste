@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { sampleDocument } from "../../src/lib/editor/sample-document";
 import {
+  appendDraftHistorySnapshot,
+  clearDraftHistorySnapshots,
   clearDraftSnapshot,
+  createDraftHistorySnapshot,
   createDraftSnapshot,
+  deleteDraftHistorySnapshot,
+  draftHistoryStorageKey,
   draftStorageKey,
+  maxDraftHistoryCount,
+  parseDraftHistorySnapshots,
   parseDraftSnapshot,
+  readDraftHistorySnapshots,
   readDraftSnapshot,
+  writeDraftHistorySnapshots,
   writeDraftSnapshot,
   type DraftPreferences,
 } from "../../src/lib/editor/draft-storage";
@@ -114,5 +123,66 @@ describe("draft storage", () => {
     expect(readDraftSnapshot(throwingStorage)).toBeUndefined();
     expect(writeDraftSnapshot(throwingStorage, snapshot)).toBe(false);
     expect(clearDraftSnapshot(throwingStorage)).toBe(false);
+  });
+
+  it("round-trips validated draft history snapshots", () => {
+    const storage = new MemoryStorage();
+    const snapshot = createDraftHistorySnapshot(sampleDocument, preferences);
+
+    expect(writeDraftHistorySnapshots(storage, [snapshot])).toBe(true);
+
+    const restored = readDraftHistorySnapshots(storage);
+    expect(restored).toHaveLength(1);
+    expect(restored[0]).toEqual(snapshot);
+
+    expect(clearDraftHistorySnapshots(storage)).toBe(true);
+    expect(storage.getItem(draftHistoryStorageKey)).toBeNull();
+  });
+
+  it("filters malformed draft history payloads and limits the list", () => {
+    const validSnapshots = Array.from({ length: maxDraftHistoryCount + 3 }, () =>
+      createDraftHistorySnapshot(sampleDocument, preferences),
+    );
+    const malformedSnapshot = {
+      ...validSnapshots[0],
+      id: 123,
+    };
+
+    const restored = parseDraftHistorySnapshots(
+      JSON.stringify([malformedSnapshot, ...validSnapshots]),
+    );
+
+    expect(restored).toHaveLength(maxDraftHistoryCount);
+    expect(restored[0]?.id).toBe(validSnapshots[0]?.id);
+    expect(parseDraftHistorySnapshots("{")).toEqual([]);
+    expect(parseDraftHistorySnapshots(JSON.stringify({ items: validSnapshots }))).toEqual([]);
+  });
+
+  it("appends and deletes draft history snapshots", () => {
+    const storage = new MemoryStorage();
+    const first = createDraftHistorySnapshot(sampleDocument, preferences);
+    const second = createDraftHistorySnapshot(sampleDocument, {
+      ...preferences,
+      language: "typescript",
+    });
+
+    expect(appendDraftHistorySnapshot(storage, first)).toHaveLength(1);
+    expect(appendDraftHistorySnapshot(storage, second).map((item) => item.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+    expect(deleteDraftHistorySnapshot(storage, second.id).map((item) => item.id)).toEqual([
+      first.id,
+    ]);
+  });
+
+  it("treats draft history storage failures as non-fatal", () => {
+    const snapshot = createDraftHistorySnapshot(sampleDocument, preferences);
+
+    expect(readDraftHistorySnapshots(throwingStorage)).toEqual([]);
+    expect(writeDraftHistorySnapshots(throwingStorage, [snapshot])).toBe(false);
+    expect(appendDraftHistorySnapshot(throwingStorage, snapshot)).toEqual([]);
+    expect(deleteDraftHistorySnapshot(throwingStorage, snapshot.id)).toEqual([]);
+    expect(clearDraftHistorySnapshots(throwingStorage)).toBe(false);
   });
 });
