@@ -1,9 +1,30 @@
 import { describe, expect, it } from "vitest";
-import type { DcLanguageId } from "../../src/lib/highlighter/catalog";
+import type { DcLanguageId, DcThemeId } from "../../src/lib/highlighter/catalog";
 import { highlightForDcHtml } from "../../src/lib/highlighter/shiki-client";
 
 const requestedLanguageSamples = [
   { language: "c", code: "#include <stdio.h>\nint main(void) { return 0; }", token: "stdio" },
+  {
+    language: "jsx",
+    code: 'export function App() { return <main className="p-4">DC</main>; }',
+    token: "className",
+  },
+  {
+    language: "tsx",
+    code: "type Props = { title: string };\nexport function App(props: Props) { return <h1>{props.title}</h1>; }",
+    token: "Props",
+  },
+  { language: "astro", code: "---\nconst title = 'DC';\n---\n<h1>{title}</h1>", token: "title" },
+  {
+    language: "tailwind",
+    code: '<article class="mx-auto grid max-w-2xl gap-4 text-slate-100">DC</article>',
+    token: "max-w-2xl",
+  },
+  {
+    language: "unocss",
+    code: '<button class="i-carbon-send rounded-lg px-3 py-2 text-blue-5">DC</button>',
+    token: "i-carbon-send",
+  },
   { language: "php", code: "<?php echo strlen('dc');", token: "strlen" },
   { language: "csharp", code: "public class App { static void Main() {} }", token: "class" },
   { language: "haskell", code: 'main = putStrLn "dc"', token: "putStrLn" },
@@ -12,6 +33,15 @@ const requestedLanguageSamples = [
   { language: "julia", code: 'function main()\n    println("dc")\nend', token: "function" },
   { language: "mojo", code: 'fn main():\n    print("dc")', token: "main" },
 ] as const satisfies readonly { language: DcLanguageId; code: string; token: string }[];
+
+const requestedThemeSamples = [
+  "catppuccin-mocha",
+  "catppuccin-latte",
+  "tokyo-night",
+  "kanagawa-wave",
+  "rose-pine",
+  "github-dark-high-contrast",
+] as const satisfies readonly DcThemeId[];
 
 describe("highlightForDcHtml", () => {
   it("loads the selected Shiki language and theme on demand", async () => {
@@ -41,6 +71,22 @@ describe("highlightForDcHtml", () => {
 
       expect(html).toContain("<pre");
       expect(html).toContain(sample.token);
+      expect(html).toContain("oklch(");
+      expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    }
+  }, 60_000);
+
+  it("loads added theme choices on demand", async () => {
+    for (const selectedTheme of requestedThemeSamples) {
+      const html = await highlightForDcHtml("const theme = 'dc';", {
+        language: "typescript",
+        theme: selectedTheme,
+        showBackground: true,
+        showLineNumbers: false,
+      });
+
+      expect(html).toContain("<pre");
+      expect(html).toContain("theme");
       expect(html).toContain("oklch(");
       expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     }

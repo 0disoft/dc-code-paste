@@ -6,7 +6,7 @@ import {
 } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 import { renderDcHtml } from "$lib/dc/render-dc-html";
-import type { DcLanguageId, DcThemeId } from "./catalog";
+import { shikiLanguageFor, type DcLanguageId, type DcThemeId } from "./catalog";
 
 const languageInputs: Record<DcLanguageId, LanguageInput> = {
   c: () => import("@shikijs/langs/c").then((module) => module.default),
@@ -14,9 +14,14 @@ const languageInputs: Record<DcLanguageId, LanguageInput> = {
   csharp: () => import("@shikijs/langs/csharp").then((module) => module.default),
   javascript: () => import("@shikijs/langs/javascript").then((module) => module.default),
   typescript: () => import("@shikijs/langs/typescript").then((module) => module.default),
+  jsx: () => import("@shikijs/langs/jsx").then((module) => module.default),
+  tsx: () => import("@shikijs/langs/tsx").then((module) => module.default),
   svelte: () => import("@shikijs/langs/svelte").then((module) => module.default),
+  astro: () => import("@shikijs/langs/astro").then((module) => module.default),
   html: () => import("@shikijs/langs/html").then((module) => module.default),
   css: () => import("@shikijs/langs/css").then((module) => module.default),
+  tailwind: () => import("@shikijs/langs/html").then((module) => module.default),
+  unocss: () => import("@shikijs/langs/html").then((module) => module.default),
   php: () => import("@shikijs/langs/php").then((module) => module.default),
   json: () => import("@shikijs/langs/json").then((module) => module.default),
   bash: () => import("@shikijs/langs/bash").then((module) => module.default),
@@ -34,14 +39,57 @@ const languageInputs: Record<DcLanguageId, LanguageInput> = {
 const themeInputs: Record<DcThemeId, ThemeInput> = {
   "github-dark": () => import("@shikijs/themes/github-dark").then((module) => module.default),
   "github-light": () => import("@shikijs/themes/github-light").then((module) => module.default),
+  "github-dark-dimmed": () =>
+    import("@shikijs/themes/github-dark-dimmed").then((module) => module.default),
+  "github-dark-high-contrast": () =>
+    import("@shikijs/themes/github-dark-high-contrast").then((module) => module.default),
+  "github-light-high-contrast": () =>
+    import("@shikijs/themes/github-light-high-contrast").then((module) => module.default),
   "vitesse-dark": () => import("@shikijs/themes/vitesse-dark").then((module) => module.default),
+  "vitesse-light": () => import("@shikijs/themes/vitesse-light").then((module) => module.default),
+  "vitesse-black": () => import("@shikijs/themes/vitesse-black").then((module) => module.default),
   "min-light": () => import("@shikijs/themes/min-light").then((module) => module.default),
+  "min-dark": () => import("@shikijs/themes/min-dark").then((module) => module.default),
   dracula: () => import("@shikijs/themes/dracula").then((module) => module.default),
+  "dracula-soft": () => import("@shikijs/themes/dracula-soft").then((module) => module.default),
   "one-dark-pro": () => import("@shikijs/themes/one-dark-pro").then((module) => module.default),
+  "one-light": () => import("@shikijs/themes/one-light").then((module) => module.default),
+  "catppuccin-mocha": () =>
+    import("@shikijs/themes/catppuccin-mocha").then((module) => module.default),
+  "catppuccin-macchiato": () =>
+    import("@shikijs/themes/catppuccin-macchiato").then((module) => module.default),
+  "catppuccin-frappe": () =>
+    import("@shikijs/themes/catppuccin-frappe").then((module) => module.default),
+  "catppuccin-latte": () =>
+    import("@shikijs/themes/catppuccin-latte").then((module) => module.default),
+  "tokyo-night": () => import("@shikijs/themes/tokyo-night").then((module) => module.default),
+  "night-owl": () => import("@shikijs/themes/night-owl").then((module) => module.default),
+  "night-owl-light": () =>
+    import("@shikijs/themes/night-owl-light").then((module) => module.default),
+  nord: () => import("@shikijs/themes/nord").then((module) => module.default),
+  "kanagawa-wave": () => import("@shikijs/themes/kanagawa-wave").then((module) => module.default),
+  "kanagawa-dragon": () =>
+    import("@shikijs/themes/kanagawa-dragon").then((module) => module.default),
+  "kanagawa-lotus": () => import("@shikijs/themes/kanagawa-lotus").then((module) => module.default),
+  "rose-pine": () => import("@shikijs/themes/rose-pine").then((module) => module.default),
+  "rose-pine-moon": () => import("@shikijs/themes/rose-pine-moon").then((module) => module.default),
+  "rose-pine-dawn": () => import("@shikijs/themes/rose-pine-dawn").then((module) => module.default),
+  "gruvbox-dark-medium": () =>
+    import("@shikijs/themes/gruvbox-dark-medium").then((module) => module.default),
+  "gruvbox-light-medium": () =>
+    import("@shikijs/themes/gruvbox-light-medium").then((module) => module.default),
+  "solarized-dark": () => import("@shikijs/themes/solarized-dark").then((module) => module.default),
+  "solarized-light": () =>
+    import("@shikijs/themes/solarized-light").then((module) => module.default),
+  monokai: () => import("@shikijs/themes/monokai").then((module) => module.default),
+  "material-theme-palenight": () =>
+    import("@shikijs/themes/material-theme-palenight").then((module) => module.default),
+  "dark-plus": () => import("@shikijs/themes/dark-plus").then((module) => module.default),
+  "light-plus": () => import("@shikijs/themes/light-plus").then((module) => module.default),
 };
 
 let highlighterPromise: Promise<HighlighterCore> | undefined;
-const languagePromises = new Map<DcLanguageId, Promise<void>>();
+const languagePromises = new Map<string, Promise<void>>();
 const themePromises = new Map<DcThemeId, Promise<void>>();
 
 function getHighlighter(): Promise<HighlighterCore> {
@@ -53,21 +101,23 @@ function getHighlighter(): Promise<HighlighterCore> {
 }
 
 function loadLanguage(highlighter: HighlighterCore, language: DcLanguageId): Promise<void> {
-  if (highlighter.getLoadedLanguages().includes(language)) {
+  const shikiLanguage = shikiLanguageFor(language);
+
+  if (highlighter.getLoadedLanguages().includes(shikiLanguage)) {
     return Promise.resolve();
   }
 
-  const existing = languagePromises.get(language);
+  const existing = languagePromises.get(shikiLanguage);
   if (existing) {
     return existing;
   }
 
   const loading = highlighter.loadLanguage(languageInputs[language]).catch((error: unknown) => {
-    languagePromises.delete(language);
+    languagePromises.delete(shikiLanguage);
     throw error;
   });
 
-  languagePromises.set(language, loading);
+  languagePromises.set(shikiLanguage, loading);
   return loading;
 }
 
@@ -100,13 +150,14 @@ export type HighlightOptions = {
 
 export async function highlightForDcHtml(code: string, options: HighlightOptions): Promise<string> {
   const highlighter = await getHighlighter();
+  const shikiLanguage = shikiLanguageFor(options.language);
   await Promise.all([
     loadLanguage(highlighter, options.language),
     loadTheme(highlighter, options.theme),
   ]);
 
   const highlighted = highlighter.codeToTokens(code || " ", {
-    lang: options.language,
+    lang: shikiLanguage,
     theme: options.theme,
   });
 
