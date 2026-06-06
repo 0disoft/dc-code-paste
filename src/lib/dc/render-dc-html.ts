@@ -1,4 +1,5 @@
 import { escapeHtml } from "./escape-html";
+import { safeCodeFontFamily } from "./font-stacks";
 import { joinStyle, sanitizeColor } from "./sanitize-style";
 
 export type DcToken = {
@@ -42,15 +43,21 @@ function renderToken(token: DcToken, foreground: string): string {
   return `<span style="${tokenStyle(token, foreground)}">${content}</span>`;
 }
 
-function renderLineNumber(index: number, foreground: string): string {
+function renderLineNumber(index: number, foreground: string, width: string): string {
   const style = joinStyle({
     color: foreground,
     opacity: "0.45",
     display: "inline-block",
-    width: "3ch",
+    width,
     "padding-right": "12px",
     "text-align": "right",
     "user-select": "none",
+    "box-sizing": "content-box",
+    "white-space": "pre",
+    "word-break": "normal",
+    "overflow-wrap": "normal",
+    "font-variant-numeric": "tabular-nums",
+    "vertical-align": "top",
   });
 
   return `<span style="${style}">${index + 1}</span>`;
@@ -62,11 +69,10 @@ export function renderDcHtml(input: DcRenderInput): string {
   const preStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
     color: foreground,
-    "font-family":
-      'ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace',
+    "font-family": safeCodeFontFamily(),
     "font-size": input.fontSize ?? "14px",
     "line-height": "1.58",
-    margin: 0,
+    margin: "0 0 16px",
     padding: input.showBackground ? "14px 16px" : 0,
     "white-space": "pre-wrap",
     "word-break": "normal",
@@ -74,8 +80,11 @@ export function renderDcHtml(input: DcRenderInput): string {
     "tab-size": 4,
   });
 
+  const lineNumberWidth = `${Math.max(2, String(input.lines.length).length)}ch`;
   const renderedLines = input.lines.map((line, index) => {
-    const prefix = input.showLineNumbers ? renderLineNumber(index, foreground) : "";
+    const prefix = input.showLineNumbers
+      ? renderLineNumber(index, foreground, lineNumberWidth)
+      : "";
     const body = line.map((token) => renderToken(token, foreground)).join("");
     return `${prefix}${body || "&nbsp;"}`;
   });
