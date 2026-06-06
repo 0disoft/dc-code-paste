@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 import { escapeHtml } from "./escape-html";
-import { joinStyle, sanitizeColor } from "./sanitize-style";
+import { joinStyle, sanitizeReadableTextColor } from "./sanitize-style";
 import {
   defaultLanguage,
   defaultTheme,
@@ -62,6 +62,7 @@ type DocumentPalette = {
 
 type RenderContext = {
   text?: string;
+  background?: string;
   inlineCodeBackground?: string;
   inlineCodeText?: string;
 };
@@ -416,10 +417,17 @@ function isOnlyHrefText(text: string, href: string): boolean {
 function renderTextStyle(
   mark: JSONContent,
   palette: DocumentPalette,
+  context: RenderContext,
 ): Record<string, string | undefined> {
   const attrs = mark.attrs ?? {};
   const color =
-    typeof attrs.color === "string" ? sanitizeColor(attrs.color, palette.text) : undefined;
+    typeof attrs.color === "string"
+      ? sanitizeReadableTextColor(
+          attrs.color,
+          context.background ?? palette.articleBackground,
+          context.text ?? palette.text,
+        )
+      : undefined;
   const fontFamily =
     typeof attrs.fontFamily === "string" ? safeProseFontFamily(attrs.fontFamily) : undefined;
   const fontSize = typeof attrs.fontSize === "string" ? safeSize(attrs.fontSize, "") : undefined;
@@ -480,7 +488,7 @@ function applyMarks(
     }
 
     if (mark.type === "textStyle") {
-      const style = joinStyle(renderTextStyle(mark, palette));
+      const style = joinStyle(renderTextStyle(mark, palette, context));
       if (style) {
         html = `<span style="${style}">${html}</span>`;
       }
@@ -588,6 +596,7 @@ async function renderCallout(
   const codePalette = calloutInlineCodeStyles[kind];
   const childContext: RenderContext = {
     text: palette.text,
+    background: palette.background,
     inlineCodeBackground: codePalette.background,
     inlineCodeText: codePalette.text,
   };
@@ -674,7 +683,11 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
   const body =
     normalizedLinkHref && isOnlyHrefText(plainBodyText, normalizedLinkHref)
       ? []
-      : await Promise.all(childrenOf(node).map((child) => renderBlockAsync(child, options)));
+      : await Promise.all(
+          childrenOf(node).map((child) =>
+            renderBlockAsync(child, options, { text: boxText, background: boxBackground }),
+          ),
+        );
   const bodyHtml = body.join("");
   const action = href
     ? `<a href="${href}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${escapeHtml(visibleLinkLabel(normalizedLinkHref ?? href))}</a>`
@@ -735,10 +748,13 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
   const children = await Promise.all(
     childrenOf(node).map((child) => {
       if (child.type === "paragraph") {
-        return `<p style="${quoteParagraphStyle}">${renderInlineChildren(child, options, { text: palette.quoteText }) || "&nbsp;"}</p>`;
+        return `<p style="${quoteParagraphStyle}">${renderInlineChildren(child, options, { text: palette.quoteText, background: palette.quoteBackground }) || "&nbsp;"}</p>`;
       }
 
-      return renderBlockAsync(child, options, { text: palette.quoteText });
+      return renderBlockAsync(child, options, {
+        text: palette.quoteText,
+        background: palette.quoteBackground,
+      });
     }),
   );
   const body = children.join("");
@@ -932,7 +948,10 @@ function quoteWrapperStyle(
 
 async function renderSectionHeading(node: JSONContent, options: DcExportOptions): Promise<string> {
   const palette = documentPalette(options);
-  const content = renderInlineChildren(node, options, { text: palette.sectionText });
+  const content = renderInlineChildren(node, options, {
+    text: palette.sectionText,
+    background: palette.articleBackground,
+  });
   const body = `<strong style="${joinStyle({
     color: palette.sectionText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
@@ -972,7 +991,11 @@ function renderCtaButtonAnchor(
 ): string {
   const palette = documentPalette(options);
   const href = safeHref(node.attrs?.href);
-  const label = renderInlineChildren(node, options, { text: palette.ctaText }) || "바로가기";
+  const label =
+    renderInlineChildren(node, options, {
+      text: palette.ctaText,
+      background: palette.ctaBackground,
+    }) || "바로가기";
 
   if (!href) {
     return "";
@@ -1098,13 +1121,15 @@ function renderReferenceItemBody(
   node: JSONContent,
   options: DcExportOptions,
   textColor: string,
+  backgroundColor: string,
 ): string {
   const documentColors = documentPalette(options);
   const href = safeHref(node.attrs?.href);
   const normalizedLinkHref = normalizedHref(node.attrs?.href);
   const fallbackLabel = normalizedLinkHref ? visibleLinkLabel(normalizedLinkHref) : "참고 자료";
   const label =
-    renderInlineChildren(node, options, { text: textColor }) || escapeHtml(fallbackLabel);
+    renderInlineChildren(node, options, { text: textColor, background: backgroundColor }) ||
+    escapeHtml(fallbackLabel);
   const linkStyle = joinStyle({
     color: documentColors.link,
     "font-weight": 850,
@@ -1187,7 +1212,7 @@ function renderReferenceListModern(items: JSONContent[], options: DcExportOption
     .map((item, index) => {
       const rowStyle = index === items.length - 1 ? lastItemStyle : itemStyle;
       const number = String(index + 1).padStart(2, "0");
-      const content = renderReferenceItemBody(item, options, palette.text);
+      const content = renderReferenceItemBody(item, options, palette.text, palette.background);
 
       return `<li style="${rowStyle}"><span style="${badgeCellStyle}"><span style="${badgeStyle}">${number}</span></span><span style="${labelCellStyle}">${content}</span></li>`;
     })
@@ -1251,7 +1276,7 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
       const number = String(index + 1).padStart(2, "0");
       const badgeTdStyle = index === items.length - 1 ? lastBadgeCellStyle : badgeCellStyle;
       const itemTdStyle = index === items.length - 1 ? lastItemCellStyle : itemCellStyle;
-      const content = renderReferenceItemBody(item, options, palette.text);
+      const content = renderReferenceItemBody(item, options, palette.text, palette.background);
 
       return `<tr><td style="${badgeTdStyle}"><span style="${badgeStyle}">${number}</span></td><td style="${itemTdStyle}">${content}</td></tr>`;
     })
@@ -1304,8 +1329,12 @@ function renderSummaryItemContent(
   node: JSONContent,
   options: DcExportOptions,
   textColor: string,
+  backgroundColor: string,
 ): string {
-  return renderInlineChildren(node, options, { text: textColor }) || "&nbsp;";
+  return (
+    renderInlineChildren(node, options, { text: textColor, background: backgroundColor }) ||
+    "&nbsp;"
+  );
 }
 
 function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions): string {
@@ -1360,7 +1389,7 @@ function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions):
   });
   const body = items
     .map((item) => {
-      const content = renderSummaryItemContent(item, options, palette.text);
+      const content = renderSummaryItemContent(item, options, palette.text, palette.background);
       return `<li style="${itemStyle}"><span style="${bulletCellStyle}"><span style="${bulletStyle}"></span></span><span style="${contentCellStyle}">${content}</span></li>`;
     })
     .join("");
@@ -1422,13 +1451,570 @@ function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): 
   });
   const rows = items
     .map((item, index) => {
-      const content = renderSummaryItemContent(item, options, palette.text);
+      const content = renderSummaryItemContent(item, options, palette.text, palette.background);
       const isLast = index === items.length - 1;
       return `<tr><td style="${isLast ? lastBulletCellStyle : bulletCellStyle}"><span style="${bulletStyle}"></span></td><td style="${isLast ? lastItemCellStyle : itemCellStyle}">${content}</td></tr>`;
     })
     .join("");
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td colspan="2" style="${labelCellStyle}">핵심 요약</td></tr>${rows}</tbody></table>`;
+}
+
+function heroBlockPalette(options: DcExportOptions) {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      background: "oklch(6.62% 0.012 94.34)",
+      fallbackBackground: "#050505",
+      border: "oklch(28.12% 0.03 83.2)",
+      accent: "oklch(84.08% 0.11 84.51)",
+      label: "oklch(84.08% 0.11 84.51)",
+      title: "oklch(98.32% 0.006 93.08)",
+      subtitle: "oklch(78.72% 0.023 86.9)",
+    };
+  }
+
+  return {
+    background: "oklch(97.68% 0.02 91.92)",
+    fallbackBackground: "#fbf6e6",
+    border: "oklch(84.22% 0.041 88.36)",
+    accent: "oklch(61.2% 0.049 77.83)",
+    label: "oklch(45.61% 0.026 79.44)",
+    title: "oklch(24.19% 0.019 255.77)",
+    subtitle: "oklch(43.22% 0.022 255.32)",
+  };
+}
+
+function heroBlockLabel(node: JSONContent): string {
+  if (typeof node.attrs?.label === "string" && node.attrs.label.trim()) {
+    return node.attrs.label.trim();
+  }
+
+  return "CODING GUIDE";
+}
+
+function heroTextChildren(node: JSONContent): JSONContent[] {
+  return childrenOf(node).filter((child) => textOf(child).trim().length > 0);
+}
+
+function renderHeroInline(
+  node: JSONContent | undefined,
+  options: DcExportOptions,
+  textColor: string,
+  backgroundColor: string,
+): string {
+  if (!node) {
+    return "";
+  }
+
+  return renderInlineChildren(node, options, { text: textColor, background: backgroundColor });
+}
+
+function renderHeroSubtitle(
+  nodes: JSONContent[],
+  options: DcExportOptions,
+  textColor: string,
+  backgroundColor: string,
+): string {
+  return nodes
+    .map((node) => renderHeroInline(node, options, textColor, backgroundColor))
+    .filter(Boolean)
+    .join("<br>");
+}
+
+function renderHeroBlock(node: JSONContent, options: DcExportOptions): string {
+  return isDcTableStructure(options)
+    ? renderHeroBlockTable(node, options)
+    : renderHeroBlockModern(node, options);
+}
+
+function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): string {
+  const palette = heroBlockPalette(options);
+  const content = heroTextChildren(node);
+  const title =
+    renderHeroInline(content[0], options, palette.title, palette.background) || "강의 노트";
+  const subtitle = renderHeroSubtitle(
+    content.slice(1),
+    options,
+    palette.subtitle,
+    palette.background,
+  );
+  const wrapperStyle = joinStyle({
+    margin: "0 0 22px",
+    padding: "22px 24px",
+    border: `1px solid ${palette.border}`,
+    "border-top": `4px solid ${palette.accent}`,
+    "background-color": palette.background,
+    color: palette.title,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "box-sizing": "border-box",
+  });
+  const labelStyle = joinStyle({
+    display: "block",
+    margin: "0 0 16px",
+    color: palette.label,
+    "font-size": "12px",
+    "font-weight": 900,
+    "line-height": 1.2,
+    "letter-spacing": "0",
+  });
+  const titleStyle = joinStyle({
+    display: "block",
+    margin: "0 0 12px",
+    color: palette.title,
+    "font-size": "30px",
+    "font-weight": 900,
+    "line-height": 1.22,
+  });
+  const subtitleStyle = joinStyle({
+    display: "block",
+    color: palette.subtitle,
+    "font-size": "17px",
+    "font-weight": 700,
+    "line-height": 1.62,
+  });
+  const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
+
+  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span><strong style="${titleStyle}">${title}</strong>${subtitleHtml}</section>`;
+}
+
+function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): string {
+  const palette = heroBlockPalette(options);
+  const content = heroTextChildren(node);
+  const title =
+    renderHeroInline(content[0], options, palette.title, palette.background) || "강의 노트";
+  const subtitle = renderHeroSubtitle(
+    content.slice(1),
+    options,
+    palette.subtitle,
+    palette.background,
+  );
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 22px",
+    "border-collapse": "collapse",
+    "background-color": palette.background,
+    border: `1px solid ${palette.border}`,
+    "border-top": `4px solid ${palette.accent}`,
+  });
+  const cellStyle = joinStyle({
+    padding: "22px 24px",
+    "background-color": palette.background,
+    color: palette.title,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "box-sizing": "border-box",
+  });
+  const labelStyle = joinStyle({
+    display: "block",
+    margin: "0 0 16px",
+    color: palette.label,
+    "font-size": "12px",
+    "font-weight": 900,
+    "line-height": 1.2,
+  });
+  const titleStyle = joinStyle({
+    display: "block",
+    margin: "0 0 12px",
+    color: palette.title,
+    "font-size": "30px",
+    "font-weight": 900,
+    "line-height": 1.22,
+  });
+  const subtitleStyle = joinStyle({
+    display: "block",
+    color: palette.subtitle,
+    "font-size": "17px",
+    "font-weight": 700,
+    "line-height": 1.62,
+  });
+  const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span><strong style="${titleStyle}">${title}</strong>${subtitleHtml}</td></tr></tbody></table>`;
+}
+
+function tutorialBlockPalette(options: DcExportOptions) {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      background: "oklch(9.2% 0.014 94.46)",
+      fallbackBackground: "#080808",
+      cardBackground: "oklch(12.04% 0.017 94.12)",
+      border: "oklch(34.91% 0.033 83.29)",
+      accent: "oklch(84.08% 0.11 84.51)",
+      numberText: "oklch(10.18% 0.015 94.76)",
+      title: "oklch(97.22% 0.008 92.87)",
+      text: "oklch(88.62% 0.016 91.83)",
+      mutedText: "oklch(71.26% 0.021 84.88)",
+    };
+  }
+
+  return {
+    background: "oklch(98.38% 0.01 97.33)",
+    fallbackBackground: dcTableFallbackColors.articleBackground,
+    cardBackground: "oklch(99.1% 0.009 93.08)",
+    border: "oklch(85.31% 0.027 84.92)",
+    accent: "oklch(61.2% 0.049 77.83)",
+    numberText: "oklch(99.1% 0.006 93.08)",
+    title: "oklch(25.72% 0.021 255.63)",
+    text: "oklch(31.82% 0.02 255.28)",
+    mutedText: "oklch(45.61% 0.026 79.44)",
+  };
+}
+
+function comparisonBlockPalette(options: DcExportOptions) {
+  if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
+    return {
+      background: "oklch(8.84% 0.013 94.3)",
+      fallbackBackground: "#080808",
+      leftBackground: "oklch(13.02% 0.026 24.58)",
+      leftFallbackBackground: "#160b0a",
+      leftBorder: "oklch(75.02% 0.17 24.82)",
+      leftTitle: "oklch(93.14% 0.03 24.92)",
+      rightBackground: "oklch(12.42% 0.022 154.8)",
+      rightFallbackBackground: "#07130d",
+      rightBorder: "oklch(76.71% 0.151 154.54)",
+      rightTitle: "oklch(92.34% 0.029 154.17)",
+      text: "oklch(91.88% 0.016 91.83)",
+      divider: "oklch(31.22% 0.028 84.54)",
+    };
+  }
+
+  return {
+    background: "oklch(98.38% 0.01 97.33)",
+    fallbackBackground: dcTableFallbackColors.articleBackground,
+    leftBackground: "oklch(97.18% 0.032 24.18)",
+    leftFallbackBackground: "#fff0ee",
+    leftBorder: "oklch(62.42% 0.178 24.04)",
+    leftTitle: "oklch(34.1% 0.098 24.62)",
+    rightBackground: "oklch(96.78% 0.033 154.76)",
+    rightFallbackBackground: "#e9f9ef",
+    rightBorder: "oklch(66.42% 0.152 154.12)",
+    rightTitle: "oklch(29.24% 0.08 154.12)",
+    text: "oklch(31.82% 0.02 255.28)",
+    divider: "oklch(85.31% 0.027 84.92)",
+  };
+}
+
+function tutorialStepTitle(node: JSONContent, index: number): string {
+  if (typeof node.attrs?.title === "string" && node.attrs.title.trim()) {
+    return node.attrs.title.trim();
+  }
+
+  return `단계 ${index + 1}`;
+}
+
+async function renderTutorialBlock(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const steps = childrenOf(node).filter((child) => child.type === "tutorialStep");
+
+  if (steps.length === 0) {
+    return "";
+  }
+
+  return isDcTableStructure(options)
+    ? renderTutorialBlockTable(steps, options)
+    : renderTutorialBlockModern(steps, options);
+}
+
+async function renderTutorialStepBody(
+  step: JSONContent,
+  options: DcExportOptions,
+  textColor: string,
+  backgroundColor: string,
+): Promise<string> {
+  const body = await Promise.all(
+    childrenOf(step).map((child) =>
+      renderBlockAsync(child, options, { text: textColor, background: backgroundColor }),
+    ),
+  );
+
+  return body.join("");
+}
+
+async function renderTutorialBlockModern(
+  steps: JSONContent[],
+  options: DcExportOptions,
+): Promise<string> {
+  const palette = tutorialBlockPalette(options);
+  const wrapperStyle = joinStyle({
+    margin: "0 0 18px",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.66,
+  });
+  const cardStyle = joinStyle({
+    margin: "0 0 12px",
+    padding: "14px 16px",
+    border: `1px solid ${palette.border}`,
+    "border-left": `4px solid ${palette.accent}`,
+    "border-radius": "7px",
+    "background-color": palette.cardBackground,
+    color: palette.text,
+  });
+  const headStyle = joinStyle({
+    display: "table",
+    width: "100%",
+    margin: "0 0 8px",
+  });
+  const numberCellStyle = joinStyle({
+    display: "table-cell",
+    width: "42px",
+    "vertical-align": "top",
+  });
+  const numberStyle = joinStyle({
+    display: "inline-block",
+    "min-width": "30px",
+    padding: "4px 0",
+    "border-radius": "999px",
+    "background-color": palette.accent,
+    color: palette.numberText,
+    "font-size": "12px",
+    "font-weight": 900,
+    "line-height": 1.1,
+    "text-align": "center",
+  });
+  const titleStyle = joinStyle({
+    display: "table-cell",
+    color: palette.title,
+    "font-size": "18px",
+    "font-weight": 900,
+    "line-height": 1.32,
+    "vertical-align": "middle",
+  });
+  const bodyStyle = joinStyle({
+    color: palette.text,
+    "padding-left": "42px",
+  });
+  const cards = await Promise.all(
+    steps.map(async (step, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      const title = escapeHtml(tutorialStepTitle(step, index));
+      const body = await renderTutorialStepBody(
+        step,
+        options,
+        palette.text,
+        palette.cardBackground,
+      );
+      const bodyHtml = body ? `<div style="${bodyStyle}">${body}</div>` : "";
+
+      return `<section style="${cardStyle}"><div style="${headStyle}"><span style="${numberCellStyle}"><span style="${numberStyle}">${number}</span></span><strong style="${titleStyle}">${title}</strong></div>${bodyHtml}</section>`;
+    }),
+  );
+
+  return `<div style="${wrapperStyle}">${cards.join("")}</div>`;
+}
+
+async function renderTutorialBlockTable(
+  steps: JSONContent[],
+  options: DcExportOptions,
+): Promise<string> {
+  const palette = tutorialBlockPalette(options);
+  const cardTableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 12px",
+    "border-collapse": "collapse",
+    "background-color": palette.cardBackground,
+    border: `1px solid ${palette.border}`,
+    "border-left": `4px solid ${palette.accent}`,
+  });
+  const numberCellStyle = joinStyle({
+    width: "52px",
+    padding: "14px 0 8px 16px",
+    "vertical-align": "top",
+  });
+  const numberStyle = joinStyle({
+    display: "inline-block",
+    "min-width": "30px",
+    padding: "4px 0",
+    "border-radius": "999px",
+    "background-color": palette.accent,
+    color: palette.numberText,
+    "font-size": "12px",
+    "font-weight": 900,
+    "line-height": 1.1,
+    "text-align": "center",
+  });
+  const titleCellStyle = joinStyle({
+    padding: "13px 16px 8px 0",
+    color: palette.title,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "18px",
+    "font-weight": 900,
+    "line-height": 1.32,
+    "vertical-align": "middle",
+  });
+  const bodyCellStyle = joinStyle({
+    padding: "0 16px 14px 68px",
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.66,
+  });
+  const cards = await Promise.all(
+    steps.map(async (step, index) => {
+      const number = String(index + 1).padStart(2, "0");
+      const title = escapeHtml(tutorialStepTitle(step, index));
+      const body = await renderTutorialStepBody(
+        step,
+        options,
+        palette.text,
+        palette.cardBackground,
+      );
+      const bodyRow = body ? `<tr><td colspan="2" style="${bodyCellStyle}">${body}</td></tr>` : "";
+
+      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}"><span style="${numberStyle}">${number}</span></td><td style="${titleCellStyle}">${title}</td></tr>${bodyRow}</tbody></table>`;
+    }),
+  );
+
+  return cards.join("");
+}
+
+function comparisonColumnTitle(node: JSONContent, fallback: string): string {
+  if (typeof node.attrs?.title === "string" && node.attrs.title.trim()) {
+    return node.attrs.title.trim();
+  }
+
+  return fallback;
+}
+
+async function renderComparisonColumnBody(
+  column: JSONContent,
+  options: DcExportOptions,
+  textColor: string,
+  backgroundColor: string,
+): Promise<string> {
+  const body = await Promise.all(
+    childrenOf(column).map((child) =>
+      renderBlockAsync(child, options, { text: textColor, background: backgroundColor }),
+    ),
+  );
+
+  return body.join("");
+}
+
+async function renderComparisonBlock(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const columns = childrenOf(node)
+    .filter((child) => child.type === "comparisonColumn")
+    .slice(0, 2);
+
+  if (columns.length < 2) {
+    return "";
+  }
+
+  return isDcTableStructure(options)
+    ? renderComparisonBlockTable(columns, options)
+    : renderComparisonBlockModern(columns, options);
+}
+
+async function renderComparisonBlockModern(
+  columns: JSONContent[],
+  options: DcExportOptions,
+): Promise<string> {
+  const palette = comparisonBlockPalette(options);
+  const wrapperStyle = joinStyle({
+    display: "table",
+    width: "100%",
+    margin: "0 0 18px",
+    "border-spacing": "10px 0",
+    "table-layout": "fixed",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "line-height": 1.64,
+  });
+  const titleStyle = (color: string) =>
+    joinStyle({
+      display: "block",
+      margin: "0 0 8px",
+      color,
+      "font-size": "12px",
+      "font-weight": 900,
+      "letter-spacing": "0",
+    });
+  const columnStyle = (side: "left" | "right") => {
+    const isRight = side === "right";
+
+    return joinStyle({
+      display: "table-cell",
+      width: "50%",
+      padding: "13px 15px",
+      border: `1px solid ${palette.divider}`,
+      "border-left": `4px solid ${isRight ? palette.rightBorder : palette.leftBorder}`,
+      "background-color": isRight ? palette.rightBackground : palette.leftBackground,
+      color: palette.text,
+      "border-radius": "7px",
+      "vertical-align": "top",
+    });
+  };
+  const renderedColumns = await Promise.all(
+    columns.map(async (column, index) => {
+      const side = index === 1 ? "right" : "left";
+      const title = escapeHtml(
+        comparisonColumnTitle(column, side === "right" ? "After" : "Before"),
+      );
+      const backgroundColor = side === "right" ? palette.rightBackground : palette.leftBackground;
+      const body = await renderComparisonColumnBody(column, options, palette.text, backgroundColor);
+      const titleColor = side === "right" ? palette.rightTitle : palette.leftTitle;
+
+      return `<section style="${columnStyle(side)}"><strong style="${titleStyle(titleColor)}">${title}</strong>${body}</section>`;
+    }),
+  );
+
+  return `<div style="${wrapperStyle}">${renderedColumns.join("")}</div>`;
+}
+
+async function renderComparisonBlockTable(
+  columns: JSONContent[],
+  options: DcExportOptions,
+): Promise<string> {
+  const palette = comparisonBlockPalette(options);
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 18px",
+    "border-collapse": "separate",
+    "border-spacing": "8px 0",
+    "background-color": palette.background,
+    "table-layout": "fixed",
+  });
+  const titleStyle = (color: string) =>
+    joinStyle({
+      display: "block",
+      margin: "0 0 8px",
+      color,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": "12px",
+      "font-weight": 900,
+      "line-height": 1.2,
+    });
+  const cellStyle = (side: "left" | "right") => {
+    const isRight = side === "right";
+
+    return joinStyle({
+      width: "50%",
+      padding: "13px 15px",
+      border: `1px solid ${palette.divider}`,
+      "border-left": `4px solid ${isRight ? palette.rightBorder : palette.leftBorder}`,
+      "background-color": isRight ? palette.rightBackground : palette.leftBackground,
+      color: palette.text,
+      "font-family": safeProseFontFamily(options.bodyFontFamily),
+      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "line-height": 1.64,
+      "vertical-align": "top",
+    });
+  };
+  const cells = await Promise.all(
+    columns.map(async (column, index) => {
+      const side = index === 1 ? "right" : "left";
+      const fallbackBackground =
+        side === "right" ? palette.rightFallbackBackground : palette.leftFallbackBackground;
+      const title = escapeHtml(
+        comparisonColumnTitle(column, side === "right" ? "After" : "Before"),
+      );
+      const titleColor = side === "right" ? palette.rightTitle : palette.leftTitle;
+      const backgroundColor = side === "right" ? palette.rightBackground : palette.leftBackground;
+      const body = await renderComparisonColumnBody(column, options, palette.text, backgroundColor);
+
+      return `<td width="50%" bgcolor="${fallbackBackground}" style="${cellStyle(side)}"><strong style="${titleStyle(titleColor)}">${title}</strong>${body}</td>`;
+    }),
+  );
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells.join("")}</tr></tbody></table>`;
 }
 
 async function renderBlockAsync(
@@ -1475,6 +2061,12 @@ async function renderBlockAsync(
       return renderReferenceList(node, options);
     case "summaryBox":
       return renderSummaryBox(node, options);
+    case "heroBlock":
+      return renderHeroBlock(node, options);
+    case "tutorialBlock":
+      return renderTutorialBlock(node, options);
+    case "comparisonBlock":
+      return renderComparisonBlock(node, options);
     case "codeBlock":
       return renderCodeBlock(node, options);
     case "blockquote":

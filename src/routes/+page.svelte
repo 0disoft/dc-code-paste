@@ -32,6 +32,7 @@
   import type { Editor, JSONContent } from '@tiptap/core';
   import { copyDcHtml, copyPlainText } from '$lib/dc/clipboard';
   import { fontFamilyOptions } from '$lib/dc/font-stacks';
+  import { sanitizeReadableTextColor } from '$lib/dc/sanitize-style';
   import {
     exportDocumentToDcHtml,
     type DcDocumentTheme,
@@ -83,7 +84,13 @@
   import { normalizeEditableLinkHref } from '$lib/editor/link';
   import { parseMarkdownToDocument } from '$lib/editor/markdown-import';
   import { normalizeQuoteStyle, quoteStyleOptions, type QuoteStyle } from '$lib/editor/quote-style';
+  import { createDefaultHeroBlock, createHeroBlockFromText } from '$lib/editor/hero-block';
   import { createDefaultSummaryBox, createSummaryBoxFromText } from '$lib/editor/summary-box';
+  import { createDefaultTutorialBlock, createTutorialBlockFromText } from '$lib/editor/tutorial-block';
+  import {
+    createComparisonBlockFromText,
+    createDefaultComparisonBlock
+  } from '$lib/editor/comparison-block';
   import { normalizeCodeFilename } from '$lib/highlighter/code-block-metadata';
   import { normalizeHighlightLines } from '$lib/highlighter/highlight-lines';
   import {
@@ -115,6 +122,16 @@
     { label: '강의 라이트', value: 'lightLecture' },
     { label: '다크 에디토리얼', value: 'darkEditorial' }
   ];
+  const editorThemeColorSafety = {
+    lightLecture: {
+      background: 'oklch(97.12% 0.012 97.41)',
+      fallback: 'oklch(21.18% 0.012 255.31)'
+    },
+    darkEditorial: {
+      background: 'oklch(7.2% 0.012 94.1)',
+      fallback: 'oklch(94.12% 0.012 93.37)'
+    }
+  } satisfies Record<DcDocumentTheme, { background: string; fallback: string }>;
   const swatches = [
     'oklch(23.39% 0.012 255.51)',
     'oklch(56.77% 0.154 252.96)',
@@ -790,6 +807,25 @@
     runEditorCommand((current) => current.chain().focus().insertContent(summaryBox).run());
   }
 
+  function applyHeroBlock() {
+    const heroBlock = createHeroBlockFromText(selectedText()) ?? createDefaultHeroBlock();
+
+    runEditorCommand((current) => current.chain().focus().insertContent(heroBlock).run());
+  }
+
+  function applyTutorialBlock() {
+    const tutorialBlock = createTutorialBlockFromText(selectedText()) ?? createDefaultTutorialBlock();
+
+    runEditorCommand((current) => current.chain().focus().insertContent(tutorialBlock).run());
+  }
+
+  function applyComparisonBlock() {
+    const comparisonBlock =
+      createComparisonBlockFromText(selectedText()) ?? createDefaultComparisonBlock();
+
+    runEditorCommand((current) => current.chain().focus().insertContent(comparisonBlock).run());
+  }
+
   function setLink() {
     if (!editor) {
       return;
@@ -824,7 +860,10 @@
   }
 
   function setTextColor(color: string) {
-    runEditorCommand((current) => current.chain().focus().setColor(color).run());
+    const safety = editorThemeColorSafety[documentTheme];
+    const readableColor = sanitizeReadableTextColor(color, safety.background, safety.fallback);
+
+    runEditorCommand((current) => current.chain().focus().setColor(readableColor).run());
   }
 
   function setFontFamily(value: string) {
@@ -1157,9 +1196,21 @@
         <Rows3 size={17} />
         <span>섹션</span>
       </button>
+      <button class:active={isActive('heroBlock')} type="button" title="히어로" aria-label="히어로" onclick={applyHeroBlock}>
+        <Heading1 size={17} />
+        <span>히어로</span>
+      </button>
       <button class:active={isActive('summaryBox')} type="button" title="요약" aria-label="요약" onclick={applySummaryBox}>
         <FileText size={17} />
         <span>요약</span>
+      </button>
+      <button class:active={isActive('tutorialBlock')} type="button" title="튜토리얼" aria-label="튜토리얼" onclick={applyTutorialBlock}>
+        <Rows3 size={17} />
+        <span>튜토리얼</span>
+      </button>
+      <button class:active={isActive('comparisonBlock')} type="button" title="비교" aria-label="비교" onclick={applyComparisonBlock}>
+        <Rows3 size={17} />
+        <span>비교</span>
       </button>
       <button
         type="button"
@@ -2487,6 +2538,193 @@
     background: oklch(84.08% 0.11 84.51);
   }
 
+  .editor-surface :global(.dc-hero-block) {
+    margin: 0 0 22px;
+    padding: 22px 24px;
+    border: 1px solid oklch(84.22% 0.041 88.36);
+    border-top: 4px solid oklch(61.2% 0.049 77.83);
+    background: oklch(97.68% 0.02 91.92);
+    color: oklch(24.19% 0.019 255.77);
+  }
+
+  .editor-surface :global(.dc-hero-rule) {
+    display: none;
+  }
+
+  .editor-surface :global(.dc-hero-label) {
+    display: block;
+    margin: 0 0 16px;
+    color: oklch(45.61% 0.026 79.44);
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .editor-surface :global(.dc-hero-body h1) {
+    margin: 0 0 12px;
+    color: oklch(24.19% 0.019 255.77);
+    font-size: 30px;
+    font-weight: 900;
+    line-height: 1.22;
+  }
+
+  .editor-surface :global(.dc-hero-body p) {
+    margin: 0;
+    color: oklch(43.22% 0.022 255.32);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.62;
+  }
+
+  .editor-surface-dark :global(.dc-hero-block) {
+    border-color: oklch(28.12% 0.03 83.2);
+    border-top-color: oklch(84.08% 0.11 84.51);
+    background: oklch(6.62% 0.012 94.34);
+    color: oklch(98.32% 0.006 93.08);
+  }
+
+  .editor-surface-dark :global(.dc-hero-label) {
+    color: oklch(84.08% 0.11 84.51);
+  }
+
+  .editor-surface-dark :global(.dc-hero-body h1) {
+    color: oklch(98.32% 0.006 93.08);
+  }
+
+  .editor-surface-dark :global(.dc-hero-body p) {
+    color: oklch(78.72% 0.023 86.9);
+  }
+
+  .editor-surface :global(.dc-tutorial-block) {
+    counter-reset: dc-tutorial-step;
+    display: grid;
+    gap: 12px;
+    margin: 0 0 18px;
+  }
+
+  .editor-surface :global(.dc-tutorial-step) {
+    counter-increment: dc-tutorial-step;
+    padding: 14px 16px;
+    border: 1px solid oklch(85.31% 0.027 84.92);
+    border-left: 4px solid oklch(61.2% 0.049 77.83);
+    border-radius: 7px;
+    background: oklch(99.1% 0.009 93.08);
+    color: oklch(31.82% 0.02 255.28);
+  }
+
+  .editor-surface :global(.dc-tutorial-head) {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 0;
+    align-items: center;
+    margin: 0 0 8px;
+  }
+
+  .editor-surface :global(.dc-tutorial-number::before) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    min-height: 22px;
+    border-radius: 999px;
+    background: oklch(61.2% 0.049 77.83);
+    color: oklch(99.1% 0.006 93.08);
+    content: counter(dc-tutorial-step, decimal-leading-zero);
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.1;
+  }
+
+  .editor-surface :global(.dc-tutorial-title) {
+    color: oklch(25.72% 0.021 255.63);
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.32;
+  }
+
+  .editor-surface :global(.dc-tutorial-body) {
+    padding-left: 42px;
+  }
+
+  .editor-surface :global(.dc-tutorial-body > *:last-child) {
+    margin-bottom: 0;
+  }
+
+  .editor-surface-dark :global(.dc-tutorial-step) {
+    border-color: oklch(34.91% 0.033 83.29);
+    border-left-color: oklch(84.08% 0.11 84.51);
+    background: oklch(12.04% 0.017 94.12);
+    color: oklch(88.62% 0.016 91.83);
+  }
+
+  .editor-surface-dark :global(.dc-tutorial-number::before) {
+    background: oklch(84.08% 0.11 84.51);
+    color: oklch(10.18% 0.015 94.76);
+  }
+
+  .editor-surface-dark :global(.dc-tutorial-title) {
+    color: oklch(97.22% 0.008 92.87);
+  }
+
+  .editor-surface :global(.dc-comparison-block) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 0 0 18px;
+  }
+
+  .editor-surface :global(.dc-comparison-column) {
+    min-width: 0;
+    padding: 13px 15px;
+    border: 1px solid oklch(85.31% 0.027 84.92);
+    border-left: 4px solid oklch(62.42% 0.178 24.04);
+    border-radius: 7px;
+    background: oklch(97.18% 0.032 24.18);
+    color: oklch(31.82% 0.02 255.28);
+  }
+
+  .editor-surface :global(.dc-comparison-column[data-side='right']) {
+    border-left-color: oklch(66.42% 0.152 154.12);
+    background: oklch(96.78% 0.033 154.76);
+  }
+
+  .editor-surface :global(.dc-comparison-title) {
+    display: block;
+    margin: 0 0 8px;
+    color: oklch(34.1% 0.098 24.62);
+    font-size: 12px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .editor-surface :global(.dc-comparison-column[data-side='right'] .dc-comparison-title) {
+    color: oklch(29.24% 0.08 154.12);
+  }
+
+  .editor-surface :global(.dc-comparison-body > *:last-child) {
+    margin-bottom: 0;
+  }
+
+  .editor-surface-dark :global(.dc-comparison-column) {
+    border-color: oklch(31.22% 0.028 84.54);
+    border-left-color: oklch(75.02% 0.17 24.82);
+    background: oklch(13.02% 0.026 24.58);
+    color: oklch(91.88% 0.016 91.83);
+  }
+
+  .editor-surface-dark :global(.dc-comparison-column[data-side='right']) {
+    border-left-color: oklch(76.71% 0.151 154.54);
+    background: oklch(12.42% 0.022 154.8);
+  }
+
+  .editor-surface-dark :global(.dc-comparison-title) {
+    color: oklch(93.14% 0.03 24.92);
+  }
+
+  .editor-surface-dark :global(.dc-comparison-column[data-side='right'] .dc-comparison-title) {
+    color: oklch(92.34% 0.029 154.17);
+  }
+
   .editor-surface :global(.dc-callout) {
     margin: 0 0 16px;
     padding: 12px 14px;
@@ -2700,6 +2938,10 @@
 
   @media (max-width: 1120px) {
     .workbench {
+      grid-template-columns: 1fr;
+    }
+
+    .editor-surface :global(.dc-comparison-block) {
       grid-template-columns: 1fr;
     }
 

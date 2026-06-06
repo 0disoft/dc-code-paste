@@ -5,6 +5,7 @@ import { sampleDocument } from "../../src/lib/editor/sample-document";
 const requiredManualCheckNodes = [
   "heading",
   "paragraph",
+  "heroBlock",
   "summaryBox",
   "summaryItem",
   "tipBox",
@@ -19,6 +20,10 @@ const requiredManualCheckNodes = [
   "linkBox",
   "blockquote",
   "sectionHeading",
+  "tutorialBlock",
+  "tutorialStep",
+  "comparisonBlock",
+  "comparisonColumn",
   "ctaButton",
   "ctaGroup",
   "referenceList",

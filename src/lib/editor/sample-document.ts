@@ -1,17 +1,16 @@
 import type { JSONContent } from "@tiptap/core";
 import { createDefaultCtaGroup } from "$lib/editor/cta-group";
+import { createDefaultComparisonBlock } from "$lib/editor/comparison-block";
+import { createDefaultHeroBlock } from "$lib/editor/hero-block";
 import { createDefaultReferenceList } from "$lib/editor/reference-list";
 import { createDefaultSummaryBox } from "$lib/editor/summary-box";
+import { createDefaultTutorialBlock } from "$lib/editor/tutorial-block";
 import { defaultLanguage } from "$lib/highlighter/catalog";
 
 export const sampleDocument: JSONContent = {
   type: "doc",
   content: [
-    {
-      type: "heading",
-      attrs: { level: 1 },
-      content: [{ type: "text", text: "C++로 보는 입력 최적화" }],
-    },
+    createDefaultHeroBlock(),
     createDefaultSummaryBox(),
     {
       type: "paragraph",
@@ -198,6 +197,8 @@ export const sampleDocument: JSONContent = {
       type: "paragraph",
       content: [{ type: "text", text: "아래 코드는 입력 설정을 한 번에 모아 둔 최소 예시야." }],
     },
+    createDefaultTutorialBlock(),
+    createDefaultComparisonBlock(),
     {
       type: "codeBlock",
       attrs: { language: defaultLanguage, highlightLines: "5-6", filename: "main.cpp" },

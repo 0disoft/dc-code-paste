@@ -15,7 +15,10 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "결론" })).toBeVisible();
   await expect(page.getByRole("button", { name: "반박" })).toBeVisible();
   await expect(page.getByRole("button", { name: "섹션" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "히어로" })).toBeVisible();
   await expect(page.getByRole("button", { name: "요약" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "튜토리얼" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "비교" })).toBeVisible();
   await expect(page.getByRole("button", { name: "코드" })).toBeVisible();
   await expect(page.getByRole("button", { name: "CTA" })).toBeVisible();
   await expect(page.getByRole("button", { name: "버튼묶음" })).toBeVisible();
@@ -49,6 +52,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toBeVisible();
   await expect(htmlSource).toHaveValue(/<table width="100%"/);
   await expect(htmlSource).toHaveValue(/bgcolor="#fbfaf2"/);
+  await expect(htmlSource).toHaveValue(/CODING GUIDE/);
+  await expect(htmlSource).toHaveValue(/C\+\+로 보는 입력 최적화/);
+  await expect(htmlSource).toHaveValue(/입출력 병목을 예제와 비교로 빠르게 잡아내는 강의 노트/);
   await expect(htmlSource).toHaveValue(/TIP/);
   await expect(htmlSource).toHaveValue(/성공/);
   await expect(htmlSource).toHaveValue(/실패/);
@@ -59,6 +65,13 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/핵심 요약/);
   await expect(htmlSource).toHaveValue(/입출력 병목은 코드보다 데이터 흐름에서 먼저 찾는다/);
   await expect(htmlSource).toHaveValue(/사용 방법 및 예시/);
+  await expect(htmlSource).toHaveValue(/입력 규모 확인/);
+  await expect(htmlSource).toHaveValue(/입출력 계열 고정/);
+  await expect(htmlSource).toHaveValue(/>01<\/span>/);
+  await expect(htmlSource).toHaveValue(/Before/);
+  await expect(htmlSource).toHaveValue(/After/);
+  await expect(htmlSource).toHaveValue(/endl을 반복문 안에서 계속 쓰면/);
+  await expect(htmlSource).toHaveValue(/\\n으로 출력/);
   await expect(htmlSource).toHaveValue(/cppreference 열기/);
   await expect(htmlSource).toHaveValue(/GitHub/);
   await expect(htmlSource).toHaveValue(/원문/);

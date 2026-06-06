@@ -1,6 +1,15 @@
 const hexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const oklchColorPattern =
   /^oklch\(\s*(?:\d+(?:\.\d+)?%|\d*\.\d+|\d+)\s+\d*(?:\.\d+)?\s+\d+(?:\.\d+)?(?:deg)?(?:\s*\/\s*(?:\d+(?:\.\d+)?%?|0?\.\d+))?\s*\)$/i;
+const oklchPartsPattern =
+  /^oklch\(\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))(%?)\s+((?:\d+(?:\.\d+)?)|(?:\.\d+))\s+((?:\d+(?:\.\d+)?)|(?:\.\d+))(?:deg)?(?:\s*\/\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))(%?))?\s*\)$/i;
+
+type OklchColor = {
+  lightness: number;
+  chroma: number;
+  hue: number;
+  alpha: number;
+};
 
 function expandHexPair(value: string): string {
   return value.length === 1 ? `${value}${value}` : value;
@@ -22,6 +31,103 @@ function formatOklch(lightness: number, chroma: number, hue: number, alpha: numb
   const alphaSuffix = alpha < 1 ? ` / ${round(alpha, 3)}` : "";
 
   return `oklch(${lightnessPercent}% ${roundedChroma} ${roundedHue}${alphaSuffix})`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function parseOklch(value: string): OklchColor | undefined {
+  const match = oklchPartsPattern.exec(value.trim());
+
+  if (!match) {
+    return undefined;
+  }
+
+  const lightnessValue = Number.parseFloat(match[1]);
+  const lightness = match[2] === "%" ? lightnessValue / 100 : lightnessValue;
+  const chroma = Number.parseFloat(match[3]);
+  const hue = Number.parseFloat(match[4]);
+  const rawAlpha = match[5] ? Number.parseFloat(match[5]) : 1;
+  const alpha = match[6] === "%" ? rawAlpha / 100 : rawAlpha;
+
+  if ([lightness, chroma, hue, alpha].some((part) => Number.isNaN(part))) {
+    return undefined;
+  }
+
+  return {
+    lightness: clamp(lightness, 0, 1),
+    chroma: clamp(chroma, 0, 0.4),
+    hue: ((hue % 360) + 360) % 360,
+    alpha: clamp(alpha, 0, 1),
+  };
+}
+
+function oklchToLinearRgb(color: OklchColor): { red: number; green: number; blue: number } {
+  const hueRadians = (color.hue * Math.PI) / 180;
+  const a = Math.cos(hueRadians) * color.chroma;
+  const b = Math.sin(hueRadians) * color.chroma;
+  const longPrime = color.lightness + 0.3963377774 * a + 0.2158037573 * b;
+  const mediumPrime = color.lightness - 0.1055613458 * a - 0.0638541728 * b;
+  const shortPrime = color.lightness - 0.0894841775 * a - 1.291485548 * b;
+  const long = longPrime ** 3;
+  const medium = mediumPrime ** 3;
+  const short = shortPrime ** 3;
+
+  return {
+    red: clamp(4.0767416621 * long - 3.3077115913 * medium + 0.2309699292 * short, 0, 1),
+    green: clamp(-1.2684380046 * long + 2.6097574011 * medium - 0.3413193965 * short, 0, 1),
+    blue: clamp(-0.0041960863 * long - 0.7034186147 * medium + 1.707614701 * short, 0, 1),
+  };
+}
+
+function relativeLuminance(color: OklchColor): number {
+  const rgb = oklchToLinearRgb(color);
+  return 0.2126 * rgb.red + 0.7152 * rgb.green + 0.0722 * rgb.blue;
+}
+
+function contrastRatio(foreground: OklchColor, background: OklchColor): number {
+  const foregroundLuminance = relativeLuminance(foreground);
+  const backgroundLuminance = relativeLuminance(background);
+  const lighter = Math.max(foregroundLuminance, backgroundLuminance);
+  const darker = Math.min(foregroundLuminance, backgroundLuminance);
+
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function readableFallbackColor(background: OklchColor): string {
+  return relativeLuminance(background) < 0.5 ? "oklch(94% 0.018 90)" : "oklch(22% 0.018 255)";
+}
+
+function adjustReadableTextColor(
+  foreground: OklchColor,
+  background: OklchColor,
+  minContrast: number,
+): string {
+  const shouldLighten = relativeLuminance(background) < 0.5;
+  const start = foreground.lightness;
+  const end = shouldLighten ? 0.96 : 0.18;
+  const direction = shouldLighten ? 1 : -1;
+  const chroma = Math.min(foreground.chroma, 0.18);
+
+  for (
+    let lightness = start;
+    shouldLighten ? lightness <= end : lightness >= end;
+    lightness += direction * 0.01
+  ) {
+    const candidate = {
+      ...foreground,
+      lightness: clamp(lightness, 0, 1),
+      chroma,
+      alpha: 1,
+    };
+
+    if (contrastRatio(candidate, background) >= minContrast) {
+      return formatOklch(candidate.lightness, candidate.chroma, candidate.hue, candidate.alpha);
+    }
+  }
+
+  return readableFallbackColor(background);
 }
 
 function hexToOklch(value: string): string | undefined {
@@ -75,6 +181,28 @@ export function sanitizeColor(value: string | undefined, fallback: string): stri
   }
 
   return fallback;
+}
+
+export function sanitizeReadableTextColor(
+  value: string | undefined,
+  background: string,
+  fallback: string,
+  minContrast = 4.5,
+): string {
+  const foreground = sanitizeColor(value, fallback);
+  const normalizedBackground = sanitizeColor(background, fallback);
+  const foregroundColor = parseOklch(foreground);
+  const backgroundColor = parseOklch(normalizedBackground);
+
+  if (!foregroundColor || !backgroundColor) {
+    return foreground;
+  }
+
+  if (contrastRatio(foregroundColor, backgroundColor) >= minContrast) {
+    return foreground;
+  }
+
+  return adjustReadableTextColor(foregroundColor, backgroundColor, minContrast);
 }
 
 export function joinStyle(parts: Record<string, string | number | boolean | undefined>): string {

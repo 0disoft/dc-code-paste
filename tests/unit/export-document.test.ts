@@ -309,6 +309,41 @@ describe("exportDocumentToDcHtml", () => {
     );
   });
 
+  it("auto-adjusts selected text colors that would disappear in dark document mode", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "다크모드 안전색",
+              marks: [
+                {
+                  type: "textStyle",
+                  attrs: {
+                    color: "oklch(10% 0.02 255)",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      documentTheme: "darkEditorial",
+    });
+    const selectedColor = html.match(/<span style="color:oklch\((\d+(?:\.\d+)?)%/);
+
+    expect(html).toContain("다크모드 안전색");
+    expect(html).not.toContain("color:oklch(10% 0.02 255)");
+    expect(Number(selectedColor?.[1])).toBeGreaterThan(50);
+  });
+
   it("exports CTA button groups with horizontal and vertical table layouts", async () => {
     const document: JSONContent = {
       type: "doc",
@@ -438,6 +473,144 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("본문은 아래에서 천천히 풀어낸다.");
     expect(html).toContain("border-top:4px solid");
     expect(html).toContain("border-radius:999px");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports hero blocks as paste-safe title panels", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "heroBlock",
+          attrs: { label: "CODEX GUIDE" },
+          content: [
+            {
+              type: "heading",
+              attrs: { level: 1 },
+              content: [{ type: "text", text: "Codex의 /goal 지시어는 어떻게 쓰는가?" }],
+            },
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "/goal은 작업을 검증 가능한 완료 계약으로 바꾼다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('bgcolor="#fbf6e6"');
+    expect(html).toContain("CODEX GUIDE");
+    expect(html).toContain("Codex의 /goal 지시어는 어떻게 쓰는가?");
+    expect(html).toContain("/goal은 작업을 검증 가능한 완료 계약으로 바꾼다.");
+    expect(html).toContain("border-top:4px solid");
+    expect(html).toContain("font-size:30px");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports tutorial blocks as numbered section cards", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "tutorialBlock",
+          content: [
+            {
+              type: "tutorialStep",
+              attrs: { title: "문제 파악" },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "입력 크기와 반복 횟수를 먼저 본다." }],
+                },
+              ],
+            },
+            {
+              type: "tutorialStep",
+              attrs: { title: "병목 좁히기" },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "시간이 튀는 지점만 따로 재본다." }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('bgcolor="#fbfaf2"');
+    expect(html).toContain(">01</span>");
+    expect(html).toContain(">02</span>");
+    expect(html).toContain("문제 파악");
+    expect(html).toContain("병목 좁히기");
+    expect(html).toContain("입력 크기와 반복 횟수를 먼저 본다.");
+    expect(html).toContain("시간이 튀는 지점만 따로 재본다.");
+    expect(html).toContain("border-left:4px solid");
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports comparison blocks as two-column paste-safe tables", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "comparisonBlock",
+          content: [
+            {
+              type: "comparisonColumn",
+              attrs: { side: "left", title: "잘못된 코드" },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "endl을 반복문 안에서 계속 쓴다." }],
+                },
+              ],
+            },
+            {
+              type: "comparisonColumn",
+              attrs: { side: "right", title: "수정 코드" },
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "\\n 출력으로 바꾼다." }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain('<td width="50%"');
+    expect(html).toContain('bgcolor="#fff0ee"');
+    expect(html).toContain('bgcolor="#e9f9ef"');
+    expect(html).toContain("잘못된 코드");
+    expect(html).toContain("수정 코드");
+    expect(html).toContain("endl을 반복문 안에서 계속 쓴다.");
+    expect(html).toContain("\\n 출력으로 바꾼다.");
+    expect(html).toContain("border-left:4px solid");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
