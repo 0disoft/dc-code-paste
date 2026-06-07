@@ -31,7 +31,7 @@
   import { onMount } from 'svelte';
   import type { Editor, JSONContent } from '@tiptap/core';
   import { copyDcHtml, copyPlainText } from '$lib/dc/clipboard';
-  import { fontFamilyOptions } from '$lib/dc/font-stacks';
+  import { defaultProseFontFamily } from '$lib/dc/font-stacks';
   import { sanitizeReadableTextColor } from '$lib/dc/sanitize-style';
   import {
     exportDocumentToDcHtml,
@@ -101,16 +101,8 @@
     type PresetSnapshot
   } from '$lib/editor/preset-storage';
 
-  const fontFamilies = fontFamilyOptions;
-  const legacyFontFamilies = new Map([
-    ['Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif', fontFamilies[0].value],
-    ['Georgia, Times New Roman, serif', fontFamilies[1].value],
-    ['Inter, Pretendard, Segoe UI, sans-serif', fontFamilies[2].value],
-    [
-      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-      fontFamilies[3].value
-    ]
-  ]);
+  const bodyFontFamily = defaultProseFontFamily;
+  const selectionFontFamily = defaultProseFontFamily;
   const bodySizes = ['14px', '15px', '16px', '17px', '18px'];
   const codeSizes = ['13px', '14px', '15px', '16px'];
   const exportStructures: { label: string; value: DcExportStructure }[] = [
@@ -145,9 +137,7 @@
   let documentJson = $state<JSONContent>(structuredClone(sampleDocument));
   let language = $state<DcLanguageId>(defaultLanguage);
   let theme = $state<DcThemeId>(defaultTheme);
-  let bodyFontFamily = $state(fontFamilies[0].value);
   let bodyFontSize = $state('15px');
-  let selectionFontFamily = $state(fontFamilies[0].value);
   let selectionFontSize = $state('15px');
   let quoteStyle = $state<QuoteStyle>('literary');
   let ctaGroupLayout = $state<CtaGroupLayout>('horizontal');
@@ -198,9 +188,9 @@
     return {
       language: defaultLanguage,
       theme: defaultTheme,
-      bodyFontFamily: fontFamilies[0].value,
+      bodyFontFamily,
       bodyFontSize: '15px',
-      selectionFontFamily: fontFamilies[0].value,
+      selectionFontFamily,
       selectionFontSize: '15px',
       codeFontSize: '14px',
       showLineNumbers: false,
@@ -224,14 +214,6 @@
     };
   }
 
-  function normalizeKnownFontFamily(value: string) {
-    if (fontFamilies.some((font) => font.value === value)) {
-      return value;
-    }
-
-    return legacyFontFamilies.get(value) ?? fontFamilies[0].value;
-  }
-
   function isKnownBodySize(value: string) {
     return bodySizes.includes(value);
   }
@@ -243,9 +225,7 @@
   function applyDraftPreferences(preferences: DraftPreferences) {
     language = preferences.language;
     theme = preferences.theme;
-    bodyFontFamily = normalizeKnownFontFamily(preferences.bodyFontFamily);
     bodyFontSize = isKnownBodySize(preferences.bodyFontSize) ? preferences.bodyFontSize : '15px';
-    selectionFontFamily = normalizeKnownFontFamily(preferences.selectionFontFamily);
     selectionFontSize = isKnownBodySize(preferences.selectionFontSize) ? preferences.selectionFontSize : '15px';
     codeFontSize = isKnownCodeSize(preferences.codeFontSize) ? preferences.codeFontSize : '14px';
     showLineNumbers = preferences.showLineNumbers;
@@ -866,10 +846,6 @@
     runEditorCommand((current) => current.chain().focus().setColor(readableColor).run());
   }
 
-  function setFontFamily(value: string) {
-    runEditorCommand((current) => current.chain().focus().setFontFamily(value).run());
-  }
-
   function setFontSize(value: string) {
     runEditorCommand((current) => current.chain().focus().setFontSize(value).run());
   }
@@ -991,9 +967,6 @@
           const ctaGroupAttrs = current.getAttributes('ctaGroup');
           ctaGroupLayout = normalizeCtaGroupLayout(ctaGroupAttrs.layout);
           const textStyleAttrs = current.getAttributes('textStyle');
-          if (typeof textStyleAttrs.fontFamily === 'string') {
-            selectionFontFamily = textStyleAttrs.fontFamily;
-          }
           if (typeof textStyleAttrs.fontSize === 'string') {
             selectionFontSize = textStyleAttrs.fontSize;
           }
@@ -1048,7 +1021,7 @@
   </header>
 
   <section class="toolbar" aria-label="글 편집 도구">
-    <div class="tool-group">
+    <div class="tool-group command-group">
       <button
         type="button"
         title="실행 취소"
@@ -1086,7 +1059,7 @@
       </button>
     </div>
 
-    <div class="tool-group">
+    <div class="tool-group inline-group">
       <button
         class:active={isActive('heading', { level: 1 })}
         type="button"
@@ -1165,7 +1138,7 @@
       </div>
     {/if}
 
-    <div class="tool-group">
+    <div class="tool-group block-insert-group">
       <button
         class:active={isActive('bulletList')}
         type="button"
@@ -1278,7 +1251,7 @@
       </label>
     </div>
 
-    <div class="tool-group tool-group-wide">
+    <div class="tool-group tool-group-wide code-settings-group">
       <button class:active={isActive('codeBlock')} type="button" onclick={applyCodeBlock}>
         <Code2 size={17} />
         <span>코드</span>
@@ -1353,28 +1326,12 @@
       </label>
     </div>
 
-    <div class="tool-group tool-group-wide">
-      <label>
-        <span><Type size={15} /> 기본</span>
-        <select bind:value={bodyFontFamily} aria-label="기본 폰트">
-          {#each fontFamilies as item}
-            <option value={item.value}>{item.label}</option>
-          {/each}
-        </select>
-      </label>
+    <div class="tool-group tool-group-wide typography-group">
       <label>
         <span>본문</span>
         <select bind:value={bodyFontSize} aria-label="기본 크기">
           {#each bodySizes as item}
             <option value={item}>{item}</option>
-          {/each}
-        </select>
-      </label>
-      <label>
-        <span><Type size={15} /> 선택</span>
-        <select bind:value={selectionFontFamily} aria-label="선택 폰트" onchange={() => setFontFamily(selectionFontFamily)}>
-          {#each fontFamilies as item}
-            <option value={item.value}>{item.label}</option>
           {/each}
         </select>
       </label>
@@ -1583,7 +1540,7 @@
       </div>
 
       {#if previewMode === 'rendered'}
-        <div class="preview-surface">
+        <div class="preview-surface" class:preview-surface-dark={documentTheme === 'darkEditorial'}>
           {#if html}
             {@html html}
           {:else}
@@ -1660,13 +1617,13 @@
     position: sticky;
     top: 8px;
     z-index: 20;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 9px 10px;
+    align-items: stretch;
     max-height: calc(100vh - 16px);
     margin-bottom: 12px;
-    overflow-y: auto;
+    overflow: auto;
     overscroll-behavior: contain;
     padding: 10px;
     border: 1px solid var(--line);
@@ -1679,24 +1636,62 @@
   .tool-group {
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-height: 40px;
-    padding-right: 8px;
-    border-right: 1px solid var(--line);
+    gap: 7px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in oklch, var(--line) 78%, transparent);
+    border-radius: 8px;
+    background: color-mix(in oklch, var(--panel-2) 46%, transparent);
   }
 
   .tool-group:last-child {
-    border-right: 0;
+    border-right: 1px solid color-mix(in oklch, var(--line) 78%, transparent);
   }
 
   .tool-group-wide {
     flex-wrap: wrap;
   }
 
+  .command-group {
+    grid-column: 1;
+    width: max-content;
+  }
+
+  .inline-group {
+    grid-column: 2;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
+  }
+
+  .link-tool,
+  .block-insert-group,
+  .code-settings-group,
+  .typography-group {
+    grid-column: 1 / -1;
+  }
+
+  .block-insert-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 8px;
+    scrollbar-gutter: stable;
+  }
+
+  .block-insert-group > * {
+    flex: 0 0 auto;
+  }
+
   .toolbar button,
   .toolbar label,
   .switch {
-    height: 34px;
+    height: 36px;
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .toolbar button {
@@ -1704,13 +1699,24 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-width: 34px;
+    min-width: 36px;
+    padding: 0 10px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--panel-2);
     color: var(--text);
     font-weight: 800;
     cursor: pointer;
+  }
+
+  .toolbar :global(svg) {
+    flex: 0 0 auto;
+  }
+
+  .toolbar button span,
+  .toolbar label span,
+  .switch span {
+    white-space: nowrap;
   }
 
   .toolbar button.active {
@@ -1740,7 +1746,8 @@
   }
 
   select {
-    height: 34px;
+    height: 36px;
+    min-width: 104px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--panel-2);
@@ -1749,7 +1756,7 @@
 
   input[type='url'] {
     width: min(320px, 48vw);
-    height: 34px;
+    height: 36px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--panel-2);
@@ -1769,7 +1776,7 @@
 
   input[type='text'] {
     width: min(260px, 44vw);
-    height: 34px;
+    height: 36px;
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--panel-2);
@@ -1784,7 +1791,7 @@
 
   .code-filename-input,
   .line-highlight-input {
-    width: 150px;
+    width: 170px;
   }
 
   .link-tool {
@@ -1837,19 +1844,43 @@
     color: oklch(92.14% 0.017 247.64);
     padding: 12px;
     font-family:
-      Consolas,
-      D2Coding,
-      나눔고딕코딩,
-      NanumGothicCoding,
-      Noto Sans Mono CJK KR,
       Cascadia Mono,
       Cascadia Code,
+      Cascadia Mono PL,
+      Cascadia Code PL,
+      D2Coding,
+      D2Coding ligature,
+      D2CodingLigature,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Nanum Gothic Coding,
+      Noto Sans Mono CJK KR,
+      Noto Sans Mono CJK,
+      Noto Sans Mono,
+      Source Han Mono K,
+      Source Han Mono KR,
+      Sarasa Mono K,
+      Sarasa Gothic K,
       JetBrains Mono,
       Fira Code,
+      Fira Mono,
+      Hack,
       Source Code Pro,
+      IBM Plex Mono,
+      Roboto Mono,
+      Iosevka,
+      Iosevka Fixed,
+      Monaspace Neon,
+      Monaspace Argon,
+      DejaVu Sans Mono,
+      Liberation Mono,
+      Ubuntu Mono,
+      Bitstream Vera Sans Mono,
+      Consolas,
       SFMono-Regular,
       Menlo,
       Monaco,
+      Lucida Console,
       Courier New,
       monospace;
     font-size: 13px;
@@ -2182,16 +2213,36 @@
     min-height: 640px;
     outline: none;
     font-family:
-      Malgun Gothic,
-      맑은 고딕,
+      Pretendard,
+      Noto Sans KR,
+      Noto Sans CJK KR,
+      SUIT,
+      Wanted Sans,
+      Spoqa Han Sans Neo,
+      Spoqa Han Sans,
+      Source Han Sans K,
+      Source Han Sans KR,
+      본고딕,
+      Nanum Gothic,
+      NanumGothic,
+      NanumSquare,
+      NanumSquare Neo,
+      NanumBarunGothic,
+      나눔고딕,
+      나눔스퀘어,
+      나눔바른고딕,
+      IBM Plex Sans KR,
+      Gmarket Sans,
+      Arial Unicode MS,
       Apple SD Gothic Neo,
       AppleGothic,
-      Pretendard,
-      Noto Sans CJK KR,
-      Noto Sans KR,
-      Nanum Gothic,
       Segoe UI,
+      Malgun Gothic,
+      맑은 고딕,
+      Noto Sans,
       Arial,
+      Helvetica Neue,
+      Helvetica,
       sans-serif;
     font-size: 15px;
     line-height: 1.7;
@@ -2227,31 +2278,96 @@
     background: oklch(18.22% 0.017 258.21);
     color: oklch(90.2% 0.018 258.33);
     padding: 14px 16px;
-  }
-
-  .editor-surface :global(.article-editor code) {
     font-family:
-      Consolas,
-      D2Coding,
-      나눔고딕코딩,
-      NanumGothicCoding,
-      Noto Sans Mono CJK KR,
       Cascadia Mono,
       Cascadia Code,
+      Cascadia Mono PL,
+      Cascadia Code PL,
+      D2Coding,
+      D2Coding ligature,
+      D2CodingLigature,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Nanum Gothic Coding,
+      Noto Sans Mono CJK KR,
+      Noto Sans Mono CJK,
+      Noto Sans Mono,
+      Source Han Mono K,
+      Source Han Mono KR,
+      Sarasa Mono K,
+      Sarasa Gothic K,
       JetBrains Mono,
       Fira Code,
+      Fira Mono,
+      Hack,
       Source Code Pro,
+      IBM Plex Mono,
+      Roboto Mono,
+      Iosevka,
+      Iosevka Fixed,
+      Monaspace Neon,
+      Monaspace Argon,
+      DejaVu Sans Mono,
+      Liberation Mono,
+      Ubuntu Mono,
+      Bitstream Vera Sans Mono,
+      Consolas,
       SFMono-Regular,
       Menlo,
       Monaco,
+      Lucida Console,
       Courier New,
       monospace;
+  }
+
+  .editor-surface :global(.article-editor pre code) {
+    font-family: inherit;
   }
 
   .editor-surface :global(.article-editor :not(pre) > code) {
     border-radius: 4px;
     background: oklch(94.93% 0.016 255.07);
     color: oklch(34.86% 0.087 278.64);
+    font-family:
+      Cascadia Mono,
+      Cascadia Code,
+      Cascadia Mono PL,
+      Cascadia Code PL,
+      D2Coding,
+      D2Coding ligature,
+      D2CodingLigature,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Nanum Gothic Coding,
+      Noto Sans Mono CJK KR,
+      Noto Sans Mono CJK,
+      Noto Sans Mono,
+      Source Han Mono K,
+      Source Han Mono KR,
+      Sarasa Mono K,
+      Sarasa Gothic K,
+      JetBrains Mono,
+      Fira Code,
+      Fira Mono,
+      Hack,
+      Source Code Pro,
+      IBM Plex Mono,
+      Roboto Mono,
+      Iosevka,
+      Iosevka Fixed,
+      Monaspace Neon,
+      Monaspace Argon,
+      DejaVu Sans Mono,
+      Liberation Mono,
+      Ubuntu Mono,
+      Bitstream Vera Sans Mono,
+      Consolas,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Lucida Console,
+      Courier New,
+      monospace;
     padding: 1px 4px;
   }
 
@@ -2383,7 +2499,7 @@
     color: oklch(97.22% 0.008 92.87);
   }
 
-  .editor-surface :global(.dc-cta-button) {
+  .editor-surface :global(.article-editor .dc-cta-button) {
     display: inline-block;
     margin: 0 10px 16px 0;
     padding: 11px 22px;
@@ -2395,13 +2511,13 @@
     text-decoration: none;
   }
 
-  .editor-surface-dark :global(.dc-cta-button) {
+  .editor-surface-dark :global(.article-editor .dc-cta-button) {
     border-color: oklch(96.28% 0.022 90.84);
     background: oklch(91.44% 0.064 90.52);
     color: oklch(13.77% 0.018 87.82);
   }
 
-  .editor-surface :global(.dc-cta-group) {
+  .editor-surface :global(.article-editor .dc-cta-group) {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -2409,12 +2525,12 @@
     margin: 0 0 16px;
   }
 
-  .editor-surface :global(.dc-cta-group[data-layout='vertical']) {
+  .editor-surface :global(.article-editor .dc-cta-group[data-layout='vertical']) {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .editor-surface :global(.dc-cta-group .dc-cta-button) {
+  .editor-surface :global(.article-editor .dc-cta-group .dc-cta-button) {
     margin: 0;
   }
 
@@ -2863,6 +2979,10 @@
     background: oklch(98.38% 0.01 97.33);
   }
 
+  .preview-surface-dark {
+    background: oklch(7.2% 0.012 94.1);
+  }
+
   .html-source {
     display: block;
     width: 100%;
@@ -2874,19 +2994,43 @@
     color: oklch(91.18% 0.019 247.75);
     padding: 18px;
     font-family:
-      Consolas,
-      D2Coding,
-      나눔고딕코딩,
-      NanumGothicCoding,
-      Noto Sans Mono CJK KR,
       Cascadia Mono,
       Cascadia Code,
+      Cascadia Mono PL,
+      Cascadia Code PL,
+      D2Coding,
+      D2Coding ligature,
+      D2CodingLigature,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Nanum Gothic Coding,
+      Noto Sans Mono CJK KR,
+      Noto Sans Mono CJK,
+      Noto Sans Mono,
+      Source Han Mono K,
+      Source Han Mono KR,
+      Sarasa Mono K,
+      Sarasa Gothic K,
       JetBrains Mono,
       Fira Code,
+      Fira Mono,
+      Hack,
       Source Code Pro,
+      IBM Plex Mono,
+      Roboto Mono,
+      Iosevka,
+      Iosevka Fixed,
+      Monaspace Neon,
+      Monaspace Argon,
+      DejaVu Sans Mono,
+      Liberation Mono,
+      Ubuntu Mono,
+      Bitstream Vera Sans Mono,
+      Consolas,
       SFMono-Regular,
       Menlo,
       Monaco,
+      Lucida Console,
       Courier New,
       monospace;
     font-size: 13px;
@@ -2902,19 +3046,43 @@
   .empty {
     color: oklch(51.52% 0.02 87.11);
     font-family:
-      Consolas,
-      D2Coding,
-      나눔고딕코딩,
-      NanumGothicCoding,
-      Noto Sans Mono CJK KR,
       Cascadia Mono,
       Cascadia Code,
+      Cascadia Mono PL,
+      Cascadia Code PL,
+      D2Coding,
+      D2Coding ligature,
+      D2CodingLigature,
+      나눔고딕코딩,
+      NanumGothicCoding,
+      Nanum Gothic Coding,
+      Noto Sans Mono CJK KR,
+      Noto Sans Mono CJK,
+      Noto Sans Mono,
+      Source Han Mono K,
+      Source Han Mono KR,
+      Sarasa Mono K,
+      Sarasa Gothic K,
       JetBrains Mono,
       Fira Code,
+      Fira Mono,
+      Hack,
       Source Code Pro,
+      IBM Plex Mono,
+      Roboto Mono,
+      Iosevka,
+      Iosevka Fixed,
+      Monaspace Neon,
+      Monaspace Argon,
+      DejaVu Sans Mono,
+      Liberation Mono,
+      Ubuntu Mono,
+      Bitstream Vera Sans Mono,
+      Consolas,
       SFMono-Regular,
       Menlo,
       Monaco,
+      Lucida Console,
       Courier New,
       monospace;
   }
@@ -2965,16 +3133,27 @@
       width: 100%;
     }
 
+    .toolbar {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .command-group,
+    .inline-group,
+    .link-tool,
+    .block-insert-group,
+    .code-settings-group,
+    .typography-group {
+      grid-column: 1;
+      width: 100%;
+    }
+
     .tool-group {
       width: 100%;
-      border-right: 0;
-      border-bottom: 1px solid var(--line);
-      padding: 0 0 8px;
+      border-right: 1px solid color-mix(in oklch, var(--line) 78%, transparent);
     }
 
     .tool-group:last-child {
-      border-bottom: 0;
-      padding-bottom: 0;
+      padding-bottom: 6px;
     }
 
     .preset-save,

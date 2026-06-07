@@ -76,10 +76,11 @@ export function renderDcHtml(input: DcRenderInput): string {
   const foreground = sanitizeColor(input.foreground, fallbackForeground);
   const filename = input.filename?.trim();
   const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
+  const codeFontFamily = safeCodeFontFamily();
   const preStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
     color: foreground,
-    "font-family": safeCodeFontFamily(),
+    "font-family": codeFontFamily,
     "font-size": input.fontSize ?? "14px",
     "line-height": "1.58",
     margin: filename ? 0 : "0 0 16px",
@@ -87,6 +88,17 @@ export function renderDcHtml(input: DcRenderInput): string {
     "white-space": "pre-wrap",
     "word-break": "normal",
     "overflow-wrap": "anywhere",
+    "tab-size": 4,
+  });
+  const codeStyle = joinStyle({
+    background: "none",
+    color: "inherit",
+    "font-family": codeFontFamily,
+    "font-size": "inherit",
+    "line-height": "inherit",
+    "white-space": "inherit",
+    "word-break": "inherit",
+    "overflow-wrap": "inherit",
     "tab-size": 4,
   });
 
@@ -128,7 +140,7 @@ export function renderDcHtml(input: DcRenderInput): string {
     return `<span style="${lineStyle}">${content}</span>`;
   });
 
-  const code = `<pre style="${preStyle}"><code>${renderedLines.join("\n")}</code></pre>`;
+  const code = `<pre style="${preStyle}"><code style="${codeStyle}">${renderedLines.join("\n")}</code></pre>`;
 
   if (!filename) {
     return code;
@@ -144,7 +156,7 @@ export function renderDcHtml(input: DcRenderInput): string {
     display: "block",
     "background-color": "oklch(20.16% 0.018 257.49)",
     color: "oklch(89.72% 0.019 247.91)",
-    "font-family": safeCodeFontFamily(),
+    "font-family": codeFontFamily,
     "font-size": "12px",
     "font-weight": 800,
     "line-height": 1.2,

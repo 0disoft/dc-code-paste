@@ -36,18 +36,13 @@ const codeSignals = new Set([
 ]);
 
 export const proseFallbackFonts = [
-  "Malgun Gothic",
-  "맑은 고딕",
-  "Apple SD Gothic Neo",
-  "AppleGothic",
   "Pretendard",
+  "Noto Sans KR",
+  "Noto Sans CJK KR",
   "SUIT",
   "Wanted Sans",
   "Spoqa Han Sans Neo",
   "Spoqa Han Sans",
-  "Noto Sans CJK KR",
-  "Noto Sans KR",
-  "Noto Sans",
   "Source Han Sans K",
   "Source Han Sans KR",
   "본고딕",
@@ -62,7 +57,12 @@ export const proseFallbackFonts = [
   "IBM Plex Sans KR",
   "Gmarket Sans",
   "Arial Unicode MS",
+  "Apple SD Gothic Neo",
+  "AppleGothic",
   "Segoe UI",
+  "Malgun Gothic",
+  "맑은 고딕",
+  "Noto Sans",
   "Arial",
   "Helvetica Neue",
   "Helvetica",
@@ -88,7 +88,10 @@ export const serifFallbackFonts = [
 ] as const;
 
 export const codeFallbackFonts = [
-  "Consolas",
+  "Cascadia Mono",
+  "Cascadia Code",
+  "Cascadia Mono PL",
+  "Cascadia Code PL",
   "D2Coding",
   "D2Coding ligature",
   "D2CodingLigature",
@@ -102,10 +105,6 @@ export const codeFallbackFonts = [
   "Source Han Mono KR",
   "Sarasa Mono K",
   "Sarasa Gothic K",
-  "Cascadia Mono",
-  "Cascadia Code",
-  "Cascadia Mono PL",
-  "Cascadia Code PL",
   "JetBrains Mono",
   "Fira Code",
   "Fira Mono",
@@ -121,6 +120,7 @@ export const codeFallbackFonts = [
   "Liberation Mono",
   "Ubuntu Mono",
   "Bitstream Vera Sans Mono",
+  "Consolas",
   "SFMono-Regular",
   "Menlo",
   "Monaco",
@@ -199,13 +199,15 @@ export function buildFontStack(
   primaryFonts: readonly string[],
   mode: "prose" | "code" = "prose",
 ): string {
+  const normalizedPrimaryFonts = primaryFonts.map(normalizeFontName).filter(Boolean);
+
   return appendFallbackFonts(
-    primaryFonts.map(normalizeFontName).filter(Boolean),
-    fallbackFontsFor(primaryFonts, mode),
+    mode === "code" ? [] : normalizedPrimaryFonts,
+    fallbackFontsFor(normalizedPrimaryFonts, mode),
   );
 }
 
-export function safeProseFontFamily(value: string): string {
+export function safeProseFontFamily(value = ""): string {
   return buildFontStack(parseFontFamily(value), "prose");
 }
 
@@ -213,9 +215,5 @@ export function safeCodeFontFamily(value = ""): string {
   return buildFontStack(parseFontFamily(value), "code");
 }
 
-export const fontFamilyOptions = [
-  { label: "맑은 고딕", value: buildFontStack(["Malgun Gothic"]) },
-  { label: "고운 본문", value: buildFontStack(["Georgia", "Times New Roman"]) },
-  { label: "둥근 산스", value: buildFontStack(["Pretendard", "Inter"]) },
-  { label: "코드", value: buildFontStack(["Consolas"], "code") },
-] as const;
+export const defaultProseFontFamily = safeProseFontFamily();
+export const defaultCodeFontFamily = safeCodeFontFamily();

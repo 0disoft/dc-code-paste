@@ -30,9 +30,56 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 파일명")).toBeVisible();
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
   await expect(page.getByLabel("문서 테마", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("기본 폰트")).toHaveCount(0);
+  await expect(page.getByLabel("선택 폰트")).toHaveCount(0);
+
+  const crampedToolbarItems = await page
+    .getByLabel("글 편집 도구")
+    .locator("button, label")
+    .evaluateAll((items) =>
+      items
+        .map((item) => {
+          const element = item as HTMLElement;
+          const box = element.getBoundingClientRect();
+
+          return {
+            height: box.height,
+            label:
+              element.textContent?.replace(/\s+/g, " ").trim() ??
+              element.getAttribute("aria-label") ??
+              "",
+            overflow: element.scrollHeight - element.clientHeight,
+          };
+        })
+        .filter((item) => item.height > 44 || item.overflow > 2),
+    );
+  expect(crampedToolbarItems).toEqual([]);
+
   await expect(page.getByText("글쓰기")).toBeVisible();
   await expect(page.getByLabel("현재 복붙 구조")).toHaveText("DC 테이블");
   await expect(page.getByLabel("현재 문서 테마")).toHaveText("강의 라이트");
+  await page.getByLabel("문서 테마", { exact: true }).selectOption("darkEditorial");
+  await expect(page.getByLabel("현재 문서 테마")).toHaveText("다크 에디토리얼");
+  await expect(page.locator(".preview-surface")).toHaveClass(/preview-surface-dark/);
+  const darkEditorCtaColors = await page.locator(".editor-surface").evaluate((surface) => {
+    const cta = surface.querySelector<HTMLElement>(".dc-cta-button");
+    const regularLink = surface.querySelector<HTMLElement>("a:not(.dc-cta-button)");
+
+    if (!cta || !regularLink) {
+      throw new Error("Expected sample document to include a CTA button and a regular link");
+    }
+
+    return {
+      ctaBackground: getComputedStyle(cta).backgroundColor,
+      ctaColor: getComputedStyle(cta).color,
+      regularLinkColor: getComputedStyle(regularLink).color,
+    };
+  });
+  expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.regularLinkColor);
+  expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.ctaBackground);
+  await page.getByLabel("문서 테마", { exact: true }).selectOption("lightLecture");
+  await expect(page.getByLabel("현재 문서 테마")).toHaveText("강의 라이트");
+  await expect(page.locator(".preview-surface")).not.toHaveClass(/preview-surface-dark/);
   await expect(page.getByRole("region", { name: "프리셋" })).toBeVisible();
   await expect(page.getByLabel("저장된 프리셋")).toContainText("프리셋 없음");
   await expect(page.getByRole("region", { name: "초안 히스토리" })).toBeVisible();

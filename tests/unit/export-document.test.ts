@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { exportDocumentToDcHtml } from "../../src/lib/dc/export-document";
 import {
   codeFallbackFonts,
-  fontFamilyOptions,
+  defaultProseFontFamily,
   safeProseFontFamily,
 } from "../../src/lib/dc/font-stacks";
 
 const exportOptions = {
   theme: "github-dark",
-  bodyFontFamily: fontFamilyOptions[0].value,
+  bodyFontFamily: defaultProseFontFamily,
   bodyFontSize: "15px",
   codeFontSize: "14px",
   showLineNumbers: false,
@@ -305,7 +305,7 @@ describe("exportDocumentToDcHtml", () => {
       `<span style="font-family:${safeProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
     );
     expect(html).toContain(
-      `<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:${fontFamilyOptions[0].value};font-size:15px`,
+      `<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:${defaultProseFontFamily};font-size:15px`,
     );
   });
 

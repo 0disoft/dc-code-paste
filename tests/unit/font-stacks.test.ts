@@ -11,6 +11,7 @@ import {
 describe("font stacks", () => {
   it("keeps selected prose fonts while appending Korean and system fallbacks", () => {
     const stack = safeProseFontFamily("Inter");
+    const fonts = stack.split(", ");
 
     expect(stack.startsWith("Inter, ")).toBe(true);
     expect(stack).toContain("Malgun Gothic");
@@ -21,7 +22,10 @@ describe("font stacks", () => {
     expect(stack).toContain("Spoqa Han Sans Neo");
     expect(stack).toContain("IBM Plex Sans KR");
     expect(stack).toContain("sans-serif");
-    expect(stack.split(", ")).toHaveLength(new Set(["Inter", ...proseFallbackFonts]).size);
+    expect(fonts.indexOf("Pretendard")).toBeLessThan(fonts.indexOf("Segoe UI"));
+    expect(fonts.indexOf("Noto Sans KR")).toBeLessThan(fonts.indexOf("Segoe UI"));
+    expect(fonts.indexOf("Segoe UI")).toBeLessThan(fonts.indexOf("Malgun Gothic"));
+    expect(fonts).toHaveLength(new Set(["Inter", ...proseFallbackFonts]).size);
   });
 
   it("uses serif fallbacks for serif-like prose selections", () => {
@@ -40,8 +44,10 @@ describe("font stacks", () => {
 
   it("uses coding fallbacks for code-like selections", () => {
     const stack = safeCodeFontFamily();
+    const fonts = stack.split(", ");
 
     expect(stack).toBe(codeFallbackFonts.join(", "));
+    expect(fonts.slice(0, 2)).toEqual(["Cascadia Mono", "Cascadia Code"]);
     expect(stack).toContain("Consolas");
     expect(stack).toContain("D2Coding");
     expect(stack).toContain("나눔고딕코딩");
@@ -52,6 +58,7 @@ describe("font stacks", () => {
     expect(stack).toContain("Fira Code");
     expect(stack).toContain("Source Code Pro");
     expect(stack).toContain("monospace");
+    expect(fonts.indexOf("Cascadia Code")).toBeLessThan(fonts.indexOf("Consolas"));
     expect(buildFontStack(["ui-monospace", "Consolas"], "code")).toBe(stack);
   });
 

@@ -24,6 +24,9 @@ describe("renderDcHtml", () => {
     expect(html).toContain("color:oklch(");
     expect(html).toContain("font-weight:700");
     expect(html).toContain(`font-family:${codeFallbackFonts.join(", ")}`);
+    expect(html).toContain(
+      `<code style="background:none;color:inherit;font-family:${codeFallbackFonts.join(", ")}`,
+    );
     expect(html).toContain("&lt;tag&gt;");
     expect(html).toContain(">1</span>");
     expect(html).not.toContain("#");
