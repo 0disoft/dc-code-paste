@@ -221,7 +221,7 @@
     );
     const markdownImportStateLabel = $derived(
         markdownImportState === "imported"
-            ? "가져옴"
+            ? "적용됨"
             : markdownImportState === "error"
               ? "비어 있음"
               : "대기",
@@ -1847,11 +1847,11 @@
                 <button
                     class="markdown-import-button"
                     type="button"
-                    aria-label="Markdown 가져오기"
+                    aria-label="Markdown 적용하기"
                     onclick={importMarkdownDraft}
                 >
                     <FileText size={16} />
-                    <span>가져오기</span>
+                    <span>적용하기</span>
                 </button>
                 <button
                     class="markdown-clear-button"

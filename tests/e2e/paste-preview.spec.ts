@@ -151,7 +151,7 @@ test("renders the paste tool", async ({ page }) => {
         "```",
       ].join("\n"),
     );
-  await page.getByRole("button", { name: "Markdown 가져오기" }).click();
+  await page.getByRole("button", { name: "Markdown 적용하기" }).click();
   await expect(htmlSource).toHaveValue(/Markdown 강의/);
   await expect(htmlSource).toHaveValue(/입력 크기를 본다/);
   await expect(htmlSource).toHaveValue(/LINK/);
