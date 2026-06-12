@@ -521,6 +521,39 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
+  it("exports paragraph-first hero blocks without forcing a title style", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "heroBlock",
+          attrs: { label: "CODEX GUIDE" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Codex의 /goal 지시어는 어떻게 쓰는가?" }],
+            },
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "/goal은 작업을 검증 가능한 완료 계약으로 바꾼다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("CODEX GUIDE");
+    expect(html).toContain("Codex의 /goal 지시어는 어떻게 쓰는가?");
+    expect(html).toContain("/goal은 작업을 검증 가능한 완료 계약으로 바꾼다.");
+    expect(html).not.toContain("font-size:30px");
+    expect(html).not.toMatch(/<strong[^>]*>Codex의 \/goal 지시어는 어떻게 쓰는가\?<\/strong>/);
+  });
+
   it("exports tutorial blocks as numbered section cards", async () => {
     const document: JSONContent = {
       type: "doc",

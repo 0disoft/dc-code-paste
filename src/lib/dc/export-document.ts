@@ -1521,6 +1521,22 @@ function renderHeroSubtitle(
     .join("<br>");
 }
 
+function isHeroTitleNode(node: JSONContent | undefined): boolean {
+  return node?.type === "heading";
+}
+
+function renderHeroContentHtml(
+  titleHtml: string,
+  subtitleHtml: string,
+  fallbackTitleStyle: string,
+): string {
+  if (titleHtml || subtitleHtml) {
+    return `${titleHtml}${subtitleHtml}`;
+  }
+
+  return `<strong style="${fallbackTitleStyle}">강의 노트</strong>`;
+}
+
 function renderHeroBlock(node: JSONContent, options: DcExportOptions): string {
   return isDcTableStructure(options)
     ? renderHeroBlockTable(node, options)
@@ -1530,10 +1546,10 @@ function renderHeroBlock(node: JSONContent, options: DcExportOptions): string {
 function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): string {
   const palette = heroBlockPalette(options);
   const content = heroTextChildren(node);
-  const title =
-    renderHeroInline(content[0], options, palette.title, palette.background) || "강의 노트";
+  const titleNode = isHeroTitleNode(content[0]) ? content[0] : undefined;
+  const title = renderHeroInline(titleNode, options, palette.title, palette.background);
   const subtitle = renderHeroSubtitle(
-    content.slice(1),
+    titleNode ? content.slice(1) : content,
     options,
     palette.subtitle,
     palette.background,
@@ -1572,18 +1588,20 @@ function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): str
     "font-weight": 700,
     "line-height": 1.62,
   });
+  const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "";
   const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
+  const contentHtml = renderHeroContentHtml(titleHtml, subtitleHtml, titleStyle);
 
-  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span><strong style="${titleStyle}">${title}</strong>${subtitleHtml}</section>`;
+  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span>${contentHtml}</section>`;
 }
 
 function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): string {
   const palette = heroBlockPalette(options);
   const content = heroTextChildren(node);
-  const title =
-    renderHeroInline(content[0], options, palette.title, palette.background) || "강의 노트";
+  const titleNode = isHeroTitleNode(content[0]) ? content[0] : undefined;
+  const title = renderHeroInline(titleNode, options, palette.title, palette.background);
   const subtitle = renderHeroSubtitle(
-    content.slice(1),
+    titleNode ? content.slice(1) : content,
     options,
     palette.subtitle,
     palette.background,
@@ -1626,9 +1644,11 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
     "font-weight": 700,
     "line-height": 1.62,
   });
+  const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "";
   const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
+  const contentHtml = renderHeroContentHtml(titleHtml, subtitleHtml, titleStyle);
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span><strong style="${titleStyle}">${title}</strong>${subtitleHtml}</td></tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span>${contentHtml}</td></tr></tbody></table>`;
 }
 
 function tutorialBlockPalette(options: DcExportOptions) {
