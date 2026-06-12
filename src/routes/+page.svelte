@@ -151,6 +151,7 @@
         "oklch(57.8% 0.18 31.88)",
         "oklch(47.55% 0.145 302.98)",
     ];
+    type ToolPanelId = "blocks" | "code" | "style";
 
     let editorHost = $state<HTMLDivElement>();
     let editor = $state<Editor>();
@@ -179,6 +180,7 @@
     let markdownDraft = $state("");
     let markdownImportState = $state<"idle" | "imported" | "error">("idle");
     let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
+    let activeToolPanel = $state<ToolPanelId | null>(null);
     let presetName = $state("");
     let presets = $state<PresetSnapshot[]>([]);
     let presetState = $state<"idle" | "saved" | "error">("idle");
@@ -1177,6 +1179,10 @@
         }
     }
 
+    function toggleToolPanel(panel: ToolPanelId) {
+        activeToolPanel = activeToolPanel === panel ? null : panel;
+    }
+
     onMount(() => {
         let disposed = false;
         let mountedEditor: Editor | undefined;
@@ -1461,6 +1467,45 @@
             </button>
         </div>
 
+        <div class="tool-group tool-panel-tabs" role="group" aria-label="도구 그룹">
+            <button
+                class:active={activeToolPanel === "blocks"}
+                type="button"
+                title="블록 도구"
+                aria-label="블록 도구"
+                aria-expanded={activeToolPanel === "blocks"}
+                aria-controls="block-tools"
+                onclick={() => toggleToolPanel("blocks")}
+            >
+                <Rows3 size={17} />
+                <span>블록</span>
+            </button>
+            <button
+                class:active={activeToolPanel === "code"}
+                type="button"
+                title="코드 도구"
+                aria-label="코드 도구"
+                aria-expanded={activeToolPanel === "code"}
+                aria-controls="code-tools"
+                onclick={() => toggleToolPanel("code")}
+            >
+                <Code2 size={17} />
+                <span>코드</span>
+            </button>
+            <button
+                class:active={activeToolPanel === "style"}
+                type="button"
+                title="스타일 도구"
+                aria-label="스타일 도구"
+                aria-expanded={activeToolPanel === "style"}
+                aria-controls="style-tools"
+                onclick={() => toggleToolPanel("style")}
+            >
+                <Paintbrush size={17} />
+                <span>스타일</span>
+            </button>
+        </div>
+
         {#if isLinkPanelOpen}
             <div class="tool-group link-tool">
                 <label>
@@ -1504,7 +1549,8 @@
             </div>
         {/if}
 
-        <div class="tool-group block-insert-group">
+        {#if activeToolPanel === "blocks"}
+            <div id="block-tools" class="tool-group tool-panel block-insert-group">
             <button
                 class:active={isActive("bulletList")}
                 type="button"
@@ -1713,9 +1759,11 @@
                     {/each}
                 </select>
             </label>
-        </div>
+            </div>
+        {/if}
 
-        <div class="tool-group tool-group-wide code-settings-group">
+        {#if activeToolPanel === "code"}
+            <div id="code-tools" class="tool-group tool-panel tool-group-wide code-settings-group">
             <button
                 class:active={isActive("codeBlock")}
                 type="button"
@@ -1799,9 +1847,11 @@
                     {/each}
                 </select>
             </label>
-        </div>
+            </div>
+        {/if}
 
-        <div class="tool-group tool-group-wide typography-group">
+        {#if activeToolPanel === "style"}
+            <div id="style-tools" class="tool-group tool-panel tool-group-wide typography-group">
             <label>
                 <span>본문</span>
                 <select bind:value={bodyFontSize} aria-label="기본 크기">
@@ -1846,7 +1896,8 @@
                     ></button>
                 {/each}
             </div>
-        </div>
+            </div>
+        {/if}
     </section>
 
     {#if isMarkdownPanelOpen}
@@ -2174,7 +2225,7 @@
         top: 8px;
         z-index: 20;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
+        grid-template-columns: auto minmax(0, 1fr) auto;
         gap: 9px 10px;
         align-items: stretch;
         max-height: calc(100vh - 16px);
@@ -2224,7 +2275,17 @@
         scrollbar-gutter: stable;
     }
 
+    .tool-panel-tabs {
+        grid-column: 3;
+        width: max-content;
+    }
+
+    .toolbar .tool-panel-tabs button {
+        min-width: 82px;
+    }
+
     .link-tool,
+    .tool-panel,
     .block-insert-group,
     .code-settings-group,
     .typography-group {
@@ -3716,6 +3777,7 @@
 
         .command-group,
         .inline-group,
+        .tool-panel-tabs,
         .link-tool,
         .block-insert-group,
         .code-settings-group,
