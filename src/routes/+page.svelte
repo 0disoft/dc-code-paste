@@ -1307,11 +1307,6 @@
 
 <main class="workspace">
     <header class="topbar">
-        <div>
-            <p class="eyebrow">dc-code-paste</p>
-            <h1>디씨 글 디자인</h1>
-        </div>
-
         <button
             class="copy-button"
             type="button"
@@ -2180,24 +2175,8 @@
     .topbar {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 20px;
-        margin-bottom: 16px;
-    }
-
-    .eyebrow {
-        margin: 0 0 4px;
-        color: var(--accent);
-        font-size: 13px;
-        font-weight: 800;
-        text-transform: uppercase;
-    }
-
-    h1 {
-        margin: 0;
-        font-size: clamp(30px, 4vw, 52px);
-        line-height: 0.98;
-        letter-spacing: 0;
+        justify-content: flex-end;
+        margin-bottom: 10px;
     }
 
     .copy-button {
@@ -3760,15 +3739,6 @@
         .workspace {
             width: min(100vw - 18px, 720px);
             padding-top: 16px;
-        }
-
-        .topbar {
-            align-items: flex-start;
-            flex-direction: column;
-        }
-
-        .copy-button {
-            width: 100%;
         }
 
         .toolbar {

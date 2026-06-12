@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("renders the paste tool", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "디씨 글 디자인" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "디씨 글 디자인" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /디씨 복사/ })).toBeVisible();
   await expect(page.getByLabel("글 편집 도구")).toBeVisible();
   await expect(page.getByRole("button", { name: "블록 도구" })).toBeVisible();
