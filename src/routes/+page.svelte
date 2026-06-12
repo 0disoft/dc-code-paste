@@ -185,6 +185,7 @@
     let markdownDraft = $state("");
     let markdownImportState = $state<"idle" | "imported" | "error">("idle");
     let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
+    let isStoragePanelOpen = $state(false);
     let activeToolPanel = $state<ToolPanelId | null>(null);
     let presetName = $state("");
     let presets = $state<PresetSnapshot[]>([]);
@@ -1431,24 +1432,6 @@
 </script>
 
 <main class="workspace">
-    <header class="topbar">
-        <button
-            class="copy-button"
-            type="button"
-            onclick={copyPreview}
-            disabled={!html || isRendering}
-        >
-            {#if copyState === "copied"}
-                <Check size={18} />
-            {:else if isRendering}
-                <span class="spin-icon"><Loader2 size={18} /></span>
-            {:else}
-                <Clipboard size={18} />
-            {/if}
-            <span>{copyLabel}</span>
-        </button>
-    </header>
-
     <section class="toolbar" aria-label="글 편집 도구">
         <div class="tool-group command-group">
             <button
@@ -1485,6 +1468,23 @@
                 <span>초기화</span>
             </button>
             <button
+                class="copy-button"
+                type="button"
+                title="디씨 복사"
+                aria-label={copyLabel}
+                onclick={copyPreview}
+                disabled={!html || isRendering}
+            >
+                {#if copyState === "copied"}
+                    <Check size={17} />
+                {:else if isRendering}
+                    <span class="spin-icon"><Loader2 size={17} /></span>
+                {:else}
+                    <Clipboard size={17} />
+                {/if}
+                <span>{copyLabel}</span>
+            </button>
+            <button
                 class:active={isMarkdownPanelOpen}
                 type="button"
                 title="Markdown"
@@ -1510,6 +1510,18 @@
                     <Sparkles size={17} />
                 {/if}
                 <span>{llmPromptCopyLabel}</span>
+            </button>
+            <button
+                class:active={isStoragePanelOpen}
+                type="button"
+                title="저장함"
+                aria-label="저장함"
+                aria-expanded={isStoragePanelOpen}
+                aria-controls="storage-panel"
+                onclick={() => (isStoragePanelOpen = !isStoragePanelOpen)}
+            >
+                <Save size={17} />
+                <span>저장함</span>
             </button>
         </div>
 
@@ -2057,175 +2069,198 @@
         </section>
     {/if}
 
-    <section class="preset-panel" aria-label="프리셋">
-        <div class="preset-save">
-            <label>
-                <span><Save size={15} /> 프리셋</span>
-                <input
-                    type="text"
-                    bind:value={presetName}
-                    aria-label="프리셋 이름"
-                    maxlength="60"
-                    placeholder="강의글 구조"
-                    oninput={() => (presetState = "idle")}
-                    onkeydown={(event) => {
-                        if (event.key === "Enter") {
-                            event.preventDefault();
-                            saveCurrentPreset();
-                        }
-                    }}
-                />
-            </label>
-            <button
-                class="preset-save-button"
-                type="button"
-                aria-label="프리셋 저장"
-                onclick={saveCurrentPreset}
-            >
-                <Save size={16} />
-                <span>저장</span>
-            </button>
-            <span class:error={presetState === "error"} class="preset-count"
-                >{presetStateLabel}</span
-            >
-        </div>
+    {#if isStoragePanelOpen}
+        <div id="storage-panel" class="storage-panel">
+            <section class="preset-panel" aria-label="프리셋">
+                <div class="preset-save">
+                    <label>
+                        <span><Save size={15} /> 프리셋</span>
+                        <input
+                            type="text"
+                            bind:value={presetName}
+                            aria-label="프리셋 이름"
+                            maxlength="60"
+                            placeholder="강의글 구조"
+                            oninput={() => (presetState = "idle")}
+                            onkeydown={(event) => {
+                                if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    saveCurrentPreset();
+                                }
+                            }}
+                        />
+                    </label>
+                    <button
+                        class="preset-save-button"
+                        type="button"
+                        aria-label="프리셋 저장"
+                        onclick={saveCurrentPreset}
+                    >
+                        <Save size={16} />
+                        <span>저장</span>
+                    </button>
+                    <span
+                        class:error={presetState === "error"}
+                        class="preset-count">{presetStateLabel}</span
+                    >
+                </div>
 
-        <div class="preset-list" aria-label="저장된 프리셋">
-            {#if presets.length === 0}
-                <span class="preset-empty">프리셋 없음</span>
-            {:else}
-                {#each presets as preset (preset.id)}
-                    <div class="preset-item">
-                        {#if isRenaming("preset", preset.id)}
-                            <input
-                                class="preset-rename-input"
-                                type="text"
-                                bind:value={renameDraft}
-                                maxlength="60"
-                                aria-label="프리셋 제목 변경"
-                                use:focusRenameInput
-                                onblur={() => savePresetRename(preset.id)}
-                                onkeydown={(event) =>
-                                    handleRenameKeydown(event, () =>
-                                        savePresetRename(preset.id),
-                                    )}
-                            />
-                        {:else}
-                            <button
-                                type="button"
-                                class="preset-apply"
-                                title="더블클릭해서 제목 변경"
-                                onclick={(event) =>
-                                    scheduleCardApply(
-                                        () => applyPreset(preset),
-                                        event,
-                                    )}
-                                ondblclick={(event) =>
-                                    beginPresetRename(preset, event)}
-                            >
-                                <span>{preset.name}</span>
-                                <small
-                                    >{preset.preferences.documentTheme ===
-                                    "darkEditorial"
-                                        ? "다크"
-                                        : "라이트"} · {presetDateLabel(
-                                        preset.updatedAt,
-                                    )}</small
+                <div class="preset-list" aria-label="저장된 프리셋">
+                    {#if presets.length === 0}
+                        <span class="preset-empty">프리셋 없음</span>
+                    {:else}
+                        {#each presets as preset (preset.id)}
+                            <div class="preset-item">
+                                {#if isRenaming("preset", preset.id)}
+                                    <input
+                                        class="preset-rename-input"
+                                        type="text"
+                                        bind:value={renameDraft}
+                                        maxlength="60"
+                                        aria-label="프리셋 제목 변경"
+                                        use:focusRenameInput
+                                        onblur={() =>
+                                            savePresetRename(preset.id)}
+                                        onkeydown={(event) =>
+                                            handleRenameKeydown(event, () =>
+                                                savePresetRename(preset.id),
+                                            )}
+                                    />
+                                {:else}
+                                    <button
+                                        type="button"
+                                        class="preset-apply"
+                                        title="더블클릭해서 제목 변경"
+                                        onclick={(event) =>
+                                            scheduleCardApply(
+                                                () => applyPreset(preset),
+                                                event,
+                                            )}
+                                        ondblclick={(event) =>
+                                            beginPresetRename(preset, event)}
+                                    >
+                                        <span>{preset.name}</span>
+                                        <small
+                                            >{preset.preferences
+                                                .documentTheme ===
+                                            "darkEditorial"
+                                                ? "다크"
+                                                : "라이트"} · {presetDateLabel(
+                                                preset.updatedAt,
+                                            )}</small
+                                        >
+                                    </button>
+                                {/if}
+                                <button
+                                    type="button"
+                                    class="preset-delete"
+                                    aria-label={`${preset.name} 삭제`}
+                                    title="삭제"
+                                    onclick={() => deletePreset(preset.id)}
                                 >
-                            </button>
-                        {/if}
-                        <button
-                            type="button"
-                            class="preset-delete"
-                            aria-label={`${preset.name} 삭제`}
-                            title="삭제"
-                            onclick={() => deletePreset(preset.id)}
-                        >
-                            <Trash2 size={15} />
-                        </button>
+                                    <Trash2 size={15} />
+                                </button>
+                            </div>
+                        {/each}
+                    {/if}
+                </div>
+            </section>
+
+            <section class="draft-history-panel" aria-label="초안 히스토리">
+                <div class="draft-history-save">
+                    <div class="draft-history-title">
+                        <History size={15} />
+                        <span>초안 히스토리</span>
                     </div>
-                {/each}
-            {/if}
-        </div>
-    </section>
+                    <button
+                        class="draft-history-save-button"
+                        type="button"
+                        aria-label="초안 스냅샷 저장"
+                        onclick={() =>
+                            saveDraftHistorySnapshot({ automatic: false })}
+                    >
+                        <Save size={16} />
+                        <span>스냅샷</span>
+                    </button>
+                    <span
+                        class:error={draftHistoryState === "error"}
+                        class="draft-history-count"
+                        aria-label="초안 히스토리 개수"
+                        >{draftHistoryStateLabel}</span
+                    >
+                </div>
 
-    <section class="draft-history-panel" aria-label="초안 히스토리">
-        <div class="draft-history-save">
-            <div class="draft-history-title">
-                <History size={15} />
-                <span>초안 히스토리</span>
-            </div>
-            <button
-                class="draft-history-save-button"
-                type="button"
-                aria-label="초안 스냅샷 저장"
-                onclick={() => saveDraftHistorySnapshot({ automatic: false })}
-            >
-                <Save size={16} />
-                <span>스냅샷</span>
-            </button>
-            <span
-                class:error={draftHistoryState === "error"}
-                class="draft-history-count"
-                aria-label="초안 히스토리 개수">{draftHistoryStateLabel}</span
-            >
-        </div>
-
-        <div class="draft-history-list" aria-label="저장된 초안">
-            {#if draftHistory.length === 0}
-                <span class="draft-history-empty">초안 없음</span>
-            {:else}
-                {#each draftHistory as snapshot (snapshot.id)}
-                    <div class="draft-history-item">
-                        {#if isRenaming("draft", snapshot.id)}
-                            <input
-                                class="preset-rename-input"
-                                type="text"
-                                bind:value={renameDraft}
-                                maxlength="60"
-                                aria-label="초안 제목 변경"
-                                use:focusRenameInput
-                                onblur={() =>
-                                    saveDraftHistoryRename(snapshot.id)}
-                                onkeydown={(event) =>
-                                    handleRenameKeydown(event, () =>
-                                        saveDraftHistoryRename(snapshot.id),
-                                    )}
-                            />
-                        {:else}
-                            <button
-                                type="button"
-                                class="draft-history-apply"
-                                title="더블클릭해서 제목 변경"
-                                onclick={(event) =>
-                                    scheduleCardApply(
-                                        () =>
-                                            restoreDraftHistorySnapshot(
+                <div class="draft-history-list" aria-label="저장된 초안">
+                    {#if draftHistory.length === 0}
+                        <span class="draft-history-empty">초안 없음</span>
+                    {:else}
+                        {#each draftHistory as snapshot (snapshot.id)}
+                            <div class="draft-history-item">
+                                {#if isRenaming("draft", snapshot.id)}
+                                    <input
+                                        class="preset-rename-input"
+                                        type="text"
+                                        bind:value={renameDraft}
+                                        maxlength="60"
+                                        aria-label="초안 제목 변경"
+                                        use:focusRenameInput
+                                        onblur={() =>
+                                            saveDraftHistoryRename(
+                                                snapshot.id,
+                                            )}
+                                        onkeydown={(event) =>
+                                            handleRenameKeydown(event, () =>
+                                                saveDraftHistoryRename(
+                                                    snapshot.id,
+                                                ),
+                                            )}
+                                    />
+                                {:else}
+                                    <button
+                                        type="button"
+                                        class="draft-history-apply"
+                                        title="더블클릭해서 제목 변경"
+                                        onclick={(event) =>
+                                            scheduleCardApply(
+                                                () =>
+                                                    restoreDraftHistorySnapshot(
+                                                        snapshot,
+                                                    ),
+                                                event,
+                                            )}
+                                        ondblclick={(event) =>
+                                            beginDraftHistoryRename(
                                                 snapshot,
-                                            ),
-                                        event,
-                                    )}
-                                ondblclick={(event) =>
-                                    beginDraftHistoryRename(snapshot, event)}
-                            >
-                                <span>{draftHistoryName(snapshot)}</span>
-                                <small>{draftHistorySummary(snapshot)}</small>
-                            </button>
-                        {/if}
-                        <button
-                            type="button"
-                            class="draft-history-delete"
-                            aria-label={`${draftHistoryName(snapshot)} 삭제`}
-                            title="삭제"
-                            onclick={() => deleteDraftHistory(snapshot.id)}
-                        >
-                            <Trash2 size={15} />
-                        </button>
-                    </div>
-                {/each}
-            {/if}
+                                                event,
+                                            )}
+                                    >
+                                        <span>{draftHistoryName(snapshot)}</span>
+                                        <small
+                                            >{draftHistorySummary(
+                                                snapshot,
+                                            )}</small
+                                        >
+                                    </button>
+                                {/if}
+                                <button
+                                    type="button"
+                                    class="draft-history-delete"
+                                    aria-label={`${draftHistoryName(
+                                        snapshot,
+                                    )} 삭제`}
+                                    title="삭제"
+                                    onclick={() =>
+                                        deleteDraftHistory(snapshot.id)}
+                                >
+                                    <Trash2 size={15} />
+                                </button>
+                            </div>
+                        {/each}
+                    {/if}
+                </div>
+            </section>
         </div>
-    </section>
+    {/if}
 
     <section class="workbench">
         <div class="editor-panel">
@@ -2339,34 +2374,7 @@
         width: min(1560px, calc(100vw - 28px));
         min-height: 100vh;
         margin: 0 auto;
-        padding: 22px 0 34px;
-    }
-
-    .topbar {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        margin-bottom: 10px;
-    }
-
-    .copy-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 9px;
-        min-width: 136px;
-        height: 46px;
-        border: 1px solid color-mix(in oklch, var(--accent) 72%, oklch(0% 0 0));
-        border-radius: 8px;
-        background: var(--accent);
-        color: oklch(22.89% 0.055 118.8);
-        font-weight: 900;
-        cursor: pointer;
-    }
-
-    .copy-button:disabled {
-        cursor: wait;
-        opacity: 0.72;
+        padding: 10px 0 34px;
     }
 
     .toolbar {
@@ -2495,6 +2503,19 @@
     .toolbar button:disabled {
         cursor: not-allowed;
         opacity: 0.42;
+    }
+
+    .toolbar .copy-button {
+        min-width: 112px;
+        border-color: color-mix(in oklch, var(--accent) 72%, oklch(0% 0 0));
+        background: var(--accent);
+        color: oklch(22.89% 0.055 118.8);
+        font-weight: 900;
+    }
+
+    .toolbar .copy-button:disabled {
+        cursor: wait;
+        opacity: 0.72;
     }
 
     label {
@@ -2703,13 +2724,19 @@
         color: var(--danger);
     }
 
+    .storage-panel {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 12px;
+    }
+
     .preset-panel,
     .draft-history-panel {
         display: flex;
         flex-wrap: wrap;
         gap: 10px;
         align-items: center;
-        margin-bottom: 12px;
+        margin: 0;
         padding: 10px;
         border: 1px solid var(--line);
         border-radius: 8px;

@@ -38,6 +38,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "구분선" })).toBeVisible();
   await expect(page.getByRole("button", { name: "초기화" })).toBeVisible();
   await expect(page.getByRole("button", { name: "LLM 가이드 복사" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "저장함" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "초안 히스토리" })).toHaveCount(0);
   await expect(page.getByLabel("인용 스타일")).toBeVisible();
 
   await page.getByRole("button", { name: "코드 도구" }).click();
@@ -100,6 +103,11 @@ test("renders the paste tool", async ({ page }) => {
   await page.getByLabel("문서 테마", { exact: true }).selectOption("lightLecture");
   await expect(page.getByLabel("현재 문서 테마")).toHaveText("강의 라이트");
   await expect(page.locator(".preview-surface")).not.toHaveClass(/preview-surface-dark/);
+  await page.getByRole("button", { name: "저장함" }).click();
+  await expect(page.getByRole("button", { name: "저장함" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
   await expect(page.getByRole("region", { name: "프리셋" })).toBeVisible();
   await expect(page.getByLabel("저장된 프리셋")).toContainText("프리셋 없음");
   await expect(page.getByRole("region", { name: "초안 히스토리" })).toBeVisible();
@@ -126,6 +134,9 @@ test("renders the paste tool", async ({ page }) => {
   await page.getByLabel("프리셋 제목 변경").press("Enter");
   await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
   await page.reload();
+  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "초안 히스토리" })).toHaveCount(0);
+  await page.getByRole("button", { name: "저장함" }).click();
   await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
   await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
   await expect(page.getByRole("button", { name: "HTML" })).toBeVisible();
