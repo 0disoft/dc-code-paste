@@ -164,8 +164,8 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("<li");
     expect(html).toContain("<hr");
     expect(html).toContain("const");
-    expect(html).toContain("oklch(");
-    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(html).toMatch(/color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 
   it("keeps legacy calloutBox documents exportable", async () => {
@@ -266,8 +266,9 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain('bgcolor="#eaf1ff"');
     expect(html).toContain('bgcolor="#fff7d9"');
     expect(html).toContain('bgcolor="#ffe9f5"');
-    expect(html).toContain("background-color:oklch(34.92% 0.104 264.18)");
-    expect(html).toContain("color:oklch(98.18% 0.012 264.12)");
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).toMatch(/color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
     expect(html).not.toContain("<aside");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
@@ -304,8 +305,13 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(
       `<span style="font-family:${safeProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
     );
-    expect(html).toContain(
-      `<p style="margin:0 0 14px;color:oklch(23.39% 0.012 255.51);font-family:${defaultProseFontFamily};font-size:15px`,
+    expect(html).toMatch(
+      new RegExp(
+        `<p style="margin:0 0 14px;color:#[0-9a-f]{6};font-family:${defaultProseFontFamily.replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&",
+        )};font-size:15px`,
+      ),
     );
   });
 
@@ -337,11 +343,10 @@ describe("exportDocumentToDcHtml", () => {
       ...exportOptions,
       documentTheme: "darkEditorial",
     });
-    const selectedColor = html.match(/<span style="color:oklch\((\d+(?:\.\d+)?)%/);
-
     expect(html).toContain("다크모드 안전색");
     expect(html).not.toContain("color:oklch(10% 0.02 255)");
-    expect(Number(selectedColor?.[1])).toBeGreaterThan(50);
+    expect(html).toMatch(/<span style="color:#[0-9a-f]{6}">다크모드 안전색<\/span>/);
+    expect(html).not.toContain("oklch(");
   });
 
   it("exports CTA button groups with horizontal and vertical table layouts", async () => {
@@ -673,7 +678,8 @@ describe("exportDocumentToDcHtml", () => {
 
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
-    expect(html).toMatch(/^<div style="[^"]*background-color:oklch\(98\.38% 0\.01 97\.33\)/);
+    expect(html).toMatch(/^<div style="[^"]*background-color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
     expect(html).toContain("padding:18px");
     expect(html).toContain("box-sizing:border-box");
     expect(html).toContain("다크모드에서도 보이는 제목");
@@ -778,15 +784,16 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toMatch(
       /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050505"/,
     );
-    expect(html).toContain("background-color:oklch(7.2% 0.012 94.1)");
-    expect(html).toContain("color:oklch(94.12% 0.012 93.37)");
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).toContain("만물큐레이션");
     expect(html).toContain("사용 방법 및 예시");
     expect(html).toContain("아카이브 보기");
     expect(html).toContain('href="https://example.com/archive"');
     expect(html).toContain('bgcolor="#0c0c0c"');
-    expect(html).toContain("background-color:oklch(34.82% 0.092 249.7)");
-    expect(html).toContain("color:oklch(98.22% 0.011 245.12)");
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).toMatch(/color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
@@ -816,7 +823,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain('bgcolor="#fbfaf2"');
     expect(html).toContain("&ldquo;");
     expect(html).toContain("font-style:italic");
-    expect(html).toContain("border:1px solid oklch(61.2% 0.049 77.83)");
+    expect(html).toMatch(/border:1px solid #[0-9a-f]{6}/);
     expect(html).toContain("느린 코드는 자료 흐름에서 먼저 걸린다.");
     expect(html).not.toContain("TIP");
     expect(html).not.toContain("주의");
@@ -1008,8 +1015,9 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(">b</span>");
     expect(html).toContain(">d</span>");
     expect(html).toContain(">e</span>");
-    expect(html).toContain("background-color:oklch(31.14% 0.076 83.12 / 0.82)");
-    expect(html).toContain("border-left:4px solid oklch(79.43% 0.129 84.28)");
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).toMatch(/border-left:4px solid #[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 
   it("exports code block filenames from code block attrs", async () => {
@@ -1027,7 +1035,8 @@ describe("exportDocumentToDcHtml", () => {
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
     expect(html).toContain("vite.config.ts");
-    expect(html).toContain("border-bottom:1px solid oklch(");
+    expect(html).toMatch(/border-bottom:1px solid #[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
     expect(html).toContain("export");
   }, 15_000);
 });

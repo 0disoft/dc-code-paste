@@ -66,8 +66,8 @@ describe("highlightForDcHtml", () => {
     expect(html).toContain("#include");
     expect(html).toContain("return");
     expect(html).toContain(">2</span>");
-    expect(html).toContain("oklch(");
-    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(html).toMatch(/color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 
   it("loads every explicitly requested extra language", async () => {
@@ -81,8 +81,8 @@ describe("highlightForDcHtml", () => {
 
       expect(html).toContain("<pre");
       expect(html).toContain(sample.token);
-      expect(html).toContain("oklch(");
-      expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+      expect(html).toMatch(/color:#[0-9a-f]{6}/);
+      expect(html).not.toContain("oklch(");
     }
   }, 60_000);
 
@@ -97,8 +97,8 @@ describe("highlightForDcHtml", () => {
 
       expect(html).toContain("<pre");
       expect(html).toContain("theme");
-      expect(html).toContain("oklch(");
-      expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+      expect(html).toMatch(/color:#[0-9a-f]{6}/);
+      expect(html).not.toContain("oklch(");
     }
   }, 60_000);
 
@@ -113,9 +113,8 @@ describe("highlightForDcHtml", () => {
     expect(html).toContain("old value");
     expect(html).toContain("new value");
     expect(html).toContain("border-left:4px solid");
-    expect(html).toContain("oklch(23.68% 0.056 25.43 / 0.88)");
-    expect(html).toContain("oklch(24.12% 0.055 145.21 / 0.86)");
-    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 
   it("adds manual line highlight colors to selected code lines", async () => {
@@ -129,9 +128,9 @@ describe("highlightForDcHtml", () => {
 
     expect(html).toContain(">2</span>");
     expect(html).toContain(">b</span>");
-    expect(html).toContain("background-color:oklch(31.14% 0.076 83.12 / 0.82)");
-    expect(html).toContain("border-left:4px solid oklch(79.43% 0.129 84.28)");
-    expect(html).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).toMatch(/border-left:4px solid #[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 
   it("renders a filename header for code blocks", async () => {
@@ -144,8 +143,9 @@ describe("highlightForDcHtml", () => {
     });
 
     expect(html).toContain("app.ts");
-    expect(html).toContain("border-bottom:1px solid oklch(");
+    expect(html).toMatch(/border-bottom:1px solid #[0-9a-f]{6}/);
     expect(html).toContain("<pre");
     expect(html).toContain("export");
+    expect(html).not.toContain("oklch(");
   }, 15_000);
 });

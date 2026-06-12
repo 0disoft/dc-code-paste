@@ -84,7 +84,7 @@ paste targets:
 <div style="...">
   <p style="...">...</p>
   <div style="...">...</div>
-  <pre style="..."><code><span style="color:oklch(...)">...</span></code></pre>
+  <pre style="..."><code><span style="color:#aabbcc">...</span></code></pre>
 </div>
 ```
 

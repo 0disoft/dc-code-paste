@@ -159,6 +159,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/newValue/);
   await expect(htmlSource).toHaveValue(/patch\.diff/);
   await expect(htmlSource).toHaveValue(/border-left:4px solid/);
-  await expect(htmlSource).toHaveValue(/oklch\(24\.12% 0\.055 145\.21 \/ 0\.86\)/);
+  await expect(htmlSource).toHaveValue(/background-color:#[0-9a-f]{6}/);
+  await expect(htmlSource).not.toHaveValue(/oklch\(/);
   await expect(htmlSource).toHaveValue(/<pre/);
 });

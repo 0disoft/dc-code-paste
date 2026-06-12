@@ -3,6 +3,8 @@ const oklchColorPattern =
   /^oklch\(\s*(?:\d+(?:\.\d+)?%|\d*\.\d+|\d+)\s+\d*(?:\.\d+)?\s+\d+(?:\.\d+)?(?:deg)?(?:\s*\/\s*(?:\d+(?:\.\d+)?%?|0?\.\d+))?\s*\)$/i;
 const oklchPartsPattern =
   /^oklch\(\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))(%?)\s+((?:\d+(?:\.\d+)?)|(?:\.\d+))\s+((?:\d+(?:\.\d+)?)|(?:\.\d+))(?:deg)?(?:\s*\/\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))(%?))?\s*\)$/i;
+const oklchFunctionPattern =
+  /oklch\(\s*(?:\d+(?:\.\d+)?%|\d*\.\d+|\d+)\s+\d*(?:\.\d+)?\s+\d+(?:\.\d+)?(?:deg)?(?:\s*\/\s*(?:\d+(?:\.\d+)?%?|0?\.\d+))?\s*\)/gi;
 
 type OklchColor = {
   lightness: number;
@@ -22,6 +24,16 @@ function round(value: number, digits: number): number {
 
 function srgbToLinear(value: number): number {
   return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+}
+
+function linearToSrgb(value: number): number {
+  return value <= 0.0031308 ? value * 12.92 : 1.055 * value ** (1 / 2.4) - 0.055;
+}
+
+function toHexByte(value: number): string {
+  return Math.round(clamp(value, 0, 1) * 255)
+    .toString(16)
+    .padStart(2, "0");
 }
 
 function formatOklch(lightness: number, chroma: number, hue: number, alpha: number): string {
@@ -84,6 +96,19 @@ function oklchToLinearRgb(color: OklchColor): { red: number; green: number; blue
 function relativeLuminance(color: OklchColor): number {
   const rgb = oklchToLinearRgb(color);
   return 0.2126 * rgb.red + 0.7152 * rgb.green + 0.0722 * rgb.blue;
+}
+
+function oklchToHex(value: string): string | undefined {
+  const color = parseOklch(value);
+
+  if (!color) {
+    return undefined;
+  }
+
+  const rgb = oklchToLinearRgb(color);
+  return `#${toHexByte(linearToSrgb(rgb.red))}${toHexByte(linearToSrgb(rgb.green))}${toHexByte(
+    linearToSrgb(rgb.blue),
+  )}`;
 }
 
 function contrastRatio(foreground: OklchColor, background: OklchColor): number {
@@ -205,9 +230,13 @@ export function sanitizeReadableTextColor(
   return adjustReadableTextColor(foregroundColor, backgroundColor, minContrast);
 }
 
+function pasteSafeStyleValue(value: string): string {
+  return value.replace(oklchFunctionPattern, (match) => oklchToHex(match) ?? match);
+}
+
 export function joinStyle(parts: Record<string, string | number | boolean | undefined>): string {
   return Object.entries(parts)
     .filter(([, value]) => value !== undefined && value !== false && value !== "")
-    .map(([property, value]) => `${property}:${String(value)}`)
+    .map(([property, value]) => `${property}:${pasteSafeStyleValue(String(value))}`)
     .join(";");
 }

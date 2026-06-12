@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeColor, sanitizeReadableTextColor } from "../../src/lib/dc/sanitize-style";
+import {
+  joinStyle,
+  sanitizeColor,
+  sanitizeReadableTextColor,
+} from "../../src/lib/dc/sanitize-style";
 
 describe("sanitizeColor", () => {
-  it("converts hex colors to oklch for paste HTML", () => {
+  it("converts hex colors to oklch for internal contrast checks", () => {
     expect(sanitizeColor("#ff0000", "oklch(0% 0 0)")).toMatch(/^oklch\(/);
   });
 
@@ -38,5 +42,18 @@ describe("sanitizeColor", () => {
 
     expect(readable).not.toBe("oklch(98% 0.02 90)");
     expect(lightness).toBeLessThan(80);
+  });
+});
+
+describe("joinStyle", () => {
+  it("serializes oklch colors as hex for paste targets that reject modern color functions", () => {
+    const style = joinStyle({
+      color: "oklch(72.42% 0.171 22.48)",
+      border: "1px solid oklch(24% 0.05 25 / 0.8)",
+      "font-weight": 800,
+    });
+
+    expect(style).toMatch(/^color:#[0-9a-f]{6};border:1px solid #[0-9a-f]{6};font-weight:800$/);
+    expect(style).not.toContain("oklch(");
   });
 });
