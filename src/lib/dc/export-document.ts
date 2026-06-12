@@ -1852,7 +1852,7 @@ async function renderTutorialBlockTable(
     "text-align": "center",
   });
   const titleCellStyle = joinStyle({
-    padding: "13px 16px 8px 0",
+    padding: "13px 16px 8px 12px",
     color: palette.title,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "18px",

@@ -596,6 +596,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(">02</span>");
     expect(html).toContain("문제 파악");
     expect(html).toContain("병목 좁히기");
+    expect(html).toContain("padding:13px 16px 8px 12px");
     expect(html).toContain("입력 크기와 반복 횟수를 먼저 본다.");
     expect(html).toContain("시간이 튀는 지점만 따로 재본다.");
     expect(html).toContain("border-left:4px solid");
