@@ -163,4 +163,24 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/background-color:#[0-9a-f]{6}/);
   await expect(htmlSource).not.toHaveValue(/oklch\(/);
   await expect(htmlSource).toHaveValue(/<pre/);
+
+  await page
+    .getByLabel("저장된 초안")
+    .getByRole("button")
+    .filter({ hasText: /1,279자/ })
+    .click();
+  await expect(htmlSource).toHaveValue(/C\+\+로 보는 입력 최적화/);
+  await expect(htmlSource).not.toHaveValue(/Markdown 강의/);
+
+  await page.getByRole("button", { name: "Markdown" }).click();
+  await page.getByLabel("Markdown 원문").fill("# 임시 문서\n\n프리셋 적용 전 상태");
+  await page.getByRole("button", { name: "Markdown 적용하기" }).click();
+  await expect(htmlSource).toHaveValue(/임시 문서/);
+  await page
+    .getByLabel("저장된 프리셋")
+    .getByRole("button")
+    .filter({ hasText: "강의글 구조" })
+    .click();
+  await expect(htmlSource).toHaveValue(/C\+\+로 보는 입력 최적화/);
+  await expect(htmlSource).not.toHaveValue(/임시 문서/);
 });

@@ -268,6 +268,26 @@
         };
     }
 
+    function cloneDocumentContent(document: JSONContent): JSONContent {
+        return structuredClone($state.snapshot(document));
+    }
+
+    function cloneDraftPreferences(
+        preferences: DraftPreferences,
+    ): DraftPreferences {
+        return structuredClone($state.snapshot(preferences));
+    }
+
+    function replaceEditorDocument(document: JSONContent) {
+        const nextDocument = cloneDocumentContent(document);
+        documentJson = nextDocument;
+        editor?.commands.setContent(cloneDocumentContent(nextDocument));
+
+        if (editor) {
+            refreshEditorState(editor);
+        }
+    }
+
     function isKnownBodySize(value: string) {
         return bodySizes.includes(value);
     }
@@ -355,7 +375,10 @@
     }
 
     function currentDraftHistoryFingerprint() {
-        return draftHistoryFingerprint(documentJson, currentDraftPreferences());
+        return draftHistoryFingerprint(
+            cloneDocumentContent(documentJson),
+            currentDraftPreferences(),
+        );
     }
 
     function draftHistorySummary(snapshot: DraftHistorySnapshot) {
@@ -396,13 +419,20 @@
         }
 
         const preferences = currentDraftPreferences();
-        const fingerprint = draftHistoryFingerprint(documentJson, preferences);
+        const currentDocument = cloneDocumentContent(documentJson);
+        const fingerprint = draftHistoryFingerprint(
+            currentDocument,
+            preferences,
+        );
 
         if (fingerprint === lastDraftHistoryFingerprint) {
             return false;
         }
 
-        const snapshot = createDraftHistorySnapshot(documentJson, preferences);
+        const snapshot = createDraftHistorySnapshot(
+            currentDocument,
+            preferences,
+        );
         const nextHistory = appendDraftHistorySnapshot(storage, snapshot);
 
         if (nextHistory[0]?.id !== snapshot.id) {
@@ -432,17 +462,14 @@
     }
 
     function restoreDraftHistorySnapshot(snapshot: DraftHistorySnapshot) {
-        applyDraftPreferences(snapshot.preferences);
-        documentJson = structuredClone(snapshot.document);
-        editor?.commands.setContent(documentJson);
-
-        if (editor) {
-            refreshEditorState(editor);
-        }
+        const preferences = cloneDraftPreferences(snapshot.preferences);
+        const nextDocument = cloneDocumentContent(snapshot.document);
+        applyDraftPreferences(preferences);
+        replaceEditorDocument(nextDocument);
 
         lastDraftHistoryFingerprint = draftHistoryFingerprint(
-            snapshot.document,
-            snapshot.preferences,
+            nextDocument,
+            preferences,
         );
         lastDraftHistorySavedAt = Date.now();
         draftHistoryState = "idle";
@@ -476,12 +503,7 @@
             language = importedLanguage;
         }
 
-        documentJson = nextDocument;
-        editor?.commands.setContent(documentJson);
-
-        if (editor) {
-            refreshEditorState(editor);
-        }
+        replaceEditorDocument(nextDocument);
 
         markdownImportState = "imported";
         isMarkdownPanelOpen = false;
@@ -505,7 +527,7 @@
 
         const preset = createPresetSnapshot(
             presetName,
-            documentJson,
+            cloneDocumentContent(documentJson),
             currentDraftPreferences(),
         );
         const nextPresets = [preset, ...readPresetSnapshots(storage)].slice(
@@ -527,13 +549,8 @@
     }
 
     function applyPreset(preset: PresetSnapshot) {
-        applyDraftPreferences(preset.preferences);
-        documentJson = structuredClone(preset.document);
-        editor?.commands.setContent(documentJson);
-
-        if (editor) {
-            refreshEditorState(editor);
-        }
+        applyDraftPreferences(cloneDraftPreferences(preset.preferences));
+        replaceEditorDocument(preset.document);
 
         presetState = "idle";
     }
@@ -1110,11 +1127,7 @@
         }
 
         applyDraftPreferences(defaultDraftPreferences());
-        documentJson = structuredClone(sampleDocument);
-        editor?.commands.setContent(documentJson);
-        if (editor) {
-            refreshEditorState(editor);
-        }
+        replaceEditorDocument(sampleDocument);
         isLinkPanelOpen = false;
         linkDraft = "";
         linkError = false;
@@ -1172,14 +1185,14 @@
         refreshDraftHistorySnapshots();
 
         if (savedDraft) {
-            documentJson = savedDraft.document;
-            applyDraftPreferences(savedDraft.preferences);
+            documentJson = cloneDocumentContent(savedDraft.document);
+            applyDraftPreferences(cloneDraftPreferences(savedDraft.preferences));
         }
 
         lastDraftHistoryFingerprint = draftHistory[0]
             ? draftHistoryFingerprint(
-                  draftHistory[0].document,
-                  draftHistory[0].preferences,
+                  cloneDocumentContent(draftHistory[0].document),
+                  cloneDraftPreferences(draftHistory[0].preferences),
               )
             : "";
         lastDraftHistorySavedAt = Date.now();
@@ -1277,7 +1290,10 @@
 
         writeDraftSnapshot(
             storage,
-            createDraftSnapshot(documentJson, currentDraftPreferences()),
+            createDraftSnapshot(
+                cloneDocumentContent(documentJson),
+                currentDraftPreferences(),
+            ),
         );
         maybeSaveAutomaticDraftHistory();
     });
