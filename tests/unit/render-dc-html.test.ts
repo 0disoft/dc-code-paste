@@ -18,15 +18,14 @@ describe("renderDcHtml", () => {
       ],
     });
 
-    expect(html).toContain('<pre style="');
+    expect(html).toContain('<div style="background-color:#111111');
     expect(html).toContain("margin:0 0 16px");
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).toContain("font-weight:700");
     expect(html).toContain(`font-family:${codeFallbackFonts.join(", ")}`);
-    expect(html).toContain(
-      `<code style="background:none;color:inherit;font-family:${codeFallbackFonts.join(", ")}`,
-    );
+    expect(html).not.toContain("<pre");
+    expect(html).not.toContain("<code");
     expect(html).toContain("&lt;tag&gt;");
     expect(html).toContain(">1</span>");
     expect(html).not.toContain("oklch(");
@@ -92,6 +91,47 @@ describe("renderDcHtml", () => {
     expect(html).toContain("+new");
   });
 
+  it("does not add preserved whitespace gaps between decorated code lines", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [[{ content: "first" }], [{ content: "second" }]],
+      lineDecorations: [
+        undefined,
+        {
+          background: "#332200",
+          borderColor: "#aa7700",
+        },
+      ],
+    });
+
+    expect(html).toContain("first");
+    expect(html).toContain("second");
+    expect(html).toContain("</div><div style=\"");
+    expect(html).not.toContain("</div>\n<div");
+  });
+
+  it("renders code lines as real blocks and preserves spaces for DC posts", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [
+        [{ content: "#include <iostream>" }],
+        [{ content: "int main() {" }],
+        [{ content: "    return 0;" }],
+      ],
+    });
+
+    expect(html).not.toContain("<pre");
+    expect(html).toContain("#include");
+    expect(html).toContain("</div><div style=");
+    expect(html).toContain("&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;0;");
+  });
+
   it("renders an optional escaped filename header above the code block", () => {
     const html = renderDcHtml({
       background: "#111111",
@@ -105,7 +145,7 @@ describe("renderDcHtml", () => {
     expect(html).toContain("<div style=");
     expect(html).toContain("main&lt;unsafe&gt;.cpp");
     expect(html).toMatch(/border-bottom:1px solid #[0-9a-f]{6}/);
-    expect(html).toContain("<pre");
+    expect(html).not.toContain("<pre");
     expect(html).toContain("margin:0");
   });
 });

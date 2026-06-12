@@ -478,9 +478,54 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("본문은 아래에서 천천히 풀어낸다.");
     expect(html).toContain("border-top:4px solid");
     expect(html).toContain("border-radius:999px");
+    expect(html).toContain('<td style="padding:5px 16px');
+    expect(html).toContain("&bull;</span>&nbsp;&nbsp;핵심만 먼저 보여준다.");
+    expect(html).not.toContain('width="28"');
+    expect(html).not.toContain('colspan="2"');
+    expect(html).not.toContain("display:block;width:8px;height:8px");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
+  });
+
+  it("exports custom summary and callout labels", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "summaryBox",
+          attrs: { label: "빠른 체크" },
+          content: [
+            {
+              type: "summaryItem",
+              content: [{ type: "text", text: "문제 크기를 먼저 본다." }],
+            },
+          ],
+        },
+        {
+          type: "tipBox",
+          attrs: { label: "메모 <중요>" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "cin/cout 설정을 앞에 둔다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("빠른 체크");
+    expect(html).toContain("문제 크기를 먼저 본다.");
+    expect(html).toContain("메모 &lt;중요&gt;");
+    expect(html).toContain("cin/cout 설정을 앞에 둔다.");
+    expect(html).not.toContain(">TIP</span>");
+    expect(html).not.toContain(">핵심 요약</td>");
   });
 
   it("exports hero blocks as paste-safe title panels", async () => {
@@ -516,6 +561,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("/goal은 작업을 검증 가능한 완료 계약으로 바꾼다.");
     expect(html).toContain("border-top:4px solid");
     expect(html).toContain("font-size:30px");
+    expect(html).toMatch(/CODEX GUIDE[\s\S]*<\/tr><tr>[\s\S]*Codex의 \/goal 지시어는 어떻게 쓰는가\?[\s\S]*<\/tr><tr>[\s\S]*\/goal은 작업을 검증 가능한 완료 계약으로 바꾼다\./);
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
@@ -552,6 +598,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("/goal은 작업을 검증 가능한 완료 계약으로 바꾼다.");
     expect(html).not.toContain("font-size:30px");
     expect(html).not.toMatch(/<strong[^>]*>Codex의 \/goal 지시어는 어떻게 쓰는가\?<\/strong>/);
+    expect(html).toMatch(/CODEX GUIDE[\s\S]*<\/tr><tr>[\s\S]*Codex의 \/goal 지시어는 어떻게 쓰는가\?<br>\/goal은 작업을 검증 가능한 완료 계약으로 바꾼다\./);
   });
 
   it("exports tutorial blocks as numbered section cards", async () => {
@@ -596,7 +643,9 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(">02</span>");
     expect(html).toContain("문제 파악");
     expect(html).toContain("병목 좁히기");
-    expect(html).toContain("padding:13px 16px 8px 12px");
+    expect(html).toContain("padding:14px 16px 8px 28px");
+    expect(html).toContain("</span>&nbsp;&nbsp;&nbsp;<strong");
+    expect(html).not.toContain('colspan="2"');
     expect(html).toContain("입력 크기와 반복 횟수를 먼저 본다.");
     expect(html).toContain("시간이 튀는 지점만 따로 재본다.");
     expect(html).toContain("border-left:4px solid");

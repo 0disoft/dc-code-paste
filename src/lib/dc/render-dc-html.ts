@@ -32,6 +32,10 @@ function normalizeTokenContent(content: string): string {
   return content.replace(/\t/g, "    ");
 }
 
+function escapeCodeContent(content: string): string {
+  return escapeHtml(normalizeTokenContent(content)).replace(/ /g, "&nbsp;");
+}
+
 function tokenStyle(token: DcToken, foreground: string): string {
   const fontStyle = token.fontStyle ?? 0;
   return joinStyle({
@@ -44,7 +48,7 @@ function tokenStyle(token: DcToken, foreground: string): string {
 }
 
 function renderToken(token: DcToken, foreground: string): string {
-  const content = escapeHtml(normalizeTokenContent(token.content));
+  const content = escapeCodeContent(token.content);
   if (!content) {
     return "";
   }
@@ -82,7 +86,7 @@ export function renderDcHtml(input: DcRenderInput): string {
   const filename = input.filename?.trim();
   const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
   const codeFontFamily = safeCodeFontFamily();
-  const preStyle = joinStyle({
+  const blockStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
     color: foreground,
     "font-family": codeFontFamily,
@@ -90,21 +94,8 @@ export function renderDcHtml(input: DcRenderInput): string {
     "line-height": "1.4",
     margin: filename ? 0 : "0 0 16px",
     padding: input.showBackground ? "14px 16px" : 0,
-    "white-space": "pre-wrap",
     "word-break": "normal",
     "overflow-wrap": "anywhere",
-    "tab-size": 4,
-  });
-  const codeStyle = joinStyle({
-    background: "none",
-    color: "inherit",
-    "font-family": codeFontFamily,
-    "font-size": "inherit",
-    "line-height": "inherit",
-    "white-space": "inherit",
-    "word-break": "inherit",
-    "overflow-wrap": "inherit",
-    "tab-size": 4,
   });
 
   const lineNumberWidth = `${Math.max(2, String(input.lines.length).length)}ch`;
@@ -121,33 +112,39 @@ export function renderDcHtml(input: DcRenderInput): string {
 
     if (!decoration) {
       if (!hasDecorations) {
-        return content;
+        const plainLineStyle = joinStyle({
+          margin: 0,
+          padding: 0,
+          "min-height": "1.4em",
+        });
+
+        return `<div style="${plainLineStyle}">${content}</div>`;
       }
 
       const neutralLineStyle = joinStyle({
-        display: "block",
         margin: input.showBackground ? "0 -16px" : undefined,
         padding: input.showBackground ? "0 16px" : undefined,
+        "min-height": "1.4em",
         "box-sizing": "border-box",
       });
 
-      return `<span style="${neutralLineStyle}">${content}</span>`;
+      return `<div style="${neutralLineStyle}">${content}</div>`;
     }
 
     const lineStyle = joinStyle({
-      display: "block",
       margin: input.showBackground ? "0 -16px" : undefined,
       padding: input.showBackground ? "0 16px 0 12px" : "0 0 0 8px",
+      "min-height": "1.4em",
       "background-color": sanitizeColor(decoration.background, "transparent"),
       color: lineForeground,
       "border-left": `4px solid ${sanitizeColor(decoration.borderColor, lineForeground)}`,
       "box-sizing": "border-box",
     });
 
-    return `<span style="${lineStyle}">${content}</span>`;
+    return `<div style="${lineStyle}">${content}</div>`;
   });
 
-  const code = `<pre style="${preStyle}"><code style="${codeStyle}">${renderedLines.join("\n")}</code></pre>`;
+  const code = `<div style="${blockStyle}">${renderedLines.join("")}</div>`;
 
   if (!filename) {
     return code;

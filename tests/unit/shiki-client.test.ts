@@ -62,9 +62,10 @@ describe("highlightForDcHtml", () => {
       showLineNumbers: true,
     });
 
-    expect(html).toContain("<pre");
+    expect(html).not.toContain("<pre");
     expect(html).toContain("#include");
     expect(html).toContain("return");
+    expect(html).toContain("</div><div style=");
     expect(html).toContain(">2</span>");
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).not.toContain("oklch(");
@@ -79,7 +80,7 @@ describe("highlightForDcHtml", () => {
         showLineNumbers: false,
       });
 
-      expect(html).toContain("<pre");
+      expect(html).not.toContain("<pre");
       expect(html).toContain(sample.token);
       expect(html).toMatch(/color:#[0-9a-f]{6}/);
       expect(html).not.toContain("oklch(");
@@ -95,7 +96,7 @@ describe("highlightForDcHtml", () => {
         showLineNumbers: false,
       });
 
-      expect(html).toContain("<pre");
+      expect(html).not.toContain("<pre");
       expect(html).toContain("theme");
       expect(html).toMatch(/color:#[0-9a-f]{6}/);
       expect(html).not.toContain("oklch(");
@@ -144,7 +145,7 @@ describe("highlightForDcHtml", () => {
 
     expect(html).toContain("app.ts");
     expect(html).toMatch(/border-bottom:1px solid #[0-9a-f]{6}/);
-    expect(html).toContain("<pre");
+    expect(html).not.toContain("<pre");
     expect(html).toContain("export");
     expect(html).not.toContain("oklch(");
   }, 15_000);

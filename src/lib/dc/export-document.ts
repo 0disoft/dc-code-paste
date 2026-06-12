@@ -269,6 +269,11 @@ function calloutStyleFor(kind: CalloutKind, options: DcExportOptions) {
     : calloutStyles[kind];
 }
 
+function labelFromAttrs(node: JSONContent, fallback: string): string {
+  const label = typeof node.attrs?.label === "string" ? node.attrs.label.trim() : "";
+  return label || fallback;
+}
+
 function calloutFallbackBackground(kind: CalloutKind, options: DcExportOptions): string {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return "#0c0c0c";
@@ -611,7 +616,7 @@ async function renderCallout(
   const body = await Promise.all(
     childrenOf(node).map((child) => renderBlockAsync(child, options, childContext)),
   );
-  const content = `<span style="${labelStyle}">${palette.label}</span>${body.join("")}`;
+  const content = `<span style="${labelStyle}">${escapeHtml(labelFromAttrs(node, palette.label))}</span>${body.join("")}`;
 
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
@@ -1315,14 +1320,15 @@ function summaryBoxPalette(options: DcExportOptions) {
 
 async function renderSummaryBox(node: JSONContent, options: DcExportOptions): Promise<string> {
   const items = childrenOf(node).filter((child) => child.type === "summaryItem");
+  const label = labelFromAttrs(node, "핵심 요약");
 
   if (items.length === 0) {
     return "";
   }
 
   return isDcTableStructure(options)
-    ? renderSummaryBoxTable(items, options)
-    : renderSummaryBoxModern(items, options);
+    ? renderSummaryBoxTable(items, options, label)
+    : renderSummaryBoxModern(items, options, label);
 }
 
 function renderSummaryItemContent(
@@ -1337,7 +1343,11 @@ function renderSummaryItemContent(
   );
 }
 
-function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions): string {
+function renderSummaryBoxModern(
+  items: JSONContent[],
+  options: DcExportOptions,
+  label: string,
+): string {
   const palette = summaryBoxPalette(options);
   const wrapperStyle = joinStyle({
     margin: "0 0 18px",
@@ -1371,14 +1381,15 @@ function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions):
   });
   const bulletCellStyle = joinStyle({
     display: "table-cell",
-    width: "22px",
+    width: "28px",
     "vertical-align": "top",
   });
   const bulletStyle = joinStyle({
-    display: "inline-block",
+    display: "block",
     width: "8px",
     height: "8px",
     margin: "8px 0 0",
+    "line-height": 0,
     "border-radius": "999px",
     "background-color": palette.bulletBackground,
   });
@@ -1394,10 +1405,14 @@ function renderSummaryBoxModern(items: JSONContent[], options: DcExportOptions):
     })
     .join("");
 
-  return `<section style="${wrapperStyle}"><span style="${labelStyle}">핵심 요약</span><ul style="${listStyle}">${body}</ul></section>`;
+  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(label)}</span><ul style="${listStyle}">${body}</ul></section>`;
 }
 
-function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): string {
+function renderSummaryBoxTable(
+  items: JSONContent[],
+  options: DcExportOptions,
+  label: string,
+): string {
   const palette = summaryBoxPalette(options);
   const tableStyle = joinStyle({
     width: "100%",
@@ -1415,26 +1430,8 @@ function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): 
     "font-weight": 900,
     "line-height": 1.2,
   });
-  const bulletCellStyle = joinStyle({
-    width: "30px",
-    padding: "6px 0 6px 16px",
-    "vertical-align": "top",
-  });
-  const lastBulletCellStyle = joinStyle({
-    width: "30px",
-    padding: "6px 0 14px 16px",
-    "vertical-align": "top",
-  });
-  const bulletStyle = joinStyle({
-    display: "inline-block",
-    width: "8px",
-    height: "8px",
-    margin: "8px 0 0",
-    "border-radius": "999px",
-    "background-color": palette.bulletBackground,
-  });
   const itemCellStyle = joinStyle({
-    padding: "5px 16px 5px 0",
+    padding: "5px 16px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
@@ -1442,7 +1439,7 @@ function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): 
     "vertical-align": "top",
   });
   const lastItemCellStyle = joinStyle({
-    padding: "5px 16px 13px 0",
+    padding: "5px 16px 13px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
@@ -1453,11 +1450,19 @@ function renderSummaryBoxTable(items: JSONContent[], options: DcExportOptions): 
     .map((item, index) => {
       const content = renderSummaryItemContent(item, options, palette.text, palette.background);
       const isLast = index === items.length - 1;
-      return `<tr><td style="${isLast ? lastBulletCellStyle : bulletCellStyle}"><span style="${bulletStyle}"></span></td><td style="${isLast ? lastItemCellStyle : itemCellStyle}">${content}</td></tr>`;
+      const bulletStyle = joinStyle({
+        color: palette.bulletBackground,
+        "font-size": "20px",
+        "font-weight": 900,
+        "line-height": 1,
+        "vertical-align": "middle",
+      });
+
+      return `<tr><td style="${isLast ? lastItemCellStyle : itemCellStyle}"><span style="${bulletStyle}">&bull;</span>&nbsp;&nbsp;${content}</td></tr>`;
     })
     .join("");
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td colspan="2" style="${labelCellStyle}">핵심 요약</td></tr>${rows}</tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${labelCellStyle}">${escapeHtml(label)}</td></tr>${rows}</tbody></table>`;
 }
 
 function heroBlockPalette(options: DcExportOptions) {
@@ -1485,11 +1490,7 @@ function heroBlockPalette(options: DcExportOptions) {
 }
 
 function heroBlockLabel(node: JSONContent): string {
-  if (typeof node.attrs?.label === "string" && node.attrs.label.trim()) {
-    return node.attrs.label.trim();
-  }
-
-  return "CODING GUIDE";
+  return labelFromAttrs(node, "CODING GUIDE");
 }
 
 function heroTextChildren(node: JSONContent): JSONContent[] {
@@ -1614,41 +1615,59 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
     border: `1px solid ${palette.border}`,
     "border-top": `4px solid ${palette.accent}`,
   });
-  const cellStyle = joinStyle({
-    padding: "22px 24px",
+  const cellBaseStyle = {
     "background-color": palette.background,
     color: palette.title,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "box-sizing": "border-box",
-  });
+  };
   const labelStyle = joinStyle({
-    display: "block",
-    margin: "0 0 16px",
     color: palette.label,
     "font-size": "12px",
     "font-weight": 900,
     "line-height": 1.2,
   });
   const titleStyle = joinStyle({
-    display: "block",
-    margin: "0 0 12px",
     color: palette.title,
     "font-size": "30px",
     "font-weight": 900,
     "line-height": 1.22,
   });
   const subtitleStyle = joinStyle({
-    display: "block",
     color: palette.subtitle,
     "font-size": "17px",
     "font-weight": 700,
     "line-height": 1.62,
   });
-  const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "";
-  const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
-  const contentHtml = renderHeroContentHtml(titleHtml, subtitleHtml, titleStyle);
+  const labelCellStyle = joinStyle({
+    ...cellBaseStyle,
+    padding: "22px 24px 12px",
+  });
+  const titleCellStyle = joinStyle({
+    ...cellBaseStyle,
+    padding: subtitle ? "0 24px 10px" : "0 24px 22px",
+  });
+  const subtitleCellStyle = joinStyle({
+    ...cellBaseStyle,
+    padding: "0 24px 22px",
+  });
+  const rows = [
+    `<tr><td style="${labelCellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span></td></tr>`,
+  ];
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span>${contentHtml}</td></tr></tbody></table>`;
+  if (title) {
+    rows.push(`<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">${title}</strong></td></tr>`);
+  }
+
+  if (subtitle) {
+    rows.push(`<tr><td style="${subtitleCellStyle}"><span style="${subtitleStyle}">${subtitle}</span></td></tr>`);
+  }
+
+  if (!title && !subtitle) {
+    rows.push(`<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">강의 노트</strong></td></tr>`);
+  }
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
 }
 
 function tutorialBlockPalette(options: DcExportOptions) {
@@ -1834,11 +1853,6 @@ async function renderTutorialBlockTable(
     border: `1px solid ${palette.border}`,
     "border-left": `4px solid ${palette.accent}`,
   });
-  const numberCellStyle = joinStyle({
-    width: "52px",
-    padding: "14px 0 8px 16px",
-    "vertical-align": "top",
-  });
   const numberStyle = joinStyle({
     display: "inline-block",
     "min-width": "30px",
@@ -1851,8 +1865,16 @@ async function renderTutorialBlockTable(
     "line-height": 1.1,
     "text-align": "center",
   });
-  const titleCellStyle = joinStyle({
-    padding: "13px 16px 8px 12px",
+  const headCellStyle = joinStyle({
+    padding: "14px 16px 8px 28px",
+    color: palette.title,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": "18px",
+    "font-weight": 900,
+    "line-height": 1.32,
+    "vertical-align": "middle",
+  });
+  const titleStyle = joinStyle({
     color: palette.title,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "18px",
@@ -1861,7 +1883,7 @@ async function renderTutorialBlockTable(
     "vertical-align": "middle",
   });
   const bodyCellStyle = joinStyle({
-    padding: "0 16px 14px 68px",
+    padding: "0 16px 14px 74px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeSize(options.bodyFontSize, "15px"),
@@ -1877,9 +1899,9 @@ async function renderTutorialBlockTable(
         palette.text,
         palette.cardBackground,
       );
-      const bodyRow = body ? `<tr><td colspan="2" style="${bodyCellStyle}">${body}</td></tr>` : "";
+      const bodyRow = body ? `<tr><td style="${bodyCellStyle}">${body}</td></tr>` : "";
 
-      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}"><span style="${numberStyle}">${number}</span></td><td style="${titleCellStyle}">${title}</td></tr>${bodyRow}</tbody></table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${headCellStyle}"><span style="${numberStyle}">${number}</span>&nbsp;&nbsp;&nbsp;<strong style="${titleStyle}">${title}</strong></td></tr>${bodyRow}</tbody></table>`;
     }),
   );
 
