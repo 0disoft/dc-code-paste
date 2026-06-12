@@ -1,5 +1,12 @@
 import type { JSONContent } from "@tiptap/core";
+import { calloutNodeNameByKind, isCalloutKind, type CalloutKind } from "$lib/editor/callout";
+import { createComparisonBlockFromText } from "$lib/editor/comparison-block";
+import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
+import { createHeroBlockFromText } from "$lib/editor/hero-block";
 import { normalizeEditableLinkHref } from "$lib/editor/link";
+import { createReferenceListFromText } from "$lib/editor/reference-list";
+import { createSummaryBoxFromText } from "$lib/editor/summary-box";
+import { createTutorialBlockFromText } from "$lib/editor/tutorial-block";
 import { defaultLanguage, isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
@@ -24,6 +31,8 @@ const orderedListPattern = /^\d+[.)]\s+(.+)$/;
 const horizontalRulePattern = /^(?:[-*_]\s*){3,}$/;
 const standaloneMarkdownLinkPattern = /^\[([^\]]+)]\(([^)]+)\)$/;
 const linkBoxLabelPattern = /^(?:linkbox|link box|링크박스|link|링크)$/i;
+const customBlockStartPattern = /^:::\s*([a-zA-Z가-힣_-]+)(?:\s+(.+))?\s*$/;
+const customBlockEndPattern = /^:::\s*$/;
 
 function textNode(text: string, marks?: InlineMark[]): JSONContent | undefined {
   if (!text) {
@@ -191,6 +200,184 @@ function linkBoxNode(label: string, href: string): JSONContent | undefined {
   };
 }
 
+function normalizeCustomBlockName(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  const aliases: Record<string, string> = {
+    히어로: "hero",
+    요약: "summary",
+    튜토리얼: "tutorial",
+    비교: "comparison",
+    참고목록: "references",
+    자료목록: "references",
+    링크목록: "references",
+    버튼: "cta",
+    버튼묶음: "cta",
+    팁: "tip",
+    주의: "warning",
+    참고: "reference",
+    강조: "emphasis",
+    성공: "success",
+    실패: "failure",
+    실험: "experiment",
+    결론: "conclusion",
+    반박: "rebuttal",
+  };
+
+  return aliases[normalized] ?? normalized;
+}
+
+function customBlockStart(line: string): { name: string; info: string } | undefined {
+  if (customBlockEndPattern.test(line.trim())) {
+    return undefined;
+  }
+
+  const match = customBlockStartPattern.exec(line.trim());
+  if (!match) {
+    return undefined;
+  }
+
+  return {
+    name: normalizeCustomBlockName(match[1] ?? ""),
+    info: match[2]?.trim() ?? "",
+  };
+}
+
+function contentOrEmptyParagraph(document: JSONContent): JSONContent[] {
+  return document.content?.length ? document.content : [{ type: "paragraph" }];
+}
+
+function collectCustomBlock(
+  lines: string[],
+  start: number,
+): { body: string; nextIndex: number } | undefined {
+  if (!customBlockStart(lines[start] ?? "")) {
+    return undefined;
+  }
+
+  const body: string[] = [];
+  let index = start + 1;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+
+    if (customBlockEndPattern.test(line.trim())) {
+      return { body: body.join("\n"), nextIndex: index + 1 };
+    }
+
+    body.push(line);
+    index += 1;
+  }
+
+  return { body: body.join("\n"), nextIndex: index };
+}
+
+function calloutKindFromCustomBlockName(name: string): CalloutKind | undefined {
+  return isCalloutKind(name) ? name : undefined;
+}
+
+function createCalloutBlock(kind: CalloutKind, body: string, fallbackLanguage: DcLanguageId) {
+  return {
+    type: calloutNodeNameByKind[kind],
+    content: contentOrEmptyParagraph(
+      parseMarkdownToDocument(body.trim() || " ", {
+        defaultLanguage: fallbackLanguage,
+      }),
+    ),
+  };
+}
+
+function ctaButtonFromLine(line: string): JSONContent | undefined {
+  const trimmed = line
+    .trim()
+    .replace(/^[-*+]\s+/, "")
+    .replace(/^\d+[.)]\s+/, "")
+    .trim();
+
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const markdownLink = /^\[([^\]]+)]\(([^)]+)\)$/.exec(trimmed);
+  if (markdownLink) {
+    const href = normalizeEditableLinkHref(markdownLink[2] ?? "");
+    const label = markdownLink[1]?.trim();
+
+    return href && label
+      ? { type: "ctaButton", attrs: { href }, content: [{ type: "text", text: label }] }
+      : undefined;
+  }
+
+  const labelled = /^(.+?)(?:\s*[:：]\s*|\s+-\s+)(https?:\/\/\S+)$/i.exec(trimmed);
+  if (labelled) {
+    const label = labelled[1]?.trim();
+    const href = normalizeEditableLinkHref(labelled[2] ?? "");
+
+    return href && label
+      ? { type: "ctaButton", attrs: { href }, content: [{ type: "text", text: label }] }
+      : undefined;
+  }
+
+  const href = normalizeEditableLinkHref(trimmed);
+  if (!href) {
+    return undefined;
+  }
+
+  return { type: "ctaButton", attrs: { href }, content: [{ type: "text", text: href }] };
+}
+
+function createCtaGroupFromText(text: string, layout: CtaGroupLayout): JSONContent | undefined {
+  const buttons = text
+    .split(/\r?\n/)
+    .map(ctaButtonFromLine)
+    .filter((button): button is JSONContent => Boolean(button));
+
+  return buttons.length > 0
+    ? {
+        type: "ctaGroup",
+        attrs: { layout },
+        content: buttons,
+      }
+    : undefined;
+}
+
+function customBlockNode(
+  name: string,
+  info: string,
+  body: string,
+  fallbackLanguage: DcLanguageId,
+): JSONContent | undefined {
+  const calloutKind = calloutKindFromCustomBlockName(name);
+  if (calloutKind) {
+    return createCalloutBlock(calloutKind, body, fallbackLanguage);
+  }
+
+  if (name === "hero") {
+    return createHeroBlockFromText(body);
+  }
+
+  if (name === "summary") {
+    return createSummaryBoxFromText(body);
+  }
+
+  if (name === "tutorial") {
+    return createTutorialBlockFromText(body);
+  }
+
+  if (name === "comparison") {
+    return createComparisonBlockFromText(body);
+  }
+
+  if (name === "references" || name === "reference-list" || name === "referencelist") {
+    return createReferenceListFromText(body);
+  }
+
+  if (name === "cta" || name === "cta-group" || name === "ctagroup") {
+    return createCtaGroupFromText(body, normalizeCtaGroupLayout(info));
+  }
+
+  return undefined;
+}
+
 function standaloneLinkBoxNode(line: string): JSONContent | undefined {
   const markdownLink = standaloneMarkdownLinkPattern.exec(line.trim());
 
@@ -220,6 +407,7 @@ function isBlockStarter(line: string): boolean {
     fencePattern.test(trimmed) ||
     headingPattern.test(trimmed) ||
     horizontalRulePattern.test(trimmed) ||
+    Boolean(customBlockStart(trimmed)) ||
     unorderedListPattern.test(trimmed) ||
     orderedListPattern.test(trimmed) ||
     Boolean(standaloneLinkBoxNode(trimmed)) ||
@@ -298,6 +486,20 @@ export function parseMarkdownToDocument(
         content: compactContent([textNode(codeLines.join("\n"))]),
       });
       continue;
+    }
+
+    const customBlock = customBlockStart(trimmed);
+    if (customBlock) {
+      const collected = collectCustomBlock(lines, index);
+      const node = collected
+        ? customBlockNode(customBlock.name, customBlock.info, collected.body, fallbackLanguage)
+        : undefined;
+
+      if (node) {
+        content.push(node);
+        index = collected.nextIndex;
+        continue;
+      }
     }
 
     if (horizontalRulePattern.test(trimmed)) {

@@ -108,6 +108,23 @@ The editor saves the current draft in browser `localStorage` after the editor is
 The draft is restored on the next page load. `초기화` clears the saved draft and returns the editor
 to the bundled sample article.
 
+## LLM Authoring
+
+`LLM 가이드` copies a prompt that asks an LLM to return Markdown plus dc-code-paste block tags. Paste
+the LLM result into the `Markdown` panel and click `Markdown 가져오기` to turn the tagged text into
+editor blocks and preview HTML.
+
+Supported block tags use `:::` fences:
+
+- `:::hero`
+- `:::summary`
+- `:::tip`, `:::warning`, `:::reference`, `:::emphasis`
+- `:::success`, `:::failure`, `:::experiment`, `:::conclusion`, `:::rebuttal`
+- `:::tutorial`
+- `:::comparison`
+- `:::references`
+- `:::cta`
+
 ## Manual DC Paste Check
 
 Before treating a release as ready, check both paste paths in a browser:

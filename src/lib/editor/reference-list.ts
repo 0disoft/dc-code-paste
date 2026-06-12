@@ -37,8 +37,16 @@ function visibleFallbackLabel(href: string): string {
   }
 }
 
+function cleanReferenceLine(line: string): string {
+  return line
+    .trim()
+    .replace(/^[-*+]\s+/, "")
+    .replace(/^\d+[.)]\s+/, "")
+    .trim();
+}
+
 function referenceItemFromLine(line: string): JSONContent | undefined {
-  const trimmed = line.trim();
+  const trimmed = cleanReferenceLine(line);
 
   if (!trimmed) {
     return undefined;

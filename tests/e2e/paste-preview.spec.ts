@@ -26,6 +26,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("버튼묶음 정렬")).toBeVisible();
   await expect(page.getByRole("button", { name: "구분선" })).toBeVisible();
   await expect(page.getByRole("button", { name: "초기화" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "LLM 가이드 복사" })).toBeVisible();
   await expect(page.getByLabel("인용 스타일")).toBeVisible();
   await expect(page.getByLabel("코드 파일명")).toBeVisible();
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();

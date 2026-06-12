@@ -85,6 +85,7 @@
         createReferenceListFromText,
     } from "$lib/editor/reference-list";
     import { normalizeEditableLinkHref } from "$lib/editor/link";
+    import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
     import { parseMarkdownToDocument } from "$lib/editor/markdown-import";
     import {
         normalizeQuoteStyle,
@@ -177,6 +178,7 @@
     let isMarkdownPanelOpen = $state(false);
     let markdownDraft = $state("");
     let markdownImportState = $state<"idle" | "imported" | "error">("idle");
+    let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
     let presetName = $state("");
     let presets = $state<PresetSnapshot[]>([]);
     let presetState = $state<"idle" | "saved" | "error">("idle");
@@ -223,6 +225,13 @@
             : markdownImportState === "error"
               ? "비어 있음"
               : "대기",
+    );
+    const llmPromptCopyLabel = $derived(
+        llmPromptCopyState === "copied"
+            ? "복사됨"
+            : llmPromptCopyState === "error"
+              ? "복사 실패"
+              : "LLM 가이드",
     );
 
     function draftStorage() {
@@ -1141,6 +1150,20 @@
         }
     }
 
+    async function copyLlmAuthoringGuide() {
+        llmPromptCopyState = "idle";
+
+        try {
+            await copyPlainText(llmAuthoringPrompt);
+            llmPromptCopyState = "copied";
+            window.setTimeout(() => {
+                llmPromptCopyState = "idle";
+            }, 1300);
+        } catch {
+            llmPromptCopyState = "error";
+        }
+    }
+
     onMount(() => {
         let disposed = false;
         let mountedEditor: Editor | undefined;
@@ -1331,6 +1354,20 @@
             >
                 <FileText size={17} />
                 <span>Markdown</span>
+            </button>
+            <button
+                class:active={llmPromptCopyState === "copied"}
+                type="button"
+                title="LLM 가이드 복사"
+                aria-label="LLM 가이드 복사"
+                onclick={copyLlmAuthoringGuide}
+            >
+                {#if llmPromptCopyState === "copied"}
+                    <Check size={17} />
+                {:else}
+                    <Sparkles size={17} />
+                {/if}
+                <span>{llmPromptCopyLabel}</span>
             </button>
         </div>
 

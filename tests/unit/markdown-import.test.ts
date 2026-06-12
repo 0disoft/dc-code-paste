@@ -159,6 +159,64 @@ describe("markdown import", () => {
     ]);
   });
 
+  it("turns LLM authoring blocks into editor design nodes", () => {
+    const document = parseMarkdownToDocument(
+      [
+        ":::hero",
+        "label: GUIDE",
+        "빠른 입출력",
+        "병목을 먼저 좁힌다.",
+        ":::",
+        "",
+        ":::summary",
+        "- 입력 크기를 본다.",
+        "- 출력 횟수를 본다.",
+        ":::",
+        "",
+        ":::tip",
+        "반복문 안에서는 `endl`을 피한다.",
+        ":::",
+        "",
+        ":::comparison",
+        "Before: endl을 반복해서 쓴다.",
+        "After: \\n을 쓰고 마지막에만 flush한다.",
+        ":::",
+        "",
+        ":::references",
+        "- [cppreference](https://en.cppreference.com)",
+        ":::",
+        "",
+        ":::cta vertical",
+        "- GitHub: https://github.com/0disoft/dc-code-paste",
+        ":::",
+      ].join("\n"),
+    );
+
+    expect(document.content?.map((node) => node.type)).toEqual([
+      "heroBlock",
+      "summaryBox",
+      "tipBox",
+      "comparisonBlock",
+      "referenceList",
+      "ctaGroup",
+    ]);
+    expect(document.content?.[0]?.attrs).toEqual({ label: "GUIDE" });
+    expect(document.content?.[1]?.content?.[0]?.type).toBe("summaryItem");
+    expect(document.content?.[2]?.content?.[0]?.type).toBe("paragraph");
+    expect(document.content?.[3]?.content?.map((node) => node.type)).toEqual([
+      "comparisonColumn",
+      "comparisonColumn",
+    ]);
+    expect(document.content?.[4]?.content?.[0]?.attrs).toEqual({
+      href: "https://en.cppreference.com/",
+    });
+    expect(document.content?.[4]?.content?.[0]?.content?.[0]).toEqual({
+      type: "text",
+      text: "cppreference",
+    });
+    expect(document.content?.[5]?.attrs).toEqual({ layout: "vertical" });
+  });
+
   it("keeps unsupported inline links as plain text", () => {
     expect(parseMarkdownInline("[bad](javascript:alert)")).toEqual([
       { type: "text", text: "[bad](javascript:alert)" },
