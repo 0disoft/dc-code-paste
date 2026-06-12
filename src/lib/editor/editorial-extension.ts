@@ -1,5 +1,6 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 import { normalizeCtaGroupLayout } from "./cta-group";
+import { defaultSummaryBoxLabel } from "./summary-box";
 
 export const SectionHeading = Node.create({
   name: "sectionHeading",
@@ -183,6 +184,19 @@ export const SummaryBox = Node.create({
   group: "block",
   content: "summaryItem+",
   defining: true,
+
+  addAttributes() {
+    return {
+      label: {
+        default: defaultSummaryBoxLabel,
+        parseHTML: (element) => element.getAttribute("data-label") ?? defaultSummaryBoxLabel,
+        renderHTML: (attributes) => {
+          const label = typeof attributes.label === "string" ? attributes.label.trim() : "";
+          return label ? { "data-label": label } : {};
+        },
+      },
+    };
+  },
 
   parseHTML() {
     return [{ tag: "section[data-dc-summary-box]" }];

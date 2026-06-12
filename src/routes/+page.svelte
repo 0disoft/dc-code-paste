@@ -1,6 +1,5 @@
 <script lang="ts">
     import {
-        AlertTriangle,
         Bold,
         BookOpen,
         Check,
@@ -30,6 +29,7 @@
     } from "lucide-svelte";
     import { onDestroy, onMount } from "svelte";
     import type { Editor, JSONContent } from "@tiptap/core";
+    import type { ResolvedPos } from "@tiptap/pm/model";
     import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
     import { defaultProseFontFamily } from "$lib/dc/font-stacks";
     import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
@@ -50,8 +50,11 @@
         type DcThemeId,
     } from "$lib/highlighter/catalog";
     import {
+        calloutKindFromNodeName,
         calloutNodeNameByKind,
+        defaultCalloutLabel,
         isCalloutNodeName,
+        calloutNodeNames,
         type CalloutKind,
     } from "$lib/editor/callout";
     import {
@@ -100,6 +103,7 @@
     import {
         createDefaultSummaryBox,
         createSummaryBoxFromText,
+        defaultSummaryBoxLabel,
     } from "$lib/editor/summary-box";
     import {
         createDefaultTutorialBlock,
@@ -153,7 +157,23 @@
         "oklch(57.8% 0.18 31.88)",
         "oklch(47.55% 0.145 302.98)",
     ];
+    const calloutToneOptions: { label: string; value: CalloutKind }[] = [
+        { label: "팁", value: "tip" },
+        { label: "주의", value: "warning" },
+        { label: "참고", value: "reference" },
+        { label: "강조", value: "emphasis" },
+        { label: "성공", value: "success" },
+        { label: "실패", value: "failure" },
+        { label: "실험", value: "experiment" },
+        { label: "결론", value: "conclusion" },
+        { label: "반박", value: "rebuttal" },
+    ];
     type ToolPanelId = "blocks" | "code" | "style";
+    type EditableBlockLabelTarget = {
+        type: string;
+        pos: number;
+        fallback: string;
+    };
     type RenameTarget =
         | { kind: "preset"; id: string }
         | { kind: "draft"; id: string };
@@ -167,6 +187,7 @@
     let selectionFontSize = $state("15px");
     let quoteStyle = $state<QuoteStyle>("literary");
     let ctaGroupLayout = $state<CtaGroupLayout>("horizontal");
+    let activeCalloutKind = $state<CalloutKind>("tip");
     let codeFontSize = $state("14px");
     let codeLineHighlights = $state("");
     let codeFilename = $state("");
@@ -187,6 +208,8 @@
     let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
     let isStoragePanelOpen = $state(false);
     let activeToolPanel = $state<ToolPanelId | null>(null);
+    let blockLabelDraft = $state("");
+    let blockLabelTarget = $state<EditableBlockLabelTarget | null>(null);
     let presetName = $state("");
     let presets = $state<PresetSnapshot[]>([]);
     let presetState = $state<"idle" | "saved" | "error">("idle");
@@ -279,14 +302,18 @@
         };
     }
 
+    function cloneSerializableValue<T>(value: T): T {
+        return JSON.parse(JSON.stringify($state.snapshot(value))) as T;
+    }
+
     function cloneDocumentContent(document: JSONContent): JSONContent {
-        return structuredClone($state.snapshot(document));
+        return cloneSerializableValue(document);
     }
 
     function cloneDraftPreferences(
         preferences: DraftPreferences,
     ): DraftPreferences {
-        return structuredClone($state.snapshot(preferences));
+        return cloneSerializableValue(preferences);
     }
 
     function replaceEditorDocument(document: JSONContent) {
@@ -727,8 +754,122 @@
         }
     }
 
+    function normalizeBlockLabel(value: unknown) {
+        return typeof value === "string"
+            ? value.trim().replace(/\s+/g, " ").slice(0, 40)
+            : "";
+    }
+
+    function editableBlockLabelFallback(nodeName: string) {
+        if (nodeName === "heroBlock") {
+            return "CODING GUIDE";
+        }
+
+        if (nodeName === "summaryBox") {
+            return defaultSummaryBoxLabel;
+        }
+
+        const calloutKind = calloutKindFromNodeName(nodeName);
+        return calloutKind ? defaultCalloutLabel(calloutKind) : undefined;
+    }
+
+    function findEditableBlockLabelTargetFromResolvedPos(
+        resolvedPos: ResolvedPos,
+    ):
+        | (EditableBlockLabelTarget & { label: string })
+        | null {
+        for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+            const node = resolvedPos.node(depth);
+            const fallback = editableBlockLabelFallback(node.type.name);
+
+            if (!fallback) {
+                continue;
+            }
+
+            const label = normalizeBlockLabel(node.attrs.label) || fallback;
+
+            return {
+                type: node.type.name,
+                pos: resolvedPos.before(depth),
+                fallback,
+                label,
+            };
+        }
+
+        return null;
+    }
+
+    function syncBlockLabelTarget(
+        target: (EditableBlockLabelTarget & { label: string }) | null,
+    ) {
+        if (!target) {
+            blockLabelTarget = null;
+            blockLabelDraft = "";
+            return;
+        }
+
+        blockLabelTarget = {
+            type: target.type,
+            pos: target.pos,
+            fallback: target.fallback,
+        };
+        blockLabelDraft = target.label;
+    }
+
+    function findEditableBlockLabelTarget(current: Editor) {
+        return findEditableBlockLabelTargetFromResolvedPos(
+            current.state.selection.$from,
+        );
+    }
+
+    function syncBlockLabelDraft(current: Editor) {
+        syncBlockLabelTarget(findEditableBlockLabelTarget(current));
+    }
+
+    function syncBlockLabelDraftFromPosition(current: Editor, pos: number) {
+        syncBlockLabelTarget(
+            findEditableBlockLabelTargetFromResolvedPos(
+                current.state.doc.resolve(pos),
+            ),
+        );
+    }
+
+    function selectedCalloutKindFromResolvedPos(resolvedPos: ResolvedPos) {
+        for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+            const kind = calloutKindFromNodeName(resolvedPos.node(depth).type.name);
+
+            if (kind) {
+                return kind;
+            }
+        }
+
+        return undefined;
+    }
+
+    function syncCalloutToneDraft(current: Editor) {
+        const kind = selectedCalloutKindFromResolvedPos(
+            current.state.selection.$from,
+        );
+
+        if (kind) {
+            activeCalloutKind = kind;
+        }
+    }
+
+    function syncCalloutToneDraftFromPosition(current: Editor, pos: number) {
+        const kind = selectedCalloutKindFromResolvedPos(
+            current.state.doc.resolve(pos),
+        );
+
+        if (kind) {
+            activeCalloutKind = kind;
+        }
+    }
+
     function refreshEditorState(nextEditor: Editor) {
         documentJson = nextEditor.getJSON();
+        syncBlockLabelDraft(nextEditor);
+        syncCalloutToneDraft(nextEditor);
         editorSignal += 1;
     }
 
@@ -747,6 +888,13 @@
         return editor?.can().redo() ?? false;
     }
 
+    function isCalloutActive() {
+        void editorSignal;
+        return editor
+            ? calloutNodeNames.some((nodeName) => editor?.isActive(nodeName))
+            : false;
+    }
+
     function runEditorCommand(command: (current: Editor) => boolean) {
         if (!editor) {
             return;
@@ -754,6 +902,53 @@
 
         command(editor);
         refreshEditorState(editor);
+    }
+
+    function blockLabelPlaceholder() {
+        void editorSignal;
+        return blockLabelTarget?.fallback ?? "블록 선택";
+    }
+
+    function applyBlockLabel() {
+        runEditorCommand((current) => {
+            const selectionTarget = findEditableBlockLabelTarget(current);
+            const target = blockLabelTarget ?? selectionTarget;
+
+            if (!target) {
+                return false;
+            }
+
+            const node = current.state.doc.nodeAt(target.pos);
+            const fallback = node
+                ? editableBlockLabelFallback(node.type.name)
+                : undefined;
+
+            if (!node || !fallback) {
+                return false;
+            }
+
+            const label = normalizeBlockLabel(blockLabelDraft) || fallback;
+            current.commands.focus();
+            current.view.dispatch(
+                current.state.tr
+                    .setNodeMarkup(target.pos, undefined, {
+                        ...node.attrs,
+                        label,
+                    })
+                    .scrollIntoView(),
+            );
+            blockLabelDraft = label;
+            return true;
+        });
+    }
+
+    function applyBlockLabelOnEnter(event: KeyboardEvent) {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        event.preventDefault();
+        applyBlockLabel();
     }
 
     function applyCodeBlock() {
@@ -820,26 +1015,69 @@
         );
     }
 
-    function retargetActiveCallout(current: Editor, kind: CalloutKind) {
-        const targetType = current.schema.nodes[calloutNodeNameByKind[kind]];
+    function calloutLabelAfterToneChange(
+        nodeTypeName: string,
+        attrs: Record<string, unknown>,
+        kind: CalloutKind,
+    ) {
+        const previousKind = calloutKindFromNodeName(nodeTypeName);
+        const previousDefault = previousKind
+            ? defaultCalloutLabel(previousKind)
+            : "";
+        const previousLabel = normalizeBlockLabel(attrs.label);
 
-        if (!targetType) {
+        return previousLabel && previousLabel !== previousDefault
+            ? previousLabel
+            : defaultCalloutLabel(kind);
+    }
+
+    function retargetCalloutAtPosition(
+        current: Editor,
+        pos: number,
+        kind: CalloutKind,
+    ) {
+        const targetType = current.schema.nodes[calloutNodeNameByKind[kind]];
+        const node = current.state.doc.nodeAt(pos);
+
+        if (!targetType || !node || !isCalloutNodeName(node.type.name)) {
             return false;
         }
 
+        const label = calloutLabelAfterToneChange(
+            node.type.name,
+            node.attrs,
+            kind,
+        );
+        current.commands.focus();
+        current.view.dispatch(
+            current.state.tr
+                .setNodeMarkup(pos, targetType, {
+                    ...node.attrs,
+                    label,
+                })
+                .scrollIntoView(),
+        );
+        syncBlockLabelTarget({
+            type: calloutNodeNameByKind[kind],
+            pos,
+            fallback: defaultCalloutLabel(kind),
+            label,
+        });
+        return true;
+    }
+
+    function retargetActiveCallout(current: Editor, kind: CalloutKind) {
         const selectionFrom = current.state.selection.$from;
 
         for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
             const node = selectionFrom.node(depth);
 
             if (isCalloutNodeName(node.type.name)) {
-                current.commands.focus();
-                current.view.dispatch(
-                    current.state.tr
-                        .setNodeMarkup(selectionFrom.before(depth), targetType)
-                        .scrollIntoView(),
+                return retargetCalloutAtPosition(
+                    current,
+                    selectionFrom.before(depth),
+                    kind,
                 );
-                return true;
             }
         }
 
@@ -865,9 +1103,50 @@
             return current
                 .chain()
                 .focus()
-                .wrapIn(calloutNodeNameByKind[kind])
+                .wrapIn(calloutNodeNameByKind[kind], {
+                    label: defaultCalloutLabel(kind),
+                })
                 .run();
         });
+    }
+
+    function applySelectedCallout() {
+        applyCallout(activeCalloutKind);
+    }
+
+    function updateActiveCalloutTone() {
+        if (!editor) {
+            return;
+        }
+
+        const trackedTarget = blockLabelTarget;
+        const didRetargetTrackedCallout =
+            trackedTarget !== null &&
+            retargetCalloutAtPosition(
+                editor,
+                trackedTarget.pos,
+                activeCalloutKind,
+            );
+
+        if (!didRetargetTrackedCallout) {
+            retargetActiveCallout(editor, activeCalloutKind);
+        }
+
+        refreshEditorState(editor);
+
+        if (didRetargetTrackedCallout && trackedTarget) {
+            const node = editor.state.doc.nodeAt(trackedTarget.pos);
+            const label =
+                normalizeBlockLabel(node?.attrs.label) ||
+                defaultCalloutLabel(activeCalloutKind);
+
+            syncBlockLabelTarget({
+                type: calloutNodeNameByKind[activeCalloutKind],
+                pos: trackedTarget.pos,
+                fallback: defaultCalloutLabel(activeCalloutKind),
+                label,
+            });
+        }
     }
 
     function selectedText() {
@@ -1348,6 +1627,27 @@
                         class: "article-editor",
                         spellcheck: "false",
                     },
+                    handleClick: (view, pos) => {
+                        if (editor) {
+                            syncBlockLabelDraftFromPosition(editor, pos);
+                            syncCalloutToneDraftFromPosition(editor, pos);
+                        } else {
+                            syncBlockLabelTarget(
+                                findEditableBlockLabelTargetFromResolvedPos(
+                                    view.state.doc.resolve(pos),
+                                ),
+                            );
+                            const kind = selectedCalloutKindFromResolvedPos(
+                                view.state.doc.resolve(pos),
+                            );
+
+                            if (kind) {
+                                activeCalloutKind = kind;
+                            }
+                        }
+
+                        return false;
+                    },
                 },
                 onCreate: ({ editor: current }) => {
                     editor = current;
@@ -1358,6 +1658,8 @@
                     refreshEditorState(current);
                 },
                 onSelectionUpdate: ({ editor: current }) => {
+                    syncBlockLabelDraft(current);
+                    syncCalloutToneDraft(current);
                     editorSignal += 1;
                     const attrs = current.getAttributes("codeBlock");
                     if (
@@ -1777,78 +2079,49 @@
             >
                 <SeparatorHorizontal size={17} />
             </button>
+            <label class="block-label-field">
+                <span><Type size={15} /> 라벨</span>
+                <input
+                    type="text"
+                    bind:value={blockLabelDraft}
+                    aria-label="블록 라벨"
+                    placeholder={blockLabelPlaceholder()}
+                    disabled={blockLabelTarget === null}
+                    onkeydown={applyBlockLabelOnEnter}
+                />
+            </label>
             <button
-                class:active={isActive("tipBox")}
                 type="button"
-                onclick={() => applyCallout("tip")}
-            >
-                <Sparkles size={17} />
-                <span>팁</span>
-            </button>
-            <button
-                class:active={isActive("warningBox")}
-                type="button"
-                onclick={() => applyCallout("warning")}
-            >
-                <AlertTriangle size={17} />
-                <span>주의</span>
-            </button>
-            <button
-                class:active={isActive("referenceBox")}
-                type="button"
-                onclick={() => applyCallout("reference")}
-            >
-                <BookOpen size={17} />
-                <span>참고</span>
-            </button>
-            <button
-                class:active={isActive("emphasisBox")}
-                type="button"
-                onclick={() => applyCallout("emphasis")}
-            >
-                <Highlighter size={17} />
-                <span>강조</span>
-            </button>
-            <button
-                class:active={isActive("successBox")}
-                type="button"
-                onclick={() => applyCallout("success")}
+                title="라벨 적용"
+                aria-label="라벨 적용"
+                disabled={blockLabelTarget === null}
+                onclick={applyBlockLabel}
             >
                 <Check size={17} />
-                <span>성공</span>
+                <span>적용</span>
             </button>
             <button
-                class:active={isActive("failureBox")}
+                class:active={isCalloutActive()}
                 type="button"
-                onclick={() => applyCallout("failure")}
-            >
-                <AlertTriangle size={17} />
-                <span>실패</span>
-            </button>
-            <button
-                class:active={isActive("experimentBox")}
-                type="button"
-                onclick={() => applyCallout("experiment")}
+                title="콜아웃"
+                aria-label="콜아웃"
+                onclick={applySelectedCallout}
             >
                 <Sparkles size={17} />
-                <span>실험</span>
+                <span>콜아웃</span>
             </button>
-            <button
-                class:active={isActive("conclusionBox")}
-                type="button"
-                onclick={() => applyCallout("conclusion")}
-            >
-                <BookOpen size={17} />
-                <span>결론</span>
-            </button>
-            <button
-                class:active={isActive("rebuttalBox")}
-                type="button"
-                onclick={() => applyCallout("rebuttal")}
-            >
-                <Highlighter size={17} />
-                <span>반박</span>
-            </button>
+            <label>
+                <span><Paintbrush size={15} /> 톤</span>
+                <select
+                    bind:value={activeCalloutKind}
+                    aria-label="콜아웃 톤"
+                    onchange={updateActiveCalloutTone}
+                >
+                    {#each calloutToneOptions as item}
+                        <option value={item.value}>{item.label}</option>
+                    {/each}
+                </select>
+            </label>
             <button
                 class:active={isActive("ctaButton")}
                 type="button"
@@ -2575,6 +2848,15 @@
     input[type="text"]:focus {
         border-color: var(--accent);
         outline: none;
+    }
+
+    input[type="text"]:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    .block-label-field input {
+        width: 150px;
     }
 
     .code-filename-input,
@@ -3431,7 +3713,7 @@
         display: block;
         margin: 0 0 9px;
         color: oklch(36.42% 0.042 78.12);
-        content: "핵심 요약";
+        content: attr(data-label);
         font-size: 12px;
         font-weight: 900;
         line-height: 1.2;

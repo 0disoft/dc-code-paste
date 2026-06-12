@@ -50,6 +50,18 @@ export const calloutKindByNodeName: Record<CalloutNodeName, CalloutKind> = {
   rebuttalBox: "rebuttal",
 };
 
+export const defaultCalloutLabels: Record<CalloutKind, string> = {
+  tip: "TIP",
+  warning: "주의",
+  reference: "REF",
+  emphasis: "POINT",
+  success: "성공",
+  failure: "실패",
+  experiment: "실험",
+  conclusion: "결론",
+  rebuttal: "반박",
+};
+
 export function isCalloutKind(value: unknown): value is CalloutKind {
   return typeof value === "string" && calloutKinds.includes(value as CalloutKind);
 }
@@ -64,4 +76,8 @@ export function isCalloutNodeName(value: unknown): value is CalloutNodeName {
 
 export function calloutKindFromNodeName(value: unknown): CalloutKind | undefined {
   return isCalloutNodeName(value) ? calloutKindByNodeName[value] : undefined;
+}
+
+export function defaultCalloutLabel(kind: CalloutKind): string {
+  return defaultCalloutLabels[kind];
 }

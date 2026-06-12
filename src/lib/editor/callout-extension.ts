@@ -1,5 +1,5 @@
 import { mergeAttributes, Node } from "@tiptap/core";
-import type { CalloutKind, CalloutNodeName } from "./callout";
+import { defaultCalloutLabel, type CalloutKind, type CalloutNodeName } from "./callout";
 
 function createCalloutExtension(kind: CalloutKind, name: CalloutNodeName) {
   return Node.create({
@@ -7,6 +7,20 @@ function createCalloutExtension(kind: CalloutKind, name: CalloutNodeName) {
     group: "block",
     content: "block+",
     defining: true,
+
+    addAttributes() {
+      return {
+        label: {
+          default: defaultCalloutLabel(kind),
+          parseHTML: (element) =>
+            element.getAttribute("data-label") ?? defaultCalloutLabel(kind),
+          renderHTML: (attributes) => {
+            const label = typeof attributes.label === "string" ? attributes.label.trim() : "";
+            return label ? { "data-label": label } : {};
+          },
+        },
+      };
+    },
 
     parseHTML() {
       return [{ tag: `aside[data-dc-callout][data-kind="${kind}"]` }];

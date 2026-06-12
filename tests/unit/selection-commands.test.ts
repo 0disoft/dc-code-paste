@@ -59,6 +59,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "he" }] },
         {
           type: "tipBox",
+          attrs: { label: "TIP" },
           content: [
             {
               type: "paragraph",
@@ -127,6 +128,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "al" }] },
         {
           type: "referenceBox",
+          attrs: { label: "REF" },
           content: [
             { type: "paragraph", content: [{ type: "text", text: "pha beta" }] },
             { type: "paragraph", content: [{ type: "text", text: "gamma" }] },
@@ -159,6 +161,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "watch " }] },
         {
           type: "emphasisBox",
+          attrs: { label: "POINT" },
           content: [
             {
               type: "paragraph",
@@ -193,6 +196,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "challenge " }] },
         {
           type: "rebuttalBox",
+          attrs: { label: "반박" },
           content: [
             {
               type: "paragraph",

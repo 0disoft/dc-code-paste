@@ -18,14 +18,17 @@ test("renders the paste tool", async ({ page }) => {
     "aria-expanded",
     "true",
   );
-  await expect(page.getByRole("button", { name: "팁" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "주의" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "참고" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "성공" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "실패" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "실험" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "결론" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "반박" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "콜아웃" })).toBeVisible();
+  await expect(page.getByLabel("콜아웃 톤")).toBeVisible();
+  await expect(page.getByLabel("콜아웃 톤")).toHaveValue("tip");
+  await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "주의" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "참고" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "성공" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "실패" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "실험" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "결론" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "반박" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "섹션" })).toBeVisible();
   await expect(page.getByRole("button", { name: "히어로" })).toBeVisible();
   await expect(page.getByRole("button", { name: "요약" })).toBeVisible();
@@ -45,6 +48,8 @@ test("renders the paste tool", async ({ page }) => {
 
   await page.getByRole("button", { name: "코드 도구" }).click();
   await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "콜아웃" })).toHaveCount(0);
+  await expect(page.getByLabel("콜아웃 톤")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "코드", exact: true })).toBeVisible();
   await expect(page.getByLabel("코드 파일명")).toBeVisible();
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
@@ -175,7 +180,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/예제 코드 저장소/);
   await expect(htmlSource).toHaveValue(/main\.cpp/);
   await expect(htmlSource).toHaveValue(/text-align:center/);
-  await expect(htmlSource).toHaveValue(/<pre/);
+  await expect(htmlSource).not.toHaveValue(/<pre/);
+  await expect(htmlSource).toHaveValue(/&nbsp;&nbsp;&nbsp;&nbsp;/);
+  await expect(htmlSource).toHaveValue(/sync_with_stdio/);
 
   await page.getByRole("button", { name: "Markdown" }).click();
   await page
@@ -208,7 +215,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/border-left:4px solid/);
   await expect(htmlSource).toHaveValue(/background-color:#[0-9a-f]{6}/);
   await expect(htmlSource).not.toHaveValue(/oklch\(/);
-  await expect(htmlSource).toHaveValue(/<pre/);
+  await expect(htmlSource).not.toHaveValue(/<pre/);
 
   await page
     .getByLabel("저장된 초안")

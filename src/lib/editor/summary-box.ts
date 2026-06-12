@@ -1,5 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 
+export const defaultSummaryBoxLabel = "핵심 요약";
+
 const defaultSummaryItems = [
   "입출력 병목은 코드보다 데이터 흐름에서 먼저 찾는다.",
   "빠른 입출력 설정은 코드 맨 앞에서 한 번에 끝낸다.",
@@ -9,6 +11,7 @@ const defaultSummaryItems = [
 export function createDefaultSummaryBox(): JSONContent {
   return {
     type: "summaryBox",
+    attrs: { label: defaultSummaryBoxLabel },
     content: defaultSummaryItems.map((text) => ({
       type: "summaryItem",
       content: [{ type: "text", text }],
@@ -37,6 +40,7 @@ export function createSummaryBoxFromText(text: string): JSONContent | undefined 
   return items.length > 0
     ? {
         type: "summaryBox",
+        attrs: { label: defaultSummaryBoxLabel },
         content: items,
       }
     : undefined;

@@ -1,7 +1,7 @@
 import type { Command } from "@tiptap/core";
 import type { Fragment, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
-import { calloutNodeNameByKind, type CalloutKind } from "./callout";
+import { calloutNodeNameByKind, defaultCalloutLabel, type CalloutKind } from "./callout";
 
 type Dispatch = (transaction: Transaction) => void;
 
@@ -83,8 +83,10 @@ export function replaceSelectedInlineRangeWithCallout(
     return false;
   }
 
+  const attrs = { label: defaultCalloutLabel(kind) };
+
   if (blockContent) {
-    return dispatchReplacement(state, dispatch, calloutType.create(null, blockContent));
+    return dispatchReplacement(state, dispatch, calloutType.create(attrs, blockContent));
   }
 
   const inlineContent = selectedInlineContent(state);
@@ -96,7 +98,7 @@ export function replaceSelectedInlineRangeWithCallout(
   return dispatchReplacement(
     state,
     dispatch,
-    calloutType.create(null, paragraphType.create(null, inlineContent)),
+    calloutType.create(attrs, paragraphType.create(null, inlineContent)),
   );
 }
 
