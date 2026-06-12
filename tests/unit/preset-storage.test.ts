@@ -9,6 +9,7 @@ import {
   parsePresetSnapshots,
   presetStorageKey,
   readPresetSnapshots,
+  renamePresetSnapshot,
   writePresetSnapshots,
 } from "../../src/lib/editor/preset-storage";
 
@@ -107,6 +108,22 @@ describe("preset storage", () => {
     expect(nextPresets[0]?.id).toBe(second.id);
   });
 
+  it("renames presets without changing their saved content", () => {
+    const storage = new MemoryStorage();
+    const preset = createPresetSnapshot("강의글 구조", sampleDocument, preferences);
+
+    expect(writePresetSnapshots(storage, [preset])).toBe(true);
+
+    const renamed = renamePresetSnapshot(storage, preset.id, "  풀이   템플릿  ");
+
+    expect(renamed).toHaveLength(1);
+    expect(renamed[0]?.name).toBe("풀이 템플릿");
+    expect(renamed[0]?.document).toEqual(sampleDocument);
+    expect(renamed[0]?.preferences).toEqual(preferences);
+    expect(renamed[0]?.updatedAt).toBe(preset.updatedAt);
+    expect(readPresetSnapshots(storage)[0]?.name).toBe("풀이 템플릿");
+  });
+
   it("treats malformed payloads and storage failures as empty or non-fatal", () => {
     const preset = createPresetSnapshot("", sampleDocument, preferences);
 
@@ -114,6 +131,7 @@ describe("preset storage", () => {
     expect(parsePresetSnapshots(JSON.stringify({ version: 2, presets: [preset] }))).toEqual([]);
     expect(readPresetSnapshots(throwingStorage)).toEqual([]);
     expect(writePresetSnapshots(throwingStorage, [preset])).toBe(false);
+    expect(renamePresetSnapshot(throwingStorage, preset.id, "새 이름")).toEqual([]);
     expect(clearPresetSnapshots(throwingStorage)).toBe(false);
   });
 });

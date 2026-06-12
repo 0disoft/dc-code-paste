@@ -34,6 +34,7 @@ export type DraftSnapshot = {
 export type DraftHistorySnapshot = DraftSnapshot & {
   id: string;
   createdAt: string;
+  name?: string;
 };
 
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -137,6 +138,15 @@ function createSnapshotId() {
   return `draft_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function normalizeSnapshotName(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, 60) : undefined;
+}
+
 function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -175,10 +185,13 @@ function normalizeDraftHistorySnapshot(value: unknown): DraftHistorySnapshot | u
     return undefined;
   }
 
+  const name = normalizeSnapshotName(value.name);
+
   return {
     ...snapshot,
     id: value.id,
     createdAt: value.createdAt,
+    ...(name ? { name } : {}),
   };
 }
 
@@ -302,6 +315,25 @@ export function deleteDraftHistorySnapshot(
 ): DraftHistorySnapshot[] {
   const current = readDraftHistorySnapshots(storage);
   const next = current.filter((item) => item.id !== id);
+
+  return writeDraftHistorySnapshots(storage, next) ? next : current;
+}
+
+export function renameDraftHistorySnapshot(
+  storage: DraftStorage,
+  id: string,
+  name: string,
+): DraftHistorySnapshot[] {
+  const current = readDraftHistorySnapshots(storage);
+  const nextName = normalizeSnapshotName(name);
+  const next = current.map((snapshot) => {
+    if (snapshot.id !== id) {
+      return snapshot;
+    }
+
+    const { name: _name, ...snapshotWithoutName } = snapshot;
+    return nextName ? { ...snapshotWithoutName, name: nextName } : snapshotWithoutName;
+  });
 
   return writeDraftHistorySnapshots(storage, next) ? next : current;
 }

@@ -14,6 +14,7 @@ import {
   parseDraftSnapshot,
   readDraftHistorySnapshots,
   readDraftSnapshot,
+  renameDraftHistorySnapshot,
   writeDraftHistorySnapshots,
   writeDraftSnapshot,
   type DraftPreferences,
@@ -176,6 +177,30 @@ describe("draft storage", () => {
     ]);
   });
 
+  it("renames draft history snapshots while preserving unnamed legacy snapshots", () => {
+    const storage = new MemoryStorage();
+    const first = createDraftHistorySnapshot(sampleDocument, preferences);
+    const second = createDraftHistorySnapshot(sampleDocument, {
+      ...preferences,
+      language: "typescript",
+    });
+
+    expect(writeDraftHistorySnapshots(storage, [first, second])).toBe(true);
+
+    const renamed = renameDraftHistorySnapshot(storage, first.id, "  풀이   초안  ");
+
+    expect(renamed[0]?.id).toBe(first.id);
+    expect(renamed[0]?.name).toBe("풀이 초안");
+    expect(renamed[0]?.document).toEqual(sampleDocument);
+    expect(renamed[0]?.updatedAt).toBe(first.updatedAt);
+    expect(renamed[1]?.name).toBeUndefined();
+    expect(readDraftHistorySnapshots(storage)[0]?.name).toBe("풀이 초안");
+
+    const cleared = renameDraftHistorySnapshot(storage, first.id, " ");
+
+    expect(cleared[0]?.name).toBeUndefined();
+  });
+
   it("treats draft history storage failures as non-fatal", () => {
     const snapshot = createDraftHistorySnapshot(sampleDocument, preferences);
 
@@ -183,6 +208,7 @@ describe("draft storage", () => {
     expect(writeDraftHistorySnapshots(throwingStorage, [snapshot])).toBe(false);
     expect(appendDraftHistorySnapshot(throwingStorage, snapshot)).toEqual([]);
     expect(deleteDraftHistorySnapshot(throwingStorage, snapshot.id)).toEqual([]);
+    expect(renameDraftHistorySnapshot(throwingStorage, snapshot.id, "새 이름")).toEqual([]);
     expect(clearDraftHistorySnapshots(throwingStorage)).toBe(false);
   });
 });

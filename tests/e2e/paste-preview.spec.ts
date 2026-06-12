@@ -106,12 +106,28 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("저장된 초안")).toContainText("초안 없음");
   await page.getByRole("button", { name: "초안 스냅샷 저장" }).click();
   await expect(page.getByLabel("저장된 초안").getByText(/초안/)).toBeVisible();
+  await page
+    .getByLabel("저장된 초안")
+    .getByRole("button")
+    .filter({ hasText: /초안/ })
+    .first()
+    .dblclick();
+  await page.getByLabel("초안 제목 변경").fill("첫 풀이 초안");
+  await page.getByLabel("초안 제목 변경").press("Enter");
+  await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
   await page.getByLabel("프리셋 이름").fill("강의글 구조");
   await page.getByRole("button", { name: "프리셋 저장" }).click();
   await expect(page.getByLabel("저장된 프리셋").getByText("강의글 구조")).toBeVisible();
+  await page
+    .getByLabel("저장된 프리셋")
+    .getByRole("button", { name: /강의글 구조/ })
+    .dblclick();
+  await page.getByLabel("프리셋 제목 변경").fill("풀이 템플릿");
+  await page.getByLabel("프리셋 제목 변경").press("Enter");
+  await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("저장된 프리셋").getByText("강의글 구조")).toBeVisible();
-  await expect(page.getByLabel("저장된 초안").getByText(/초안/)).toBeVisible();
+  await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
+  await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
   await expect(page.getByRole("button", { name: "HTML" })).toBeVisible();
   await page.getByRole("button", { name: "HTML" }).click();
   await expect(page.getByRole("button", { name: /원문 복사/ })).toBeVisible();
@@ -198,7 +214,7 @@ test("renders the paste tool", async ({ page }) => {
   await page
     .getByLabel("저장된 프리셋")
     .getByRole("button")
-    .filter({ hasText: "강의글 구조" })
+    .filter({ hasText: "풀이 템플릿" })
     .click();
   await expect(htmlSource).toHaveValue(/C\+\+로 보는 입력 최적화/);
   await expect(htmlSource).not.toHaveValue(/임시 문서/);

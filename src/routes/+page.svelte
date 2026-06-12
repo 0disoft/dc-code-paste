@@ -28,7 +28,7 @@
         Redo2,
         Trash2,
     } from "lucide-svelte";
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import type { Editor, JSONContent } from "@tiptap/core";
     import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
     import { defaultProseFontFamily } from "$lib/dc/font-stacks";
@@ -70,6 +70,7 @@
         maxDraftHistoryCount,
         readDraftHistorySnapshots,
         readDraftSnapshot,
+        renameDraftHistorySnapshot,
         writeDraftSnapshot,
         type DraftHistorySnapshot,
         type DraftPreferences,
@@ -114,6 +115,7 @@
         createPresetSnapshot,
         deletePresetSnapshot,
         readPresetSnapshots,
+        renamePresetSnapshot,
         writePresetSnapshots,
         type PresetSnapshot,
     } from "$lib/editor/preset-storage";
@@ -152,6 +154,9 @@
         "oklch(47.55% 0.145 302.98)",
     ];
     type ToolPanelId = "blocks" | "code" | "style";
+    type RenameTarget =
+        | { kind: "preset"; id: string }
+        | { kind: "draft"; id: string };
 
     let editorHost = $state<HTMLDivElement>();
     let editor = $state<Editor>();
@@ -186,10 +191,13 @@
     let presetState = $state<"idle" | "saved" | "error">("idle");
     let draftHistory = $state<DraftHistorySnapshot[]>([]);
     let draftHistoryState = $state<"idle" | "saved" | "error">("idle");
+    let renameTarget = $state<RenameTarget | null>(null);
+    let renameDraft = $state("");
     let editorSignal = $state(0);
     let canPersistDraft = $state(false);
     let lastDraftHistoryFingerprint = "";
     let lastDraftHistorySavedAt = 0;
+    let cardApplyTimer: ReturnType<typeof setTimeout> | undefined;
     let renderTurn = 0;
 
     const htmlSize = $derived(
@@ -395,6 +403,81 @@
         return `${themeLabel} · ${languageLabel(snapshot.preferences.language)} · ${textLength}자`;
     }
 
+    function defaultDraftHistoryName(snapshot: DraftHistorySnapshot) {
+        return `초안 ${presetDateLabel(snapshot.updatedAt)}`;
+    }
+
+    function draftHistoryName(snapshot: DraftHistorySnapshot) {
+        return snapshot.name ?? defaultDraftHistoryName(snapshot);
+    }
+
+    function isRenaming(kind: RenameTarget["kind"], id: string) {
+        return renameTarget?.kind === kind && renameTarget.id === id;
+    }
+
+    function focusRenameInput(node: HTMLInputElement) {
+        node.focus();
+        node.select();
+    }
+
+    function clearPendingCardApply() {
+        if (cardApplyTimer) {
+            clearTimeout(cardApplyTimer);
+            cardApplyTimer = undefined;
+        }
+    }
+
+    function scheduleCardApply(callback: () => void, event: MouseEvent) {
+        if (event.detail > 1) {
+            clearPendingCardApply();
+            return;
+        }
+
+        clearPendingCardApply();
+        cardApplyTimer = setTimeout(() => {
+            cardApplyTimer = undefined;
+            callback();
+        }, 260);
+    }
+
+    function beginPresetRename(preset: PresetSnapshot, event: MouseEvent) {
+        event.preventDefault();
+        clearPendingCardApply();
+        renameTarget = { kind: "preset", id: preset.id };
+        renameDraft = preset.name;
+    }
+
+    function beginDraftHistoryRename(
+        snapshot: DraftHistorySnapshot,
+        event: MouseEvent,
+    ) {
+        event.preventDefault();
+        clearPendingCardApply();
+        renameTarget = { kind: "draft", id: snapshot.id };
+        renameDraft = draftHistoryName(snapshot);
+    }
+
+    function cancelRename() {
+        renameTarget = null;
+        renameDraft = "";
+    }
+
+    function handleRenameKeydown(
+        event: KeyboardEvent,
+        save: () => void,
+    ) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            save();
+            return;
+        }
+
+        if (event.key === "Escape") {
+            event.preventDefault();
+            cancelRename();
+        }
+    }
+
     function refreshPresetSnapshots() {
         const storage = draftStorage();
         presets = storage ? readPresetSnapshots(storage) : [];
@@ -477,12 +560,32 @@
         draftHistoryState = "idle";
     }
 
+    function saveDraftHistoryRename(id: string) {
+        if (!isRenaming("draft", id)) {
+            return;
+        }
+
+        const storage = draftStorage();
+
+        if (!storage) {
+            draftHistoryState = "error";
+            return;
+        }
+
+        draftHistory = renameDraftHistorySnapshot(storage, id, renameDraft);
+        cancelRename();
+    }
+
     function deleteDraftHistory(id: string) {
         const storage = draftStorage();
 
         if (!storage) {
             draftHistoryState = "error";
             return;
+        }
+
+        if (isRenaming("draft", id)) {
+            cancelRename();
         }
 
         draftHistory = deleteDraftHistorySnapshot(storage, id);
@@ -557,12 +660,32 @@
         presetState = "idle";
     }
 
+    function savePresetRename(id: string) {
+        if (!isRenaming("preset", id)) {
+            return;
+        }
+
+        const storage = draftStorage();
+
+        if (!storage) {
+            presetState = "error";
+            return;
+        }
+
+        presets = renamePresetSnapshot(storage, id, renameDraft);
+        cancelRename();
+    }
+
     function deletePreset(id: string) {
         const storage = draftStorage();
 
         if (!storage) {
             presetState = "error";
             return;
+        }
+
+        if (isRenaming("preset", id)) {
+            cancelRename();
         }
 
         presets = deletePresetSnapshot(storage, id);
@@ -1182,6 +1305,8 @@
     function toggleToolPanel(panel: ToolPanelId) {
         activeToolPanel = activeToolPanel === panel ? null : panel;
     }
+
+    onDestroy(clearPendingCardApply);
 
     onMount(() => {
         let disposed = false;
@@ -1971,21 +2096,44 @@
             {:else}
                 {#each presets as preset (preset.id)}
                     <div class="preset-item">
-                        <button
-                            type="button"
-                            class="preset-apply"
-                            onclick={() => applyPreset(preset)}
-                        >
-                            <span>{preset.name}</span>
-                            <small
-                                >{preset.preferences.documentTheme ===
-                                "darkEditorial"
-                                    ? "다크"
-                                    : "라이트"} · {presetDateLabel(
-                                    preset.updatedAt,
-                                )}</small
+                        {#if isRenaming("preset", preset.id)}
+                            <input
+                                class="preset-rename-input"
+                                type="text"
+                                bind:value={renameDraft}
+                                maxlength="60"
+                                aria-label="프리셋 제목 변경"
+                                use:focusRenameInput
+                                onblur={() => savePresetRename(preset.id)}
+                                onkeydown={(event) =>
+                                    handleRenameKeydown(event, () =>
+                                        savePresetRename(preset.id),
+                                    )}
+                            />
+                        {:else}
+                            <button
+                                type="button"
+                                class="preset-apply"
+                                title="더블클릭해서 제목 변경"
+                                onclick={(event) =>
+                                    scheduleCardApply(
+                                        () => applyPreset(preset),
+                                        event,
+                                    )}
+                                ondblclick={(event) =>
+                                    beginPresetRename(preset, event)}
                             >
-                        </button>
+                                <span>{preset.name}</span>
+                                <small
+                                    >{preset.preferences.documentTheme ===
+                                    "darkEditorial"
+                                        ? "다크"
+                                        : "라이트"} · {presetDateLabel(
+                                        preset.updatedAt,
+                                    )}</small
+                                >
+                            </button>
+                        {/if}
                         <button
                             type="button"
                             class="preset-delete"
@@ -2029,23 +2177,45 @@
             {:else}
                 {#each draftHistory as snapshot (snapshot.id)}
                     <div class="draft-history-item">
-                        <button
-                            type="button"
-                            class="draft-history-apply"
-                            onclick={() =>
-                                restoreDraftHistorySnapshot(snapshot)}
-                        >
-                            <span
-                                >초안 {presetDateLabel(
-                                    snapshot.updatedAt,
-                                )}</span
+                        {#if isRenaming("draft", snapshot.id)}
+                            <input
+                                class="preset-rename-input"
+                                type="text"
+                                bind:value={renameDraft}
+                                maxlength="60"
+                                aria-label="초안 제목 변경"
+                                use:focusRenameInput
+                                onblur={() =>
+                                    saveDraftHistoryRename(snapshot.id)}
+                                onkeydown={(event) =>
+                                    handleRenameKeydown(event, () =>
+                                        saveDraftHistoryRename(snapshot.id),
+                                    )}
+                            />
+                        {:else}
+                            <button
+                                type="button"
+                                class="draft-history-apply"
+                                title="더블클릭해서 제목 변경"
+                                onclick={(event) =>
+                                    scheduleCardApply(
+                                        () =>
+                                            restoreDraftHistorySnapshot(
+                                                snapshot,
+                                            ),
+                                        event,
+                                    )}
+                                ondblclick={(event) =>
+                                    beginDraftHistoryRename(snapshot, event)}
                             >
-                            <small>{draftHistorySummary(snapshot)}</small>
-                        </button>
+                                <span>{draftHistoryName(snapshot)}</span>
+                                <small>{draftHistorySummary(snapshot)}</small>
+                            </button>
+                        {/if}
                         <button
                             type="button"
                             class="draft-history-delete"
-                            aria-label={`초안 ${presetDateLabel(snapshot.updatedAt)} 삭제`}
+                            aria-label={`${draftHistoryName(snapshot)} 삭제`}
                             title="삭제"
                             onclick={() => deleteDraftHistory(snapshot.id)}
                         >
@@ -2641,6 +2811,20 @@
         padding: 7px 10px;
         text-align: left;
         cursor: pointer;
+    }
+
+    .preset-rename-input {
+        min-width: 150px;
+        max-width: 210px;
+        border: 0;
+        border-right: 1px solid var(--line);
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+        background: color-mix(in oklch, var(--panel) 88%, var(--accent) 12%);
+        color: var(--text);
+        padding: 7px 10px;
+        font-size: 13px;
+        font-weight: 900;
     }
 
     .preset-apply span,

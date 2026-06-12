@@ -134,6 +134,20 @@ export function writePresetSnapshots(
   }
 }
 
+export function renamePresetSnapshot(
+  storage: PresetStorage,
+  id: string,
+  name: string,
+): PresetSnapshot[] {
+  const current = readPresetSnapshots(storage);
+  const nextName = normalizePresetName(name);
+  const nextPresets = current.map((preset) =>
+    preset.id === id ? { ...preset, name: nextName } : preset,
+  );
+
+  return writePresetSnapshots(storage, nextPresets) ? nextPresets : current;
+}
+
 export function deletePresetSnapshot(storage: PresetStorage, id: string): PresetSnapshot[] {
   const nextPresets = readPresetSnapshots(storage).filter((preset) => preset.id !== id);
   return writePresetSnapshots(storage, nextPresets) ? nextPresets : readPresetSnapshots(storage);
