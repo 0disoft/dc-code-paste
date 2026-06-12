@@ -66,6 +66,7 @@ export function createEditorExtensions() {
   return [
     StarterKit.configure({
       codeBlock: false,
+      link: false,
     }),
     QuoteStyleAttributes,
     DcCodeBlock.configure({
