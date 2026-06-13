@@ -1,9 +1,9 @@
 import type { JSONContent } from "@tiptap/core";
 
 const defaultHero = {
-  label: "CODING GUIDE",
-  title: "C++로 보는 입력 최적화",
-  subtitle: "입출력 병목을 예제와 비교로 빠르게 잡아내는 강의 노트.",
+  label: "GO CONCURRENCY",
+  title: "Go 동시성 마스터하기: 고루틴과 채널",
+  subtitle: "병렬 처리를 우아하게 구현하는 Go의 동시성 모델을 실전 패턴으로 정리한다.",
 } as const;
 
 type HeroInput = {

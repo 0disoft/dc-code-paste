@@ -32,4 +32,21 @@ describe("createReferenceListFromText", () => {
       ],
     });
   });
+
+  it("skips lines that do not contain a usable reference URL", () => {
+    const document = createReferenceListFromText(
+      ["그냥 설명 문장", "javascript:alert(1)", "https://example.com/docs"].join("\n"),
+    );
+
+    expect(document).toEqual({
+      type: "referenceList",
+      content: [
+        {
+          type: "referenceItem",
+          attrs: { href: "https://example.com/docs" },
+          content: [{ type: "text", text: "example.com/docs" }],
+        },
+      ],
+    });
+  });
 });

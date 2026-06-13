@@ -35,7 +35,7 @@ describe("createHeroBlockFromText", () => {
 
     expect(document).toMatchObject({
       type: "heroBlock",
-      attrs: { label: "CODING GUIDE" },
+      attrs: { label: "GO CONCURRENCY" },
       content: [
         {
           type: "heading",

@@ -2,32 +2,63 @@ import type { JSONContent } from "@tiptap/core";
 
 const defaultTutorialSteps = [
   {
-    title: "입력 규모 확인",
-    body: "입력 개수, 반복 횟수, 출력 횟수를 먼저 적어 두면 병목이 어디서 날지 훨씬 빨리 보인다.",
+    title: "작업 단위 쪼개기",
+    body: "함수 앞에 go를 붙여 독립적으로 돌릴 수 있는 일을 먼저 분리한다.",
   },
   {
-    title: "입출력 계열 고정",
-    body: "한 글 안에서는 cin/cout 또는 scanf/printf 중 하나로 밀고 가야 순서 꼬임을 줄일 수 있다.",
+    title: "채널로 값 전달",
+    body: "공유 변수보다 channel을 통해 값이 이동하는 방향을 코드에 드러낸다.",
   },
   {
-    title: "최소 코드로 검증",
-    body: "최적화 코드를 넣기 전에 기본 코드로 맞추고, 시간이 튀는 지점만 좁혀 본다.",
+    title: "닫는 쪽 정하기",
+    body: "송신자가 작업을 끝낸 뒤 close로 종료 신호를 주는 구조를 명확히 한다.",
+  },
+  {
+    title: "취소 경로 연결",
+    body: "context를 넘겨 요청 취소와 타임아웃이 모든 고루틴에 전파되게 한다.",
   },
 ] as const;
 
 export function createDefaultTutorialBlock(): JSONContent {
   return {
     type: "tutorialBlock",
-    content: defaultTutorialSteps.map((step) => createTutorialStep(step.title, step.body)),
+    content: defaultTutorialSteps.map((step, index) =>
+      createTutorialStep(step.title, step.body, index + 1),
+    ),
   };
 }
 
-function createTutorialStep(title: string, body?: string): JSONContent {
+export function normalizeTutorialStepNumber(value: unknown, fallback?: number): string {
+  const raw = typeof value === "string" || typeof value === "number" ? String(value).trim() : "";
+  const compact = raw.replace(/\s+/g, "");
+
+  if (/^\d{1,3}$/.test(compact)) {
+    return compact.padStart(2, "0");
+  }
+
+  if (compact) {
+    return compact.slice(0, 8);
+  }
+
+  return typeof fallback === "number" && Number.isFinite(fallback)
+    ? String(Math.max(1, Math.floor(fallback))).padStart(2, "0")
+    : "";
+}
+
+export function createTutorialStep(
+  title: string,
+  body?: string,
+  number?: string | number,
+): JSONContent {
   const trimmedBody = body?.trim();
+  const normalizedNumber = normalizeTutorialStepNumber(number);
 
   return {
     type: "tutorialStep",
-    attrs: { title },
+    attrs: {
+      title,
+      ...(normalizedNumber ? { number: normalizedNumber } : {}),
+    },
     content: trimmedBody
       ? [
           {
@@ -39,13 +70,24 @@ function createTutorialStep(title: string, body?: string): JSONContent {
   };
 }
 
-function cleanTutorialLine(line: string): string {
+function parseTutorialLineNumber(line: string): { number?: string; text: string } {
+  const trimmed = line.trim().replace(/^[-*+]\s+/, "");
+  const numbered = /^(\d{1,3})(?:[.)]|\s+)\s*(.*)$/.exec(trimmed);
+
+  if (numbered) {
+    return {
+      number: normalizeTutorialStepNumber(numbered[1]),
+      text: numbered[2]?.trim() ?? "",
+    };
+  }
+
+  return { text: trimmed };
+}
+
+function cleanTutorialLine(line: string): { number?: string; text: string } {
   return line
-    .trim()
-    .replace(/^[-*+]\s+/, "")
-    .replace(/^\d{1,2}[.)]\s+/, "")
-    .replace(/^0?\d{1,2}\s+/, "")
-    .trim();
+    ? parseTutorialLineNumber(line)
+    : { text: "" };
 }
 
 function splitTutorialLine(line: string): { title: string; body?: string } {
@@ -71,10 +113,10 @@ export function createTutorialBlockFromText(text: string): JSONContent | undefin
   const steps = text
     .split(/\r?\n/)
     .map(cleanTutorialLine)
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const step = splitTutorialLine(line);
-      return createTutorialStep(step.title, step.body);
+    .filter((line) => line.text.length > 0)
+    .map((line, index) => {
+      const step = splitTutorialLine(line.text);
+      return createTutorialStep(step.title, step.body, line.number ?? index + 1);
     });
 
   return steps.length > 0

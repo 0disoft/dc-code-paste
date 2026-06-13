@@ -1,11 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
-import { createDefaultCtaGroup } from "$lib/editor/cta-group";
 import { createDefaultComparisonBlock } from "$lib/editor/comparison-block";
+import { createDefaultCtaGroup } from "$lib/editor/cta-group";
 import { createDefaultHeroBlock } from "$lib/editor/hero-block";
 import { createDefaultReferenceList } from "$lib/editor/reference-list";
 import { createDefaultSummaryBox } from "$lib/editor/summary-box";
 import { createDefaultTutorialBlock } from "$lib/editor/tutorial-block";
-import { defaultLanguage } from "$lib/highlighter/catalog";
 
 export const sampleDocument: JSONContent = {
   type: "doc",
@@ -15,113 +14,11 @@ export const sampleDocument: JSONContent = {
     {
       type: "paragraph",
       content: [
-        { type: "text", text: "입출력이 많은 문제에서는 " },
-        { type: "text", text: "동기화 해제", marks: [{ type: "bold" }] },
-        { type: "text", text: "만 해도 체감 성능이 꽤 달라져." },
-      ],
-    },
-    {
-      type: "tipBox",
-      content: [
+        { type: "text", text: "Go는 메모리 공유 대신 " },
+        { type: "text", text: "통신을 통한 메모리 공유", marks: [{ type: "bold" }] },
         {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "cin/cout을 계속 쓸 거면 " },
-            { type: "text", text: "ios::sync_with_stdio(false)", marks: [{ type: "code" }] },
-            { type: "text", text: "는 거의 습관처럼 넣어도 좋아." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "emphasisBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "여기서 중요한 건 빠른 입출력이 아니라 " },
-            {
-              type: "text",
-              text: "언제 병목이 생기는지 먼저 보는 습관",
-              marks: [{ type: "bold" }],
-            },
-            { type: "text", text: "이야." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "warningBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "scanf/printf와 cin/cout을 섞어 쓰면 순서가 꼬일 수 있어. " },
-            { type: "text", text: "한 글 안에서는 같은 입출력 계열로 밀고 가는 편이 안전해." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "successBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "입출력 계열을 하나로 고정하면 디버깅 포인트가 확 줄어." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "failureBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "endl을 반복문 안에서 계속 쓰면 flush 때문에 시간이 새기 쉽다." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "experimentBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "정말 병목인지 모르겠으면 " },
-            { type: "text", text: "입력만 읽는 버전", marks: [{ type: "code" }] },
-            { type: "text", text: "으로 먼저 재보면 돼." },
-          ],
-        },
-      ],
-    },
-    {
-      type: "conclusionBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "빠른 입출력은 마법이 아니라 불필요한 기다림을 줄이는 기본 세팅이야.",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "rebuttalBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "그래도 느리면 입출력보다 알고리즘이나 자료구조가 문제일 가능성이 더 커.",
-            },
-          ],
+          type: "text",
+          text: "를 지향한다. 고루틴과 채널을 같이 보면 동시성 코드의 흐름이 훨씬 또렷해진다.",
         },
       ],
     },
@@ -134,12 +31,122 @@ export const sampleDocument: JSONContent = {
           content: [
             {
               type: "text",
-              text: "느린 코드는 대부분 한 줄짜리 비법보다 입출력 횟수와 자료 흐름에서 먼저 걸린다.",
+              text: "Do not communicate by sharing memory; instead, share memory by communicating.",
             },
           ],
         },
       ],
     },
+    {
+      type: "sectionHeading",
+      content: [{ type: "text", text: "고루틴" }],
+    },
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "함수 호출 앞에 " },
+        { type: "text", text: "go", marks: [{ type: "code" }] },
+        {
+          type: "text",
+          text: "를 붙이면 새 고루틴이 생성된다. 고루틴은 OS 스레드보다 훨씬 가볍고, Go 런타임이 이를 효율적으로 스케줄링한다.",
+        },
+      ],
+    },
+    {
+      type: "codeBlock",
+      attrs: {
+        language: "go",
+        filename: "goroutine_basic.go",
+        highlightLines: "5-6",
+      },
+      content: [
+        {
+          type: "text",
+          text: 'package main\n\nimport "fmt"\n\nfunc main() {\n    go fmt.Println("비동기 실행")\n    fmt.Println("메인 함수 실행")\n    // 고루틴 완료를 보장하지 않으면 메인이 먼저 종료될 수 있다\n}',
+        },
+      ],
+    },
+    {
+      type: "tipBox",
+      attrs: { label: "스택 감각", toneColor: "#16a34a" },
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "고루틴 하나의 초기 스택은 작게 시작하고 필요할 때 늘어난다. 수천 개의 작업을 만들 수 있지만, 종료 경로는 반드시 설계해야 한다.",
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "sectionHeading",
+      content: [{ type: "text", text: "채널 방향" }],
+    },
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "채널은 " },
+        { type: "text", text: "make(chan T)", marks: [{ type: "code" }] },
+        { type: "text", text: "로 만들고 " },
+        { type: "text", text: "<-", marks: [{ type: "code" }] },
+        {
+          type: "text",
+          text: " 연산자로 값을 주고받는다. 함수 시그니처에 방향을 적으면 실수를 컴파일 단계에서 줄일 수 있다.",
+        },
+      ],
+    },
+    {
+      type: "codeBlock",
+      attrs: {
+        language: "go",
+        filename: "directional_channel.go",
+        highlightLines: "1-2",
+        additionLines: "5",
+        deletionLines: "7",
+      },
+      content: [
+        {
+          type: "text",
+          text: "func sendOnly(ch chan<- int) {\n    ch <- 42\n}\n\nfunc recvOnly(ch <-chan int) {\n    val := <-ch\n    fmt.Println(val)\n}",
+        },
+      ],
+    },
+    {
+      type: "warningBox",
+      attrs: { label: "데드락 체크", toneColor: "#d97706" },
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "버퍼 없는 채널에서 송신자와 수신자가 동시에 준비되지 않으면 고루틴은 멈춘다. 작은 예제에서도 누가 보내고 누가 받는지 먼저 그려야 한다.",
+            },
+          ],
+        },
+      ],
+    },
+    createDefaultComparisonBlock(),
+    {
+      type: "horizontalRule",
+    },
+    {
+      type: "sectionHeading",
+      content: [{ type: "text", text: "실전 패턴" }],
+    },
+    {
+      type: "paragraph",
+      content: [
+        {
+          type: "text",
+          text: "여러 워커가 작업을 나눠 처리하고 결과를 모으는 Fan-Out / Fan-In 흐름은 채널의 쓰임을 가장 빨리 체감할 수 있는 패턴이다.",
+        },
+      ],
+    },
+    createDefaultTutorialBlock(),
     {
       type: "bulletList",
       content: [
@@ -148,7 +155,7 @@ export const sampleDocument: JSONContent = {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "입력 크기와 반복 횟수를 먼저 본다." }],
+              content: [{ type: "text", text: "작업 큐는 버퍼 채널로 단순하게 시작한다." }],
             },
           ],
         },
@@ -157,7 +164,9 @@ export const sampleDocument: JSONContent = {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "빠른 입출력 설정은 코드 맨 앞에서 끝낸다." }],
+              content: [
+                { type: "text", text: "종료 신호는 close와 context 중 어느 쪽이 책임지는지 정한다." },
+              ],
             },
           ],
         },
@@ -171,7 +180,7 @@ export const sampleDocument: JSONContent = {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "기본 코드로 먼저 맞춘다." }],
+              content: [{ type: "text", text: "작은 입력으로 고루틴 종료를 먼저 확인한다." }],
             },
           ],
         },
@@ -180,61 +189,8 @@ export const sampleDocument: JSONContent = {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "시간이 튀면 입출력과 불필요한 flush를 본다." }],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "horizontalRule",
-    },
-    {
-      type: "sectionHeading",
-      content: [{ type: "text", text: "사용 방법 및 예시" }],
-    },
-    {
-      type: "paragraph",
-      content: [{ type: "text", text: "아래 코드는 입력 설정을 한 번에 모아 둔 최소 예시야." }],
-    },
-    createDefaultTutorialBlock(),
-    createDefaultComparisonBlock(),
-    {
-      type: "codeBlock",
-      attrs: { language: defaultLanguage, highlightLines: "5-6", filename: "main.cpp" },
-      content: [
-        {
-          type: "text",
-          text: '#include <iostream>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n\n    int n;\n    cin >> n;\n    cout << n << "\\n";\n}',
-        },
-      ],
-    },
-    {
-      type: "ctaButton",
-      attrs: { href: "https://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio" },
-      content: [{ type: "text", text: "cppreference 열기" }],
-    },
-    createDefaultCtaGroup("horizontal"),
-    createDefaultReferenceList(),
-    {
-      type: "referenceBox",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "참고: " },
-            {
-              type: "text",
-              text: "cppreference ios_base::sync_with_stdio",
-              marks: [
-                {
-                  type: "link",
-                  attrs: {
-                    href: "https://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio",
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                  },
-                },
+              content: [
+                { type: "text", text: "부하를 늘리기 전에 취소 경로와 타임아웃을 연결한다." },
               ],
             },
           ],
@@ -242,13 +198,50 @@ export const sampleDocument: JSONContent = {
       ],
     },
     {
-      type: "linkBox",
-      attrs: { href: "https://en.cppreference.com/w/cpp/io/ios_base/sync_with_stdio" },
+      type: "referenceBox",
+      attrs: { label: "읽을거리", toneColor: "#2563eb" },
       content: [
         {
           type: "paragraph",
           content: [
-            { type: "text", text: "원문 레퍼런스는 링크박스로 따로 빼두면 글 흐름이 덜 끊겨." },
+            { type: "text", text: "공식 문서의 " },
+            {
+              type: "text",
+              text: "A Tour of Go 동시성 장",
+              marks: [
+                {
+                  type: "link",
+                  attrs: {
+                    href: "https://go.dev/tour/concurrency/1",
+                    target: "_blank",
+                    rel: "noopener noreferrer",
+                  },
+                },
+              ],
+            },
+            { type: "text", text: "을 같이 열어두면 예제를 바로 실행해 보기 좋다." },
+          ],
+        },
+      ],
+    },
+    createDefaultReferenceList(),
+    {
+      type: "ctaButton",
+      attrs: { href: "https://go.dev/play/" },
+      content: [{ type: "text", text: "Go Playground 열기" }],
+    },
+    createDefaultCtaGroup("vertical"),
+    {
+      type: "linkBox",
+      attrs: { href: "https://go.dev/doc/effective_go#concurrency" },
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "Effective Go의 동시성 문단은 링크박스로 따로 빼두면 다시 찾아보기 쉽다.",
+            },
           ],
         },
       ],

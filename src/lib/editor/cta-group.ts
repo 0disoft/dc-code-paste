@@ -14,10 +14,9 @@ export function normalizeCtaGroupLayout(value: unknown): CtaGroupLayout {
 }
 
 const defaultCtaButtons = [
-  { label: "GitHub", href: "https://github.com/" },
-  { label: "원문", href: "https://example.com/source" },
-  { label: "다운로드", href: "https://example.com/download" },
-  { label: "실행하기", href: "https://example.com/run" },
+  { label: "Go Playground", href: "https://go.dev/play/" },
+  { label: "공식 문서", href: "https://go.dev/doc/" },
+  { label: "GitHub", href: "https://github.com/golang/go" },
 ] as const;
 
 export function createDefaultCtaGroup(layout: CtaGroupLayout): JSONContent {

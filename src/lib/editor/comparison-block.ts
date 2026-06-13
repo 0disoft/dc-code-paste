@@ -15,11 +15,11 @@ type MutableComparisonColumnInput = {
 const defaultComparison = {
   left: {
     title: "Before",
-    lines: ["endl을 반복문 안에서 계속 쓰면 매번 flush가 걸려 시간이 새기 쉽다."],
+    lines: ["공유 슬라이스에 sync.Mutex로 직접 락을 걸면 락 누락과 순서 꼬임을 계속 의심해야 한다."],
   },
   right: {
     title: "After",
-    lines: ["\\n으로 출력하고 마지막에 필요한 경우만 flush하면 불필요한 대기를 줄일 수 있다."],
+    lines: ["버퍼 채널을 작업 큐로 쓰면 값의 이동 방향이 드러나고 경쟁 상태를 줄일 수 있다."],
   },
 } as const;
 

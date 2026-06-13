@@ -16,12 +16,12 @@ describe("createTutorialBlockFromText", () => {
       content: [
         {
           type: "tutorialStep",
-          attrs: { title: "문제 파악" },
+          attrs: { title: "문제 파악", number: "01" },
           content: [],
         },
         {
           type: "tutorialStep",
-          attrs: { title: "입출력 계열 고정" },
+          attrs: { title: "입출력 계열 고정", number: "02" },
           content: [
             {
               type: "paragraph",
@@ -31,7 +31,7 @@ describe("createTutorialBlockFromText", () => {
         },
         {
           type: "tutorialStep",
-          attrs: { title: "검증" },
+          attrs: { title: "검증", number: "03" },
           content: [
             {
               type: "paragraph",
@@ -41,5 +41,21 @@ describe("createTutorialBlockFromText", () => {
         },
       ],
     });
+  });
+
+  it("preserves explicit multi-step labels from selected lines", () => {
+    const document = createTutorialBlockFromText(
+      [
+        "04 추가 검증: 작은 입력부터 다시 본다.",
+        "5 병목 재측정: 시간 튀는 구간만 따로 잰다.",
+        "006 제출 전 확인",
+      ].join("\n"),
+    );
+
+    expect(document?.content?.map((step) => step.attrs)).toEqual([
+      { title: "추가 검증", number: "04" },
+      { title: "병목 재측정", number: "05" },
+      { title: "제출 전 확인", number: "006" },
+    ]);
   });
 });

@@ -1,11 +1,11 @@
 import type { JSONContent } from "@tiptap/core";
 
-export const defaultSummaryBoxLabel = "핵심 요약";
+export const defaultSummaryBoxLabel = "동시성 핵심";
 
 const defaultSummaryItems = [
-  "입출력 병목은 코드보다 데이터 흐름에서 먼저 찾는다.",
-  "빠른 입출력 설정은 코드 맨 앞에서 한 번에 끝낸다.",
-  "같은 글 안에서는 같은 입출력 계열로 밀고 간다.",
+  "goroutine은 go 키워드로 실행되는 가벼운 작업 단위다.",
+  "channel은 고루틴 사이에서 값을 안전하게 주고받는 통로다.",
+  "context는 여러 고루틴의 취소와 시간 제한을 한 번에 전파한다.",
 ] as const;
 
 export function createDefaultSummaryBox(): JSONContent {
