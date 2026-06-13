@@ -2348,6 +2348,7 @@
 </script>
 
 <main class="workspace">
+    <div class="toolbar-shell">
     <section class="toolbar" aria-label="글 편집 도구">
         <div class="tool-group command-group">
             <button
@@ -2970,43 +2971,6 @@
         {/if}
     </section>
 
-    {#if isMarkdownPanelOpen}
-        <section class="markdown-panel" aria-label="Markdown import">
-            <textarea
-                class="markdown-input"
-                bind:value={markdownDraft}
-                aria-label="Markdown 원문"
-                spellcheck="false"
-                placeholder={`# 제목\n\n본문과 [링크](https://example.com)\n\n\`\`\`cpp\nint main() {}\n\`\`\``}
-                oninput={() => (markdownImportState = "idle")}
-            ></textarea>
-            <div class="markdown-actions">
-                <button
-                    class="markdown-import-button"
-                    type="button"
-                    aria-label="Markdown 적용하기"
-                    onclick={importMarkdownDraft}
-                >
-                    <FileText size={16} />
-                    <span>적용하기</span>
-                </button>
-                <button
-                    class="markdown-clear-button"
-                    type="button"
-                    aria-label="Markdown 비우기"
-                    onclick={clearMarkdownDraft}
-                >
-                    <Trash2 size={15} />
-                    <span>비우기</span>
-                </button>
-                <span
-                    class:error={markdownImportState === "error"}
-                    class="markdown-status">{markdownImportStateLabel}</span
-                >
-            </div>
-        </section>
-    {/if}
-
     {#if isStoragePanelOpen}
         <div id="storage-panel" class="storage-panel">
             <section class="preset-panel" aria-label="프리셋">
@@ -3199,6 +3163,44 @@
             </section>
         </div>
     {/if}
+    </div>
+
+    {#if isMarkdownPanelOpen}
+        <section class="markdown-panel" aria-label="Markdown import">
+            <textarea
+                class="markdown-input"
+                bind:value={markdownDraft}
+                aria-label="Markdown 원문"
+                spellcheck="false"
+                placeholder={`# 제목\n\n본문과 [링크](https://example.com)\n\n\`\`\`cpp\nint main() {}\n\`\`\``}
+                oninput={() => (markdownImportState = "idle")}
+            ></textarea>
+            <div class="markdown-actions">
+                <button
+                    class="markdown-import-button"
+                    type="button"
+                    aria-label="Markdown 적용하기"
+                    onclick={importMarkdownDraft}
+                >
+                    <FileText size={16} />
+                    <span>적용하기</span>
+                </button>
+                <button
+                    class="markdown-clear-button"
+                    type="button"
+                    aria-label="Markdown 비우기"
+                    onclick={clearMarkdownDraft}
+                >
+                    <Trash2 size={15} />
+                    <span>비우기</span>
+                </button>
+                <span
+                    class:error={markdownImportState === "error"}
+                    class="markdown-status">{markdownImportStateLabel}</span
+                >
+            </div>
+        </section>
+    {/if}
 
     <section class="workbench">
         <div class="editor-panel">
@@ -3337,24 +3339,29 @@
         padding: 10px 0 34px;
     }
 
-    .toolbar {
+    .toolbar-shell {
         position: sticky;
         top: 8px;
         z-index: 20;
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 9px 10px;
-        align-items: stretch;
+        gap: 10px;
         max-height: calc(100vh - 16px);
         margin-bottom: 12px;
         overflow: auto;
         overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+    }
+
+    .toolbar {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 9px 10px;
+        align-items: stretch;
         padding: 10px;
         border: 1px solid var(--line);
         border-radius: 8px;
         background: color-mix(in oklch, var(--panel) 98%, oklch(0% 0 0 / 0));
         box-shadow: 0 18px 44px oklch(0% 0 0 / 0.18);
-        scrollbar-gutter: stable;
     }
 
     .tool-group {
@@ -3708,9 +3715,10 @@
     }
 
     .storage-panel {
+        grid-column: 1 / -1;
         display: grid;
         gap: 10px;
-        margin-bottom: 12px;
+        margin: 0;
     }
 
     .preset-panel,
