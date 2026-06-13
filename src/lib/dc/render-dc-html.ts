@@ -1,5 +1,5 @@
 import { escapeHtml } from "./escape-html";
-import { safeCodeFontFamily } from "./font-stacks";
+import { safeDcCodeFontFamily } from "./font-stacks";
 import { joinStyle, sanitizeColor } from "./sanitize-style";
 
 export type DcToken = {
@@ -85,7 +85,7 @@ export function renderDcHtml(input: DcRenderInput): string {
   const foreground = sanitizeColor(input.foreground, fallbackForeground);
   const filename = input.filename?.trim();
   const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
-  const codeFontFamily = safeCodeFontFamily();
+  const codeFontFamily = safeDcCodeFontFamily();
   const blockStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
     color: foreground,
@@ -98,7 +98,7 @@ export function renderDcHtml(input: DcRenderInput): string {
     "overflow-wrap": "anywhere",
   });
 
-  const lineNumberWidth = `${Math.max(2, String(input.lines.length).length)}ch`;
+  const lineNumberWidth = `${Math.min(5, Math.max(2, String(input.lines.length).length))}ch`;
   const renderedLines = input.lines.map((line, index) => {
     const decoration = input.lineDecorations?.[index];
     const lineForeground = sanitizeColor(decoration?.foreground, foreground);

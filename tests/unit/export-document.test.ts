@@ -2,18 +2,29 @@ import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 import { exportDocumentToDcHtml } from "../../src/lib/dc/export-document";
 import {
-  codeFallbackFonts,
   defaultProseFontFamily,
-  safeProseFontFamily,
+  safeDcCodeFontFamily,
+  safeDcProseFontFamily,
 } from "../../src/lib/dc/font-stacks";
+import { parseMarkdownToDocument } from "../../src/lib/editor/markdown-import";
+
+const expectedDefaultDcProseFontFamily = safeDcProseFontFamily(defaultProseFontFamily);
 
 const exportOptions = {
   theme: "github-dark",
   bodyFontFamily: defaultProseFontFamily,
-  bodyFontSize: "15px",
-  codeFontSize: "14px",
+  bodyFontSize: "17px",
+  codeFontSize: "15px",
   showLineNumbers: false,
 } as const;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function textOfTestDocument(node: JSONContent): string {
+  return `${node.text ?? ""}${(node.content ?? []).map(textOfTestDocument).join("")}`;
+}
 
 describe("exportDocumentToDcHtml", () => {
   it("renders prose, links, callouts, and code blocks as inline-style DC HTML", async () => {
@@ -142,8 +153,9 @@ describe("exportDocumentToDcHtml", () => {
 
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
-    expect(html).toContain("<h1");
-    expect(html).toContain("font-weight:800");
+    expect(html).toContain("강의 노트");
+    expect(html).toContain("font-weight:700");
+    expect(html).not.toMatch(/font-weight:(?:800|850|900)/);
     expect(html).toContain('href="https://example.com"');
     expect(html).toContain("TIP");
     expect(html).toContain("주의");
@@ -151,7 +163,6 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("POINT");
     expect(html).toContain("LINK");
     expect(html).toContain('href="https://example.com/reference"');
-    expect(html).toContain("<blockquote");
     expect(html).toContain("인용문도 글 흐름 안에서 살아야 한다.");
     expect(html).toContain("&ldquo;");
     expect(html).toContain("font-style:italic");
@@ -159,9 +170,25 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("사용 방법 및 예시");
     expect(html).toContain('href="https://example.com/start"');
     expect(html).toContain("바로가기");
-    expect(html).toContain("<ul");
-    expect(html).toContain("<ol");
-    expect(html).toContain("<li");
+    expect(html).not.toContain("<ul");
+    expect(html).not.toContain("<ol");
+    expect(html).not.toContain("<li");
+    expect(html).toContain("&bull;</span></td><td");
+    expect(html).toContain(">1.</span></td><td");
+    expect(html).toMatch(
+      new RegExp(
+        `<span style="color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:17px;font-weight:400;line-height:1\\.7">첫 번째 체크</span>`,
+      ),
+    );
+    expect(html).toMatch(
+      new RegExp(
+        `<span style="color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:17px;font-weight:400;line-height:1\\.7">순서 있는 체크</span>`,
+      ),
+    );
     expect(html).toContain("<hr");
     expect(html).toContain("const");
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
@@ -303,17 +330,303 @@ describe("exportDocumentToDcHtml", () => {
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
     expect(html).toContain(
-      `<span style="font-family:${safeProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
+      `<span style="font-family:${safeDcProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
     );
+    expect(html).toContain(`font-family:${expectedDefaultDcProseFontFamily}`);
+    expect(
+      html.match(new RegExp(`font-family:${escapeRegExp(expectedDefaultDcProseFontFamily)}`, "g"))
+        ?.length ?? 0,
+    ).toBeGreaterThanOrEqual(6);
+    expect(html).toContain("font-size:17px");
+    expect(html).toContain(`<td style="padding:18px;background-color:`);
+    expect(html).toContain(`font-family:${expectedDefaultDcProseFontFamily};font-size:17px`);
     expect(html).toMatch(
       new RegExp(
-        `<p style="margin:0 0 14px;color:#[0-9a-f]{6};font-family:${defaultProseFontFamily.replace(
-          /[.*+?^${}()|[\]\\]/g,
-          "\\$&",
-        )};font-size:15px`,
+        `<table width="100%"[^>]*style="width:100%;margin:0 0 14px;border-collapse:collapse"><tbody><tr><td style="padding:0;color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:17px;line-height:1\\.72">`,
       ),
     );
   });
+
+  it("keeps markdown-authored long DC table exports below the DC upload limit", async () => {
+    const markdown = [
+      ":::hero",
+      "label: GO CONCURRENCY",
+      "Go 동시성 마스터하기: 고루틴과 채널",
+      "병렬 처리를 우아하게 구현하는 Go의 동시성 모델을 배우고 실무에 적용하는 가이드",
+      ":::",
+      "",
+      ":::summary",
+      "label: 핵심 요약",
+      "- `goroutine`은 경량 스레드로 `go` 키워드만으로 실행된다.",
+      "- `channel`은 고루틴 간 안전한 데이터 교환을 위한 유일한 통로다.",
+      "- 버퍼가 없는 채널은 동기화 도구로, 버퍼가 있는 채널은 비동기 큐로 활용된다.",
+      ":::",
+      "",
+      "## 동시성의 기본 철학",
+      "",
+      "> Do not communicate by sharing memory; instead, share memory by communicating.",
+      "> — Effective Go",
+      "",
+      "Go는 메모리 공유 대신 **통신을 통한 메모리 공유**를 지향한다.",
+      "",
+      "---",
+      "",
+      "## 고루틴",
+      "",
+      "함수 호출 앞에 `go`를 붙이면 새로운 고루틴이 생성된다.",
+      "",
+      "```go title=\"goroutine_basic.go\" {4,6}",
+      "package main",
+      "",
+      "import \"fmt\"",
+      "",
+      "func main() {",
+      "    go fmt.Println(\"비동기 실행\")",
+      "    fmt.Println(\"메인 함수 실행\")",
+      "    // 고루틴 완료를 보장하지 않으면 메인이 먼저 종료될 수 있다",
+      "}",
+      "```",
+      "",
+      ":::tip",
+      "label: 고루틴과 OS 스레드",
+      "color: #16a34a",
+      "고루틴 하나의 초기 스택 크기는 몇 KB에 불과하며, 필요에 따라 동적으로 증가한다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## 채널",
+      "",
+      "채널은 `make(chan T)`로 생성한다. 송수신 연산자인 `<-`를 통해 데이터를 주고받는다.",
+      "",
+      "```go title=\"unbuffered_channel.go\" {3,7,9}",
+      "package main",
+      "",
+      "import \"fmt\"",
+      "",
+      "func main() {",
+      "    ch := make(chan string)",
+      "",
+      "    go func() {",
+      "        ch <- \"안녕하세요\"",
+      "    }()",
+      "",
+      "    msg := <-ch",
+      "    fmt.Println(msg)",
+      "}",
+      "```",
+      "",
+      ":::warning",
+      "label: 주의",
+      "color: #d97706",
+      "버퍼 없는 채널에서 수신자가 준비되지 않으면 송신자는 블록된다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## 버퍼 채널로 생산자-소비자 구현",
+      "",
+      "```go title=\"buffered_channel.go\" {3,7} add=12 delete=4",
+      "package main",
+      "",
+      "import \"fmt\"",
+      "",
+      "func main() {",
+      "    jobs := make(chan int, 5)",
+      "    done := make(chan bool)",
+      "",
+      "    go func() {",
+      "        for j := range jobs {",
+      "            fmt.Println(\"처리 중:\", j)",
+      "        }",
+      "        done <- true",
+      "    }()",
+      "",
+      "    for i := 1; i <= 3; i++ {",
+      "        jobs <- i",
+      "    }",
+      "    close(jobs)",
+      "    <-done",
+      "}",
+      "```",
+      "",
+      ":::comparison",
+      "Before: 공유 슬라이스에 `sync.Mutex`로 락을 걸고 작업 큐를 구현하던 방식은 락 누락과 성능 저하 위험이 컸다.",
+      "After: 버퍼 채널로 큐를 대체하자 코드가 절반으로 줄었고, 경쟁 상태 걱정 없이 안전하게 동작했다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## 채널 방향",
+      "",
+      "```go title=\"directional_channel.go\" {1-2,5}",
+      "func sendOnly(ch chan<- int) {",
+      "    ch <- 42",
+      "}",
+      "",
+      "func recvOnly(ch <-chan int) {",
+      "    val := <-ch",
+      "    fmt.Println(val)",
+      "}",
+      "```",
+      "",
+      ":::emphasis",
+      "label: POINT",
+      "color: #9333ea",
+      "채널 방향을 함수 시그니처에 명시하면 컴파일 타임에 실수를 잡을 수 있다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## select 문",
+      "",
+      "```go title=\"select.go\" {4,7-10}",
+      "select {",
+      "case msg1 := <-ch1:",
+      "    fmt.Println(\"ch1:\", msg1)",
+      "case msg2 := <-ch2:",
+      "    fmt.Println(\"ch2:\", msg2)",
+      "case <-time.After(1 * time.Second):",
+      "    fmt.Println(\"타임아웃\")",
+      "default:",
+      "    fmt.Println(\"즉시 실행\")",
+      "}",
+      "```",
+      "",
+      ":::experiment",
+      "label: 실험",
+      "color: #4f46e5",
+      "5개의 채널을 동시에 기다리는 코드를 `select`와 개별 `if-else`로 비교했다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## 실전 패턴: Fan-Out / Fan-In",
+      "",
+      "여러 워커가 작업을 분산 처리하고 결과를 하나로 모으는 패턴이다.",
+      "",
+      "```go title=\"fanout_fanin.go\" {6-10,18-22}",
+      "func worker(id int, jobs <-chan int, results chan<- int) {",
+      "    for j := range jobs {",
+      "        results <- j * 2",
+      "    }",
+      "}",
+      "",
+      "func main() {",
+      "    const numWorkers = 3",
+      "    jobs := make(chan int, 10)",
+      "    results := make(chan int, 10)",
+      "",
+      "    for w := 1; w <= numWorkers; w++ {",
+      "        go worker(w, jobs, results)",
+      "    }",
+      "",
+      "    for j := 1; j <= 5; j++ {",
+      "        jobs <- j",
+      "    }",
+      "    close(jobs)",
+      "",
+      "    for r := 1; r <= 5; r++ {",
+      "        <-results",
+      "    }",
+      "}",
+      "```",
+      "",
+      ":::tutorial",
+      "- 01 워커 정의: 입력 채널(`<-chan`)과 출력 채널(`chan<-`)을 받는 `worker` 함수를 작성한다.",
+      "- 02 워커 풀 생성: `for` 루프로 원하는 수만큼 `go worker(...)`를 실행한다.",
+      "- 03 작업 전송: `jobs` 채널에 작업을 보내고 완료되면 `close(jobs)`로 워커에게 종료 신호를 준다.",
+      "- 04 결과 수집: `results` 채널에서 기대하는 개수만큼 읽어 들인다.",
+      ":::",
+      "",
+      "---",
+      "",
+      "## Context로 취소 전파",
+      "",
+      "```go title=\"context_cancel.go\" {5,9-10}",
+      "func doWork(ctx context.Context) {",
+      "    for {",
+      "        select {",
+      "        case <-ctx.Done():",
+      "            return",
+      "        default:",
+      "            // 작업 수행",
+      "        }",
+      "    }",
+      "}",
+      "```",
+      "",
+      ":::success",
+      "label: 성공",
+      "color: #15803d",
+      "context를 사용하면 고루틴이 몇 개든 상관없이 깔끔하게 전파 종료가 가능하다.",
+      ":::",
+      "",
+      ":::failure",
+      "label: 실패",
+      "color: #dc2626",
+      "`done` 채널을 직접 만들어 취소 신호를 전달하다 보면 추적이 불가능해진다.",
+      ":::",
+      "",
+      ":::conclusion",
+      "label: 결론",
+      "color: #a16207",
+      "고루틴과 채널은 Go 동시성의 핵심이다. 버퍼 없는 채널로 동기화하고, 버퍼 채널로 큐를 만들며, select로 다중 채널을 감시하고, context로 생명주기를 관리하라.",
+      ":::",
+      "",
+      ":::rebuttal",
+      "label: 반박",
+      "color: #db2777",
+      "\"채널이 만능이다\"라는 생각은 위험하다. 단순한 카운터나 캐시 같은 공유 상태는 `sync.Mutex`나 `sync.RWMutex`가 더 낫다.",
+      ":::",
+      "",
+      ":::references",
+      "- [A Tour of Go - Concurrency](https://go.dev/tour/concurrency/1)",
+      "- [Go by Example: Channels](https://gobyexample.com/channels)",
+      "- [Effective Go - Concurrency](https://go.dev/doc/effective_go#concurrency)",
+      "- [Go Concurrency Patterns (Pipelines)](https://go.dev/blog/pipelines)",
+      ":::",
+      "",
+      ":::cta",
+      "- GitHub: https://github.com/golang/go",
+      "- Go Playground: https://go.dev/play/",
+      "- 원문: https://go.dev/doc/",
+      ":::",
+    ].join("\n");
+    const document = parseMarkdownToDocument(markdown, { defaultLanguage: "go" });
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      bodyFontSize: "17px",
+      codeFontSize: "15px",
+      theme: "catppuccin-mocha",
+    });
+
+    expect(markdown.length).toBeGreaterThan(3_000);
+    expect(markdown.length).toBeLessThan(6_000);
+    expect(textOfTestDocument(document).length).toBeGreaterThan(2_500);
+    expect(html.length).toBeLessThan(65_535);
+    expect(html).toContain("Go 동시성 마스터하기");
+    expect(
+      html.match(new RegExp(`font-family:${escapeRegExp(expectedDefaultDcProseFontFamily)}`, "g"))
+        ?.length ?? 0,
+    ).toBeGreaterThan(30);
+    expect(html).toMatch(
+      new RegExp(
+        `<td style="padding:0;color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:20px;font-weight:700;line-height:1\\.28">동시성의 기본 철학</td>`,
+      ),
+    );
+    expect(html).toMatch(
+      new RegExp(
+        `<td style="[^"]*font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )}[^"]*"><span style="[^"]*">&bull;</span>&nbsp;&nbsp;`,
+      ),
+    );
+  }, 20_000);
 
   it("auto-adjusts selected text colors that would disappear in dark document mode", async () => {
     const document: JSONContent = {
@@ -435,12 +748,23 @@ describe("exportDocumentToDcHtml", () => {
     });
 
     expect(html).toContain('bgcolor="#e5f6ff"');
-    expect(html).toContain(">01</span>");
-    expect(html).toContain(">02</span>");
+    expect(html).toContain(
+      'width="7" height="18" bgcolor="#2478ce" style="width:7px;height:18px;padding:0;background-color:#2478ce;font-size:0;line-height:0"',
+    );
+    expect(html).toContain(">01</span></td><td width=\"7\" height=\"18\"");
+    expect(html).toContain(">02</span></td><td width=\"7\" height=\"18\"");
     expect(html).toContain("가이드 원문");
     expect(html).toContain("구현 저장소");
     expect(html).toContain('href="https://example.com/guide"');
     expect(html).toContain('href="https://github.com/0disoft/dc-code-paste"');
+    expect(html).toContain("display:inline-block;margin:0");
+    expect(html).toContain("display:inline-table;border-collapse:collapse;vertical-align:middle");
+    expect(html).toContain("padding:0;background-color:#2478ce");
+    expect(html).toContain("line-height:18px;vertical-align:middle");
+    expect(html).toContain('<span style="display:inline-block;height:18px');
+    expect(html).toContain("line-height:1.18");
+    expect(html).toContain(`font-family:${expectedDefaultDcProseFontFamily};font-size:17px`);
+    expect(html).toContain("vertical-align:middle");
     expect(html).toContain("border-left:4px solid");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
@@ -524,8 +848,50 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("문제 크기를 먼저 본다.");
     expect(html).toContain("메모 &lt;중요&gt;");
     expect(html).toContain("cin/cout 설정을 앞에 둔다.");
+    expect(html).toMatch(
+      new RegExp(
+        `<span style="[^"]*font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )}[^"]*">메모 &lt;중요&gt;</span>`,
+      ),
+    );
     expect(html).not.toContain(">TIP</span>");
     expect(html).not.toContain(">핵심 요약</td>");
+  });
+
+  it("exports custom callout colors as DC-safe hex styles", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "tipBox",
+          attrs: { label: "메모", toneColor: "#0ea5e9" },
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "색상 피커로 고른 " },
+                { type: "text", text: "tone", marks: [{ type: "code" }] },
+                { type: "text", text: "을 유지한다." },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("메모");
+    expect(html).toContain('bgcolor="#ddf2fc"');
+    expect(html).toContain("border-left:4px solid #0ea5e9");
+    expect(html).toContain("background-color:#ddf2fc");
+    expect(html).toContain("tone");
+    expect(html).not.toContain("oklch(");
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
   });
 
   it("exports hero blocks as paste-safe title panels", async () => {
@@ -559,6 +925,13 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("CODEX GUIDE");
     expect(html).toContain("Codex의 /goal 지시어는 어떻게 쓰는가?");
     expect(html).toContain("/goal은 작업을 검증 가능한 완료 계약으로 바꾼다.");
+    expect(html).toMatch(
+      new RegExp(
+        `<span style="[^"]*font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )}[^"]*">CODEX GUIDE</span>`,
+      ),
+    );
     expect(html).toContain("border-top:4px solid");
     expect(html).toContain("font-size:30px");
     expect(html).toMatch(/CODEX GUIDE[\s\S]*<\/tr><tr>[\s\S]*Codex의 \/goal 지시어는 어떻게 쓰는가\?[\s\S]*<\/tr><tr>[\s\S]*\/goal은 작업을 검증 가능한 완료 계약으로 바꾼다\./);
@@ -601,6 +974,70 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toMatch(/CODEX GUIDE[\s\S]*<\/tr><tr>[\s\S]*Codex의 \/goal 지시어는 어떻게 쓰는가\?<br>\/goal은 작업을 검증 가능한 완료 계약으로 바꾼다\./);
   });
 
+  it("exports nested hero layout blocks without flattening them into subtitle text", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "heroBlock",
+          attrs: { label: "CODING GUIDE" },
+          content: [
+            {
+              type: "comparisonBlock",
+              content: [
+                {
+                  type: "comparisonColumn",
+                  attrs: { side: "left", title: "Before" },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "endl을 반복문 안에서 쓴다." }],
+                    },
+                  ],
+                },
+                {
+                  type: "comparisonColumn",
+                  attrs: { side: "right", title: "After" },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "\\n으로 출력한다." }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "heading",
+              attrs: { level: 1 },
+              content: [{ type: "text", text: "C++ 입력 최적화" }],
+            },
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "입출력 병목을 빠르게 찾는다." }],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain("C++ 입력 최적화");
+    expect(html).toContain("입출력 병목을 빠르게 찾는다.");
+    expect(html).toContain("Before");
+    expect(html).toContain("After");
+    expect(html).toContain("border-collapse:collapse");
+    expect(html).not.toContain("강의 노트");
+    expect(html).toMatch(/C\+\+ 입력 최적화[\s\S]*입출력 병목을 빠르게 찾는다\.[\s\S]*Before/);
+    expect(html).not.toMatch(/입출력 병목을 빠르게 찾는다\.<br>Before/);
+    expect(html).not.toMatch(/\sclass=/);
+    expect(html).not.toMatch(/\sdata-[\w-]+=/);
+  });
+
   it("exports tutorial blocks as numbered section cards", async () => {
     const document: JSONContent = {
       type: "doc",
@@ -610,7 +1047,7 @@ describe("exportDocumentToDcHtml", () => {
           content: [
             {
               type: "tutorialStep",
-              attrs: { title: "문제 파악" },
+              attrs: { title: "문제 파악", number: "04" },
               content: [
                 {
                   type: "paragraph",
@@ -620,7 +1057,7 @@ describe("exportDocumentToDcHtml", () => {
             },
             {
               type: "tutorialStep",
-              attrs: { title: "병목 좁히기" },
+              attrs: { title: "병목 좁히기", number: "05" },
               content: [
                 {
                   type: "paragraph",
@@ -638,13 +1075,21 @@ describe("exportDocumentToDcHtml", () => {
       structure: "dcTable",
     });
 
-    expect(html).toContain('bgcolor="#fbfaf2"');
-    expect(html).toContain(">01</span>");
-    expect(html).toContain(">02</span>");
+    expect(html).toContain('bgcolor="#ffffff"');
+    expect(html).toContain(
+      'width="7" height="22" bgcolor="#948163" style="width:7px;height:22px;padding:0;background-color:#948163;font-size:0;line-height:0"',
+    );
+    expect(html).toContain(">04</span></td><td width=\"7\" height=\"22\"");
+    expect(html).toContain(">05</span></td><td width=\"7\" height=\"22\"");
     expect(html).toContain("문제 파악");
     expect(html).toContain("병목 좁히기");
-    expect(html).toContain("padding:14px 16px 8px 28px");
-    expect(html).toContain("</span>&nbsp;&nbsp;&nbsp;<strong");
+    expect(html).toContain("padding:14px 0 8px 28px");
+    expect(html).toContain("padding:14px 16px 8px 0");
+    expect(html).toContain("padding:0 16px 14px 0");
+    expect(html).toContain("padding:0;background-color:#948163");
+    expect(html).toContain("line-height:22px;vertical-align:middle");
+    expect(html).toContain('<span style="display:inline-block;height:22px');
+    expect(html).toContain("</table></td><td");
     expect(html).not.toContain('colspan="2"');
     expect(html).toContain("입력 크기와 반복 횟수를 먼저 본다.");
     expect(html).toContain("시간이 튀는 지점만 따로 재본다.");
@@ -691,20 +1136,25 @@ describe("exportDocumentToDcHtml", () => {
       structure: "dcTable",
     });
 
-    expect(html).toContain('<td width="50%"');
+    expect(html).toContain('<td width="49%" bgcolor="#fff0ee"');
+    expect(html).toContain('<td width="2%" bgcolor="#ffffff"');
+    expect(html).toContain('<td width="49%" bgcolor="#e9f9ef"');
     expect(html).toContain('bgcolor="#fff0ee"');
     expect(html).toContain('bgcolor="#e9f9ef"');
     expect(html).toContain("잘못된 코드");
     expect(html).toContain("수정 코드");
     expect(html).toContain("endl을 반복문 안에서 계속 쓴다.");
     expect(html).toContain("\\n 출력으로 바꾼다.");
-    expect(html).toContain("border-left:4px solid");
+    expect(html).toContain('<td width="4" bgcolor="#ef4444"');
+    expect(html).toContain('<td width="4" bgcolor="#22c55e"');
+    expect(html).not.toContain("</table></td>");
+    expect(html).toContain("font-size:0;line-height:0");
     expect(html).not.toMatch(/\sclass=/);
     expect(html).not.toMatch(/\sdata-[\w-]+=/);
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
-  it("adds viewer-safe fallback stacks to prose and code font declarations", async () => {
+  it("adds compact DC-safe fallback stacks to prose and code font declarations", async () => {
     const document: JSONContent = {
       type: "doc",
       content: [
@@ -738,9 +1188,11 @@ describe("exportDocumentToDcHtml", () => {
       bodyFontFamily: "Inter",
     });
 
-    expect(html).toContain(`font-family:${safeProseFontFamily("Inter")}`);
-    expect(html).toContain(`font-family:${safeProseFontFamily("Pretendard")}`);
-    expect(html).toContain(`font-family:${codeFallbackFonts.join(", ")}`);
+    expect(html).toContain(`font-family:${safeDcProseFontFamily("Inter")}`);
+    expect(html).toContain(`font-family:${safeDcProseFontFamily("Pretendard")}`);
+    expect(html).toContain(`font-family:${safeDcCodeFontFamily()}`);
+    expect(html).not.toContain("NanumSquare Neo");
+    expect(html).not.toContain("Helvetica Neue");
   }, 15_000);
 
   it("exports an article canvas so dark DC editor backgrounds do not swallow prose", async () => {
@@ -805,7 +1257,7 @@ describe("exportDocumentToDcHtml", () => {
     });
 
     expect(html).toMatch(
-      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fbfaf2"/,
+      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff"/,
     );
     expect(html).toContain("<tbody><tr><td");
     expect(html).toContain('bgcolor="#e6fbe4"');
@@ -865,7 +1317,7 @@ describe("exportDocumentToDcHtml", () => {
     });
 
     expect(html).toMatch(
-      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#050505"/,
+      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#151515"/,
     );
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
@@ -873,7 +1325,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("사용 방법 및 예시");
     expect(html).toContain("아카이브 보기");
     expect(html).toContain('href="https://example.com/archive"');
-    expect(html).toContain('bgcolor="#0c0c0c"');
+    expect(html).toContain('bgcolor="#1b1b1b"');
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).not.toContain("oklch(");
@@ -903,7 +1355,7 @@ describe("exportDocumentToDcHtml", () => {
       structure: "dcTable",
     });
 
-    expect(html).toContain('bgcolor="#fbfaf2"');
+    expect(html).toContain('bgcolor="#ffffff"');
     expect(html).toContain("&ldquo;");
     expect(html).toContain("font-style:italic");
     expect(html).toMatch(/border:1px solid #[0-9a-f]{6}/);
@@ -1024,7 +1476,7 @@ describe("exportDocumentToDcHtml", () => {
 
     const html = await exportDocumentToDcHtml(document, exportOptions);
 
-    expect(html).toContain("<h2");
+    expect(html).toContain("위험한 링크");
     expect(html).not.toContain("<h99");
     expect(html).toContain("위험한 링크");
     expect(html).toContain("위험한 링크 박스");
@@ -1100,6 +1552,37 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain(">e</span>");
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/border-left:4px solid #[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
+  }, 15_000);
+
+  it("exports code block addition and deletion markers from code block attrs", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "codeBlock",
+          attrs: { language: "cpp", additionLines: "2", deletionLines: "1" },
+          content: [
+            {
+              type: "text",
+              text: "int oldValue = 1;\nint newValue = 2;\nreturn newValue;",
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      showLineNumbers: true,
+    });
+
+    expect(html).toContain(">1</span>");
+    expect(html).toContain(">2</span>");
+    expect(html).toContain("oldValue");
+    expect(html).toContain("newValue");
+    expect(html.match(/border-left:4px solid #[0-9a-f]{6}/g)).toHaveLength(2);
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).not.toContain("oklch(");
   }, 15_000);
 

@@ -45,7 +45,7 @@ The app keeps an editor document model internally, then exports inline-style HTM
 paste targets:
 
 - Paste structure: `DC 테이블` uses table wrappers with `bgcolor` fallbacks for stricter DCInside
-  paste surfaces; `기본` keeps a lighter `div` wrapper for ordinary rich-text paste targets
+  paste surfaces
 - Article canvas: root wrapper with an inline light background, padding, font, and text color so
   prose stays readable when pasted into DCInside dark mode
 - Prose blocks: paragraph, heading, list, quote, divider
@@ -78,16 +78,6 @@ paste targets:
 </table>
 ```
 
-`기본` structure keeps the same content contract with simpler block wrappers:
-
-```html
-<div style="...">
-  <p style="...">...</p>
-  <div style="...">...</div>
-  <pre style="..."><code><span style="color:#aabbcc">...</span></code></pre>
-</div>
-```
-
 `디씨 복사` writes both `text/html` and `text/plain` for rich paste targets. The preview panel can
 also switch to `HTML` mode, where `원문 복사` copies the exported inline HTML as plain text for
 editors that expect raw HTML source.
@@ -103,10 +93,10 @@ The editor saves the current draft in browser `localStorage` after the editor is
 - Code language and Shiki theme
 - Body, selection, and code font settings
 - Line number setting
-- Paste structure: `DC 테이블` or `기본`
+- Paste structure: `DC 테이블`
 
 The draft is restored on the next page load. `초기화` clears the saved draft and returns the editor
-to the bundled sample article.
+to an empty article; `예시 템플릿` restores the bundled sample article.
 
 ## LLM Authoring
 
@@ -135,7 +125,6 @@ Before treating a release as ready, check both paste paths in a browser:
 3. Switch the preview panel to `HTML`, click `원문 복사`, paste into DCInside's HTML mode, and confirm
    the same article renders after leaving HTML mode.
 4. Confirm code colors, box spacing, links, and body font size match the preview closely enough.
-5. Refresh the app after editing text and changing paste structure; confirm the draft comes back.
-6. Click `초기화`, refresh, and confirm the sample article comes back instead of the previous draft.
+5. Refresh the app after editing text; confirm the draft comes back.
+6. Click `초기화`, refresh, and confirm an empty article comes back instead of the previous draft.
 7. In `DC 테이블`, confirm exported HTML contains `table`, `td`, and `bgcolor`.
-8. In `기본`, confirm exported HTML keeps the simpler root `div` structure.

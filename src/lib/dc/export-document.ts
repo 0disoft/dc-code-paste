@@ -9,10 +9,16 @@ import {
 } from "$lib/highlighter/catalog";
 import type { CalloutKind } from "$lib/editor/callout";
 import { calloutKindFromNodeName, normalizeCalloutKind } from "$lib/editor/callout";
+import { createCalloutColorPalette, parseCalloutToneColor } from "$lib/editor/callout-palette";
 import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
 import { normalizeEditableLinkHref } from "$lib/editor/link";
 import { normalizeQuoteStyle, type QuoteStyle } from "$lib/editor/quote-style";
-import { safeCodeFontFamily, safeProseFontFamily } from "./font-stacks";
+import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
+import {
+  defaultProseFontFamily,
+  safeDcCodeFontFamily as safeCodeFontFamily,
+  safeDcProseFontFamily as safeProseFontFamily,
+} from "./font-stacks";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 
@@ -26,7 +32,7 @@ export type DcExportOptions = {
   structure?: DcExportStructure;
 };
 
-export type DcExportStructure = "modern" | "dcTable";
+export type DcExportStructure = "dcTable";
 export type DcDocumentTheme = "lightLecture" | "darkEditorial";
 
 const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
@@ -37,6 +43,11 @@ const inlineCodeText = "oklch(34.86% 0.087 278.64)";
 const quoteAccentColor = "oklch(61.2% 0.049 77.83)";
 const quoteTextColor = "oklch(37.24% 0.026 77.36)";
 const quoteMarkColor = "oklch(74.61% 0.063 77.91)";
+const defaultBodyFontSize = "17px";
+const defaultCodeFontSize = "15px";
+const dcLightPageBackground = "#ffffff";
+const dcDarkPageBackground = "#151515";
+const dcDarkPanelBackground = "#1b1b1b";
 
 type DocumentPalette = {
   articleBackground: string;
@@ -65,6 +76,7 @@ type RenderContext = {
   background?: string;
   inlineCodeBackground?: string;
   inlineCodeText?: string;
+  proseTableSafe?: boolean;
 };
 
 function normalizeDocumentTheme(value: DcDocumentTheme | undefined): DcDocumentTheme {
@@ -74,22 +86,22 @@ function normalizeDocumentTheme(value: DcDocumentTheme | undefined): DcDocumentT
 function documentPalette(options: DcExportOptions): DocumentPalette {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      articleBackground: "oklch(7.2% 0.012 94.1)",
-      fallbackBackground: "#050505",
-      text: "oklch(94.12% 0.012 93.37)",
-      mutedText: "oklch(71.26% 0.021 84.88)",
-      heading: "oklch(98.32% 0.006 93.08)",
-      link: "oklch(83.57% 0.141 84.66)",
-      divider: "oklch(34.91% 0.033 83.29)",
-      inlineCodeBackground: "oklch(18.92% 0.02 83.18)",
-      inlineCodeText: "oklch(96.51% 0.015 91.73)",
-      quoteBackground: "oklch(9.76% 0.011 94.84)",
-      quoteText: "oklch(87.91% 0.018 86.38)",
-      quoteAccent: "oklch(84.08% 0.11 84.51)",
-      quoteMark: "oklch(80.12% 0.097 84.88)",
-      sectionText: "oklch(97.22% 0.008 92.87)",
-      sectionAccent: "oklch(88.91% 0.091 87.72)",
-      sectionBorder: "oklch(35.04% 0.033 84.06)",
+      articleBackground: dcDarkPageBackground,
+      fallbackBackground: dcDarkPageBackground,
+      text: "#e8e8e8",
+      mutedText: "#b8b8b8",
+      heading: "#f4f4f4",
+      link: "#8ab4f8",
+      divider: "#343434",
+      inlineCodeBackground: "#252525",
+      inlineCodeText: "#f2f2f2",
+      quoteBackground: dcDarkPageBackground,
+      quoteText: "#dddddd",
+      quoteAccent: "#d7bd77",
+      quoteMark: "#c9ad67",
+      sectionText: "#f4f4f4",
+      sectionAccent: "#d7bd77",
+      sectionBorder: "#383838",
       ctaBackground: "oklch(91.44% 0.064 90.52)",
       ctaBorder: "oklch(96.28% 0.022 90.84)",
       ctaText: "oklch(13.77% 0.018 87.82)",
@@ -97,8 +109,8 @@ function documentPalette(options: DcExportOptions): DocumentPalette {
   }
 
   return {
-    articleBackground,
-    fallbackBackground: dcTableFallbackColors.articleBackground,
+    articleBackground: dcLightPageBackground,
+    fallbackBackground: dcLightPageBackground,
     text: fallbackTextColor,
     mutedText: "oklch(43.22% 0.022 255.32)",
     heading: "oklch(24.19% 0.019 255.77)",
@@ -120,7 +132,7 @@ function documentPalette(options: DcExportOptions): DocumentPalette {
 }
 
 const dcTableFallbackColors = {
-  articleBackground: "#fbfaf2",
+  articleBackground: dcLightPageBackground,
   tipBackground: "#e6fbe4",
   warningBackground: "#fff1cf",
   referenceBackground: "#e5f6ff",
@@ -130,7 +142,7 @@ const dcTableFallbackColors = {
   experimentBackground: "#eaf1ff",
   conclusionBackground: "#fff7d9",
   rebuttalBackground: "#ffe9f5",
-  quoteBackground: "#fbfaf2",
+  quoteBackground: dcLightPageBackground,
 };
 
 const calloutStyles: Record<
@@ -263,7 +275,23 @@ const darkCalloutStyles: Record<
   },
 };
 
-function calloutStyleFor(kind: CalloutKind, options: DcExportOptions) {
+function calloutStyleFor(kind: CalloutKind, options: DcExportOptions, node?: JSONContent) {
+  const toneColor = parseCalloutToneColor(node?.attrs?.toneColor);
+
+  if (toneColor) {
+    const palette = createCalloutColorPalette(
+      toneColor,
+      kind,
+      normalizeDocumentTheme(options.documentTheme) === "darkEditorial" ? "dark" : "light",
+    );
+    return {
+      label: calloutStyles[kind].label,
+      background: palette.background,
+      border: palette.border,
+      text: palette.text,
+    };
+  }
+
   return normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
     ? darkCalloutStyles[kind]
     : calloutStyles[kind];
@@ -274,9 +302,23 @@ function labelFromAttrs(node: JSONContent, fallback: string): string {
   return label || fallback;
 }
 
-function calloutFallbackBackground(kind: CalloutKind, options: DcExportOptions): string {
+function calloutFallbackBackground(
+  kind: CalloutKind,
+  options: DcExportOptions,
+  node?: JSONContent,
+): string {
+  const toneColor = parseCalloutToneColor(node?.attrs?.toneColor);
+
+  if (toneColor) {
+    return createCalloutColorPalette(
+      toneColor,
+      kind,
+      normalizeDocumentTheme(options.documentTheme) === "darkEditorial" ? "dark" : "light",
+    ).fallbackBackground;
+  }
+
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
-    return "#0c0c0c";
+    return dcDarkPanelBackground;
   }
 
   return dcTableFallbackColors[`${kind}Background`];
@@ -344,14 +386,88 @@ function safeSize(value: string, fallback: string): string {
   return /^\d{1,2}px$/.test(normalized) ? normalized : fallback;
 }
 
+function safeBodyFontSize(options: DcExportOptions): string {
+  return safeSize(options.bodyFontSize, defaultBodyFontSize);
+}
+
+function safeCodeFontSize(options: DcExportOptions): string {
+  return safeSize(options.codeFontSize, defaultCodeFontSize);
+}
+
 function safeHeadingLevel(value: unknown): 1 | 2 | 3 | 4 | 5 | 6 {
   return value === 1 || value === 2 || value === 3 || value === 4 || value === 5 || value === 6
     ? value
     : 2;
 }
 
-function isDcTableStructure(options: DcExportOptions): boolean {
-  return options.structure === "dcTable";
+function isDcTableStructure(_options: DcExportOptions): boolean {
+  return true;
+}
+
+function parseStyleDeclaration(part: string): { property: string; value: string } | undefined {
+  const separator = part.indexOf(":");
+
+  if (separator === -1) {
+    return undefined;
+  }
+
+  const property = part.slice(0, separator).trim().toLowerCase();
+  const value = part.slice(separator + 1).trim();
+
+  return property && value ? { property, value } : undefined;
+}
+
+function styleHasDeclaration(style: string, property: string, value: string): boolean {
+  const expectedProperty = property.toLowerCase();
+
+  return style.split(";").some((part) => {
+    const declaration = parseStyleDeclaration(part);
+    return declaration?.property === expectedProperty && declaration.value === value;
+  });
+}
+
+function removeStyleDeclaration(style: string, property: string, value: string): string {
+  const expectedProperty = property.toLowerCase();
+
+  return style
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => {
+      const declaration = parseStyleDeclaration(part);
+      return declaration?.property !== expectedProperty || declaration.value !== value;
+    })
+    .join(";");
+}
+
+function canCompactInheritedFontSize(tagName: string): boolean {
+  return tagName === "table" || tagName === "div" || tagName === "section";
+}
+
+function compactInheritedProseStyles(html: string, options: DcExportOptions): string {
+  const inheritedFontSize = safeBodyFontSize(options);
+  let keptInheritedFontSizeCount = 0;
+
+  return html.replace(
+    /<([a-z][\w-]*)([^<>]*?)\sstyle="([^"]*)"/gi,
+    (_match, tagName: string, beforeStyle: string, rawStyle: string) => {
+      let style = rawStyle;
+      const normalizedTagName = tagName.toLowerCase();
+
+      if (
+        canCompactInheritedFontSize(normalizedTagName) &&
+        styleHasDeclaration(style, "font-size", inheritedFontSize)
+      ) {
+        if (keptInheritedFontSizeCount >= 2) {
+          style = removeStyleDeclaration(style, "font-size", inheritedFontSize);
+        } else {
+          keptInheritedFontSizeCount += 1;
+        }
+      }
+
+      return style ? `<${tagName}${beforeStyle} style="${style}"` : `<${tagName}${beforeStyle}`;
+    },
+  );
 }
 
 function renderDcTableBlock({
@@ -383,6 +499,40 @@ function renderDcTableBlock({
   });
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
+}
+
+function renderDcProseCellBlock({
+  body,
+  options,
+  color,
+  margin,
+  fontSize,
+  fontWeight,
+  lineHeight,
+}: {
+  body: string;
+  options: DcExportOptions;
+  color: string;
+  margin: string;
+  fontSize: string;
+  fontWeight?: number;
+  lineHeight: number;
+}): string {
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin,
+    "border-collapse": "collapse",
+  });
+  const cellStyle = joinStyle({
+    padding: "0",
+    color,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": fontSize,
+    "font-weight": fontWeight,
+    "line-height": lineHeight,
+  });
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
 }
 
 function safeHref(value: unknown): string | undefined {
@@ -455,7 +605,7 @@ function applyMarks(
 
   for (const mark of marks ?? []) {
     if (mark.type === "bold") {
-      html = `<strong style="font-weight:800">${html}</strong>`;
+      html = `<strong style="font-weight:700">${html}</strong>`;
       continue;
     }
 
@@ -537,15 +687,30 @@ function renderParagraph(
   context: RenderContext = {},
 ): string {
   const palette = documentPalette(options);
-  const style = joinStyle({
+  const body = renderInlineChildren(node, options, context) || "&nbsp;";
+
+  if (isDcTableStructure(options) && context.proseTableSafe) {
+    return renderDcProseCellBlock({
+      body,
+      options,
+      color: context.text ?? palette.text,
+      margin: "0 0 14px",
+      fontSize: safeBodyFontSize(options),
+      lineHeight: 1.72,
+    });
+  }
+
+  const paragraphStyle = joinStyle({
     margin: "0 0 14px",
+  });
+  const textStyle = joinStyle({
     color: context.text ?? palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.72,
   });
 
-  return `<p style="${style}">${renderInlineChildren(node, options, context) || "&nbsp;"}</p>`;
+  return `<p style="${paragraphStyle}"><span style="${textStyle}">${body}</span></p>`;
 }
 
 function renderHeading(node: JSONContent, options: DcExportOptions): string {
@@ -557,11 +722,24 @@ function renderHeading(node: JSONContent, options: DcExportOptions): string {
     color: palette.heading,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": size,
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.28,
   });
+  const body = renderInlineChildren(node, options) || "&nbsp;";
 
-  return `<h${level} style="${style}">${renderInlineChildren(node, options)}</h${level}>`;
+  if (isDcTableStructure(options)) {
+    return renderDcProseCellBlock({
+      body,
+      options,
+      color: palette.heading,
+      margin: "22px 0 12px",
+      fontSize: size,
+      fontWeight: 700,
+      lineHeight: 1.28,
+    });
+  }
+
+  return `<h${level} style="${style}">${body}</h${level}>`;
 }
 
 async function renderList(
@@ -570,13 +748,77 @@ async function renderList(
   ordered: boolean,
 ): Promise<string> {
   const palette = documentPalette(options);
+  const listItemContext: RenderContext = {
+    text: palette.text,
+    background: palette.articleBackground,
+    inlineCodeBackground: palette.inlineCodeBackground,
+    inlineCodeText: palette.inlineCodeText,
+    proseTableSafe: true,
+  };
+
+  if (isDcTableStructure(options)) {
+    const proseFontFamily = safeProseFontFamily(options.bodyFontFamily);
+    const bodyFontSize = safeBodyFontSize(options);
+    const tableStyle = joinStyle({
+      width: "100%",
+      margin: "0 0 14px",
+      "border-collapse": "collapse",
+    });
+    const markerCellStyle = joinStyle({
+      width: "22px",
+      padding: "0 9px 7px 0",
+      color: palette.text,
+      "font-family": proseFontFamily,
+      "font-size": bodyFontSize,
+      "font-weight": 400,
+      "line-height": 1.7,
+      "text-align": ordered ? "right" : "center",
+      "vertical-align": "top",
+      "white-space": "nowrap",
+    });
+    const markerTextStyle = joinStyle({
+      color: palette.text,
+      "font-family": proseFontFamily,
+      "font-size": bodyFontSize,
+      "font-weight": 400,
+      "line-height": 1.7,
+      "white-space": "nowrap",
+    });
+    const bodyCellStyle = joinStyle({
+      padding: "0 0 7px",
+      color: palette.text,
+      "font-family": proseFontFamily,
+      "font-size": bodyFontSize,
+      "font-weight": 400,
+      "line-height": 1.7,
+      "vertical-align": "top",
+    });
+    const bodyTextStyle = joinStyle({
+      color: palette.text,
+      "font-family": proseFontFamily,
+      "font-size": bodyFontSize,
+      "font-weight": 400,
+      "line-height": 1.7,
+    });
+    const rows = await Promise.all(
+      childrenOf(node).map(async (item, index) => {
+        const marker = ordered ? `${index + 1}.` : "&bull;";
+        const body = await renderListItemBody(item, options, listItemContext, bodyTextStyle);
+
+        return `<tr><td width="22" style="${markerCellStyle}"><span style="${markerTextStyle}">${marker}</span></td><td style="${bodyCellStyle}">${body}</td></tr>`;
+      }),
+    );
+
+    return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
+  }
+
   const tag = ordered ? "ol" : "ul";
   const listStyle = joinStyle({
     margin: "0 0 14px",
     padding: "0 0 0 24px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.7,
   });
   const items = await Promise.all(
@@ -591,14 +833,48 @@ async function renderList(
   return `<${tag} style="${listStyle}">${items.join("")}</${tag}>`;
 }
 
+async function renderListItemBody(
+  item: JSONContent,
+  options: DcExportOptions,
+  context: RenderContext,
+  textStyle: string,
+): Promise<string> {
+  const parts = await Promise.all(
+    childrenOf(item).map(async (child) => {
+      if (child.type === "paragraph") {
+        const body = renderInlineChildren(child, options, context) || "&nbsp;";
+        return `<span style="${textStyle}">${body}</span>`;
+      }
+
+      return renderBlockAsync(child, options, context);
+    }),
+  );
+  const body = parts.filter(Boolean).join("<br>");
+
+  return body || "&nbsp;";
+}
+
 async function renderCallout(
   node: JSONContent,
   options: DcExportOptions,
   explicitKind?: CalloutKind,
 ): Promise<string> {
   const kind = explicitKind ?? normalizeCalloutKind(node.attrs?.kind);
-  const palette = calloutStyleFor(kind, options);
-  const codePalette = calloutInlineCodeStyles[kind];
+  const palette = calloutStyleFor(kind, options, node);
+  const customToneColor = parseCalloutToneColor(node.attrs?.toneColor);
+  const customPalette = customToneColor
+    ? createCalloutColorPalette(
+        customToneColor,
+        kind,
+        normalizeDocumentTheme(options.documentTheme) === "darkEditorial" ? "dark" : "light",
+      )
+    : undefined;
+  const codePalette = customPalette
+    ? {
+        background: customPalette.inlineCodeBackground,
+        text: customPalette.inlineCodeText,
+      }
+    : calloutInlineCodeStyles[kind];
   const childContext: RenderContext = {
     text: palette.text,
     background: palette.background,
@@ -609,8 +885,9 @@ async function renderCallout(
     display: "block",
     margin: "0 0 6px",
     color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "letter-spacing": "0",
   });
   const body = await Promise.all(
@@ -622,7 +899,7 @@ async function renderCallout(
     return renderDcTableBlock({
       body: content,
       backgroundColor: palette.background,
-      fallbackBackground: calloutFallbackBackground(kind, options),
+      fallbackBackground: calloutFallbackBackground(kind, options, node),
       borderColor: palette.border,
     });
   }
@@ -635,7 +912,7 @@ async function renderCallout(
     color: palette.text,
     "border-radius": "7px",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.68,
   });
 
@@ -666,22 +943,23 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
     color: boxText,
     "border-radius": "7px",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.68,
   });
   const labelStyle = joinStyle({
     display: "block",
     margin: "0 0 6px",
     color: isDarkEditorial ? "oklch(79.74% 0.124 233.36)" : "oklch(32.26% 0.07 249.42)",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "letter-spacing": "0",
   });
   const linkStyle = joinStyle({
     display: "inline-block",
     margin: "2px 0 0",
     color: palette.link,
-    "font-weight": 800,
+    "font-weight": 700,
     "text-decoration": "underline",
     "text-underline-offset": "2px",
   });
@@ -724,6 +1002,8 @@ async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Pro
       ? node.attrs.language
       : defaultLanguage;
   const highlightLines = normalizeHighlightLines(node.attrs?.highlightLines);
+  const additionLines = normalizeHighlightLines(node.attrs?.additionLines);
+  const deletionLines = normalizeHighlightLines(node.attrs?.deletionLines);
   const filename = normalizeCodeFilename(node.attrs?.filename);
 
   return highlightForDcHtml(textOf(node), {
@@ -732,8 +1012,10 @@ async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Pro
     showBackground: true,
     showLineNumbers: options.showLineNumbers,
     filename,
-    fontSize: safeSize(options.codeFontSize, "14px"),
+    fontSize: safeCodeFontSize(options),
     highlightLines,
+    additionLines,
+    deletionLines,
   });
 }
 
@@ -744,9 +1026,9 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
     margin: quoteStyle === "pull" ? 0 : "0 0 8px",
     color: quoteStyle === "pull" ? palette.heading : palette.quoteText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": quoteStyle === "pull" ? "21px" : safeSize(options.bodyFontSize, "15px"),
+    "font-size": quoteStyle === "pull" ? "21px" : safeBodyFontSize(options),
     "font-style": quoteStyle === "academic" || quoteStyle === "pull" ? undefined : "italic",
-    "font-weight": quoteStyle === "pull" ? 900 : undefined,
+    "font-weight": quoteStyle === "pull" ? 700 : undefined,
     "line-height": quoteStyle === "pull" ? 1.48 : 1.78,
     "text-align": quoteStyle === "pull" ? "center" : undefined,
   });
@@ -783,7 +1065,7 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
 
 function quoteFallbackBackground(options: DcExportOptions): string {
   return normalizeDocumentTheme(options.documentTheme) === "darkEditorial"
-    ? documentPalette(options).fallbackBackground
+    ? dcDarkPageBackground
     : dcTableFallbackColors.quoteBackground;
 }
 
@@ -838,7 +1120,7 @@ function renderQuoteContent(
     color: palette.quoteMark,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "34px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1,
     "vertical-align": "top",
     margin: "0 8px 0 0",
@@ -859,7 +1141,7 @@ function renderQuoteContent(
       color: palette.quoteMark,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": "56px",
-      "font-weight": 900,
+      "font-weight": 700,
       "line-height": 0.82,
       margin: "0 0 4px",
     });
@@ -874,7 +1156,7 @@ function renderQuoteContent(
       color: palette.mutedText,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": "12px",
-      "font-weight": 900,
+      "font-weight": 700,
       "letter-spacing": "0",
     });
 
@@ -899,7 +1181,7 @@ function quoteWrapperStyle(
       color: palette.quoteText,
       "background-color": "transparent",
       "font-family": safeProseFontFamily(options.bodyFontFamily),
-      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-size": safeBodyFontSize(options),
       "line-height": 1.78,
     });
   }
@@ -915,7 +1197,7 @@ function quoteWrapperStyle(
       "background-color": "transparent",
       "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": "21px",
-      "font-weight": 900,
+      "font-weight": 700,
       "line-height": 1.48,
       "text-align": "center",
     });
@@ -930,7 +1212,7 @@ function quoteWrapperStyle(
       color: palette.quoteText,
       "background-color": palette.quoteBackground,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
-      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-size": safeBodyFontSize(options),
       "font-style": "italic",
       "line-height": 1.78,
     });
@@ -945,7 +1227,7 @@ function quoteWrapperStyle(
     color: palette.quoteText,
     "background-color": "transparent",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "font-style": "italic",
     "line-height": 1.78,
   });
@@ -961,7 +1243,7 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
     color: palette.sectionText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "20px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.35,
   })}">${content || "&nbsp;"}</strong>`;
 
@@ -982,7 +1264,7 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
     color: palette.sectionText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "20px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.35,
   });
 
@@ -1014,8 +1296,8 @@ function renderCtaButtonAnchor(
     "background-color": palette.ctaBackground,
     color: palette.ctaText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
-    "font-weight": 900,
+    "font-size": safeBodyFontSize(options),
+    "font-weight": 700,
     "line-height": 1.2,
     "text-decoration": "none",
     ...overrides,
@@ -1043,7 +1325,7 @@ async function renderCtaGroup(node: JSONContent, options: DcExportOptions): Prom
   const wrapperStyle = joinStyle({
     margin: "0 0 16px",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.2,
   });
   const body =
@@ -1099,12 +1381,13 @@ function renderCtaGroupTable(
 function referenceListPalette(options: DcExportOptions) {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      background: "oklch(9.8% 0.014 94.7)",
-      fallbackBackground: "#090909",
-      border: "oklch(34.06% 0.044 236.72)",
+      background: dcDarkPanelBackground,
+      fallbackBackground: dcDarkPanelBackground,
+      border: "#353535",
       badgeBackground: "oklch(74.22% 0.14 232.34)",
+      badgeFallbackBackground: "#38bdf8",
       badgeText: "oklch(8.61% 0.019 237.62)",
-      itemDivider: "oklch(24.21% 0.025 236.68)",
+      itemDivider: "#303030",
       text: "oklch(91.87% 0.029 233.82)",
       mutedText: "oklch(70.88% 0.035 235.94)",
     };
@@ -1115,6 +1398,7 @@ function referenceListPalette(options: DcExportOptions) {
     fallbackBackground: dcTableFallbackColors.referenceBackground,
     border: "oklch(78.06% 0.088 247.23)",
     badgeBackground: "oklch(56.77% 0.154 252.96)",
+    badgeFallbackBackground: "#2478ce",
     badgeText: "oklch(99.21% 0.006 247.8)",
     itemDivider: "oklch(88.91% 0.035 247.16)",
     text: "oklch(28.43% 0.052 249.88)",
@@ -1137,14 +1421,77 @@ function renderReferenceItemBody(
     escapeHtml(fallbackLabel);
   const linkStyle = joinStyle({
     color: documentColors.link,
-    "font-weight": 850,
+    display: "inline-block",
+    margin: "0",
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeBodyFontSize(options),
+    "font-weight": 700,
+    "line-height": 1.18,
     "text-decoration": "underline",
     "text-underline-offset": "2px",
+    "vertical-align": "middle",
   });
 
   return href
     ? `<a href="${href}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${label}</a>`
     : label;
+}
+
+function renderDcRoundedBadge({
+  text,
+  backgroundColor,
+  fallbackBackgroundColor,
+  textColor,
+  width,
+  height,
+  fontSize,
+}: {
+  text: string;
+  backgroundColor: string;
+  fallbackBackgroundColor: string;
+  textColor: string;
+  width: number;
+  height: number;
+  fontSize: number;
+}): string {
+  const sideWidth = Math.max(4, Math.round(width * 0.22));
+  const outerTableStyle = joinStyle({
+    display: "inline-table",
+    "border-collapse": "collapse",
+    "vertical-align": "middle",
+  });
+  const sideCellStyle = joinStyle({
+    width: `${sideWidth}px`,
+    height: `${height}px`,
+    padding: "0",
+    "background-color": backgroundColor,
+    "font-size": "0",
+    "line-height": "0",
+  });
+  const textStyle = joinStyle({
+    height: `${height}px`,
+    padding: "0",
+    "background-color": backgroundColor,
+    color: textColor,
+    "font-family": safeProseFontFamily(defaultProseFontFamily),
+    "font-size": `${fontSize}px`,
+    "font-weight": 700,
+    "line-height": `${height}px`,
+    "vertical-align": "middle",
+    "white-space": "nowrap",
+  });
+  const spanStyle = joinStyle({
+    display: "inline-block",
+    height: `${height}px`,
+    color: textColor,
+    "font-family": safeProseFontFamily(defaultProseFontFamily),
+    "font-size": `${fontSize}px`,
+    "font-weight": 700,
+    "line-height": `${height}px`,
+    "white-space": "nowrap",
+  });
+
+  return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${fallbackBackgroundColor}" style="${outerTableStyle}"><tbody><tr><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td><td height="${height}" valign="middle" bgcolor="${fallbackBackgroundColor}" style="${textStyle}"><span style="${spanStyle}">${escapeHtml(text)}</span></td><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td></tr></tbody></table>`;
 }
 
 async function renderReferenceList(node: JSONContent, options: DcExportOptions): Promise<string> {
@@ -1171,7 +1518,7 @@ function renderReferenceListModern(items: JSONContent[], options: DcExportOption
     "background-color": palette.background,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.62,
   });
   const itemStyle = joinStyle({
@@ -1193,25 +1540,28 @@ function renderReferenceListModern(items: JSONContent[], options: DcExportOption
     display: "table-cell",
     width: "42px",
     padding: "12px 0 12px 12px",
-    "vertical-align": "top",
+    "vertical-align": "middle",
   });
   const badgeStyle = joinStyle({
     display: "inline-block",
-    "min-width": "26px",
-    padding: "2px 0",
-    "border-radius": "999px",
+    "min-width": "30px",
+    height: "18px",
+    padding: "0",
+    "border-radius": "4px",
     "background-color": palette.badgeBackground,
     color: palette.badgeText,
     "font-size": "11px",
-    "font-weight": 900,
-    "line-height": 1.2,
+    "font-weight": 700,
+    "line-height": "18px",
     "text-align": "center",
+    "vertical-align": "middle",
   });
   const labelCellStyle = joinStyle({
     display: "table-cell",
     padding: "11px 14px 11px 0",
     color: palette.text,
-    "vertical-align": "top",
+    "line-height": 1.18,
+    "vertical-align": "middle",
   });
   const body = items
     .map((item, index) => {
@@ -1240,41 +1590,29 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
     width: "42px",
     padding: "10px 0 10px 12px",
     "border-bottom": `1px solid ${palette.itemDivider}`,
-    "vertical-align": "top",
+    "vertical-align": "middle",
   });
   const lastBadgeCellStyle = joinStyle({
     width: "42px",
     padding: "10px 0 10px 12px",
-    "vertical-align": "top",
-  });
-  const badgeStyle = joinStyle({
-    display: "inline-block",
-    "min-width": "26px",
-    padding: "2px 0",
-    "border-radius": "999px",
-    "background-color": palette.badgeBackground,
-    color: palette.badgeText,
-    "font-size": "11px",
-    "font-weight": 900,
-    "line-height": 1.2,
-    "text-align": "center",
+    "vertical-align": "middle",
   });
   const itemCellStyle = joinStyle({
     padding: "10px 14px 10px 0",
     "border-bottom": `1px solid ${palette.itemDivider}`,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
-    "line-height": 1.62,
-    "vertical-align": "top",
+    "font-size": safeBodyFontSize(options),
+    "line-height": 1.18,
+    "vertical-align": "middle",
   });
   const lastItemCellStyle = joinStyle({
     padding: "10px 14px 10px 0",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
-    "line-height": 1.62,
-    "vertical-align": "top",
+    "font-size": safeBodyFontSize(options),
+    "line-height": 1.18,
+    "vertical-align": "middle",
   });
   const rows = items
     .map((item, index) => {
@@ -1282,8 +1620,17 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
       const badgeTdStyle = index === items.length - 1 ? lastBadgeCellStyle : badgeCellStyle;
       const itemTdStyle = index === items.length - 1 ? lastItemCellStyle : itemCellStyle;
       const content = renderReferenceItemBody(item, options, palette.text, palette.background);
+      const badge = renderDcRoundedBadge({
+        text: number,
+        backgroundColor: palette.badgeBackground,
+        fallbackBackgroundColor: palette.badgeFallbackBackground,
+        textColor: palette.badgeText,
+        width: 30,
+        height: 18,
+        fontSize: 11,
+      });
 
-      return `<tr><td style="${badgeTdStyle}"><span style="${badgeStyle}">${number}</span></td><td style="${itemTdStyle}">${content}</td></tr>`;
+      return `<tr><td style="${badgeTdStyle}">${badge}</td><td style="${itemTdStyle}">${content}</td></tr>`;
     })
     .join("");
 
@@ -1293,9 +1640,9 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
 function summaryBoxPalette(options: DcExportOptions) {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      background: "oklch(10.18% 0.015 94.76)",
-      fallbackBackground: "#090909",
-      border: "oklch(36.21% 0.032 84.68)",
+      background: dcDarkPanelBackground,
+      fallbackBackground: dcDarkPanelBackground,
+      border: "#353535",
       accent: "oklch(84.08% 0.11 84.51)",
       label: "oklch(88.91% 0.091 87.72)",
       text: "oklch(94.12% 0.012 93.37)",
@@ -1358,15 +1705,16 @@ function renderSummaryBoxModern(
     color: palette.text,
     "border-radius": "7px",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.62,
   });
   const labelStyle = joinStyle({
     display: "block",
     margin: "0 0 9px",
     color: palette.label,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "letter-spacing": "0",
   });
   const listStyle = joinStyle({
@@ -1427,14 +1775,14 @@ function renderSummaryBoxTable(
     color: palette.label,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.2,
   });
   const itemCellStyle = joinStyle({
     padding: "5px 16px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.62,
     "vertical-align": "top",
   });
@@ -1442,7 +1790,7 @@ function renderSummaryBoxTable(
     padding: "5px 16px 13px",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.62,
     "vertical-align": "top",
   });
@@ -1453,7 +1801,7 @@ function renderSummaryBoxTable(
       const bulletStyle = joinStyle({
         color: palette.bulletBackground,
         "font-size": "20px",
-        "font-weight": 900,
+        "font-weight": 700,
         "line-height": 1,
         "vertical-align": "middle",
       });
@@ -1468,9 +1816,9 @@ function renderSummaryBoxTable(
 function heroBlockPalette(options: DcExportOptions) {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      background: "oklch(6.62% 0.012 94.34)",
-      fallbackBackground: "#050505",
-      border: "oklch(28.12% 0.03 83.2)",
+      background: dcDarkPageBackground,
+      fallbackBackground: dcDarkPageBackground,
+      border: "#383838",
       accent: "oklch(84.08% 0.11 84.51)",
       label: "oklch(84.08% 0.11 84.51)",
       title: "oklch(98.32% 0.006 93.08)",
@@ -1495,6 +1843,33 @@ function heroBlockLabel(node: JSONContent): string {
 
 function heroTextChildren(node: JSONContent): JSONContent[] {
   return childrenOf(node).filter((child) => textOf(child).trim().length > 0);
+}
+
+function heroContentParts(node: JSONContent): {
+  titleNode: JSONContent | undefined;
+  subtitleNodes: JSONContent[];
+  bodyNodes: JSONContent[];
+} {
+  const content = heroTextChildren(node);
+  const titleIndex = content.findIndex(isHeroTitleNode);
+  const titleNode = titleIndex >= 0 ? content[titleIndex] : undefined;
+  const beforeTitle = titleIndex >= 0 ? content.slice(0, titleIndex) : [];
+  const afterTitle = titleIndex >= 0 ? content.slice(titleIndex + 1) : content;
+  const firstBodyIndex = afterTitle.findIndex((child) => child.type !== "paragraph");
+
+  if (firstBodyIndex === -1) {
+    return {
+      titleNode,
+      subtitleNodes: afterTitle,
+      bodyNodes: beforeTitle,
+    };
+  }
+
+  return {
+    titleNode,
+    subtitleNodes: afterTitle.slice(0, firstBodyIndex),
+    bodyNodes: [...beforeTitle, ...afterTitle.slice(firstBodyIndex)],
+  };
 }
 
 function renderHeroInline(
@@ -1530,27 +1905,49 @@ function renderHeroContentHtml(
   titleHtml: string,
   subtitleHtml: string,
   fallbackTitleStyle: string,
+  hasBody: boolean,
 ): string {
   if (titleHtml || subtitleHtml) {
     return `${titleHtml}${subtitleHtml}`;
   }
 
+  if (hasBody) {
+    return "";
+  }
+
   return `<strong style="${fallbackTitleStyle}">강의 노트</strong>`;
 }
 
-function renderHeroBlock(node: JSONContent, options: DcExportOptions): string {
+async function renderHeroBlock(node: JSONContent, options: DcExportOptions): Promise<string> {
   return isDcTableStructure(options)
     ? renderHeroBlockTable(node, options)
     : renderHeroBlockModern(node, options);
 }
 
-function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): string {
+async function renderHeroBodyBlocks(
+  nodes: JSONContent[],
+  options: DcExportOptions,
+  textColor: string,
+  backgroundColor: string,
+): Promise<string> {
+  const body = await Promise.all(
+    nodes.map((child) =>
+      renderBlockAsync(child, options, {
+        text: textColor,
+        background: backgroundColor,
+      }),
+    ),
+  );
+
+  return body.join("");
+}
+
+async function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): Promise<string> {
   const palette = heroBlockPalette(options);
-  const content = heroTextChildren(node);
-  const titleNode = isHeroTitleNode(content[0]) ? content[0] : undefined;
+  const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
   const subtitle = renderHeroSubtitle(
-    titleNode ? content.slice(1) : content,
+    subtitleNodes,
     options,
     palette.subtitle,
     palette.background,
@@ -1569,8 +1966,9 @@ function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): str
     display: "block",
     margin: "0 0 16px",
     color: palette.label,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.2,
     "letter-spacing": "0",
   });
@@ -1578,31 +1976,32 @@ function renderHeroBlockModern(node: JSONContent, options: DcExportOptions): str
     display: "block",
     margin: "0 0 12px",
     color: palette.title,
-    "font-size": "30px",
-    "font-weight": 900,
+    "font-size": "28px",
+    "font-weight": 700,
     "line-height": 1.22,
   });
   const subtitleStyle = joinStyle({
     display: "block",
     color: palette.subtitle,
-    "font-size": "17px",
+    "font-size": safeBodyFontSize(options),
     "font-weight": 700,
     "line-height": 1.62,
   });
   const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "";
   const subtitleHtml = subtitle ? `<span style="${subtitleStyle}">${subtitle}</span>` : "";
-  const contentHtml = renderHeroContentHtml(titleHtml, subtitleHtml, titleStyle);
+  const body = await renderHeroBodyBlocks(bodyNodes, options, palette.subtitle, palette.background);
+  const contentHtml = renderHeroContentHtml(titleHtml, subtitleHtml, titleStyle, Boolean(body));
+  const bodyHtml = body ? `<div style="margin:16px 0 0">${body}</div>` : "";
 
-  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span>${contentHtml}</section>`;
+  return `<section style="${wrapperStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span>${contentHtml}${bodyHtml}</section>`;
 }
 
-function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): string {
+async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): Promise<string> {
   const palette = heroBlockPalette(options);
-  const content = heroTextChildren(node);
-  const titleNode = isHeroTitleNode(content[0]) ? content[0] : undefined;
+  const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
   const subtitle = renderHeroSubtitle(
-    titleNode ? content.slice(1) : content,
+    subtitleNodes,
     options,
     palette.subtitle,
     palette.background,
@@ -1623,19 +2022,20 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
   };
   const labelStyle = joinStyle({
     color: palette.label,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.2,
   });
   const titleStyle = joinStyle({
     color: palette.title,
-    "font-size": "30px",
-    "font-weight": 900,
+    "font-size": "28px",
+    "font-weight": 700,
     "line-height": 1.22,
   });
   const subtitleStyle = joinStyle({
     color: palette.subtitle,
-    "font-size": "17px",
+    "font-size": safeBodyFontSize(options),
     "font-weight": 700,
     "line-height": 1.62,
   });
@@ -1651,6 +2051,10 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
     ...cellBaseStyle,
     padding: "0 24px 22px",
   });
+  const bodyCellStyle = joinStyle({
+    ...cellBaseStyle,
+    padding: "0 24px 22px",
+  });
   const rows = [
     `<tr><td style="${labelCellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span></td></tr>`,
   ];
@@ -1663,8 +2067,13 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
     rows.push(`<tr><td style="${subtitleCellStyle}"><span style="${subtitleStyle}">${subtitle}</span></td></tr>`);
   }
 
-  if (!title && !subtitle) {
+  if (!title && !subtitle && bodyNodes.length === 0) {
     rows.push(`<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">강의 노트</strong></td></tr>`);
+  }
+
+  if (bodyNodes.length > 0) {
+    const body = await renderHeroBodyBlocks(bodyNodes, options, palette.subtitle, palette.background);
+    rows.push(`<tr><td style="${bodyCellStyle}">${body}</td></tr>`);
   }
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
@@ -1673,11 +2082,13 @@ function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): stri
 function tutorialBlockPalette(options: DcExportOptions) {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      background: "oklch(9.2% 0.014 94.46)",
-      fallbackBackground: "#080808",
-      cardBackground: "oklch(12.04% 0.017 94.12)",
-      border: "oklch(34.91% 0.033 83.29)",
+      background: dcDarkPageBackground,
+      fallbackBackground: dcDarkPageBackground,
+      cardBackground: dcDarkPanelBackground,
+      cardFallbackBackground: dcDarkPanelBackground,
+      border: "#353535",
       accent: "oklch(84.08% 0.11 84.51)",
+      accentFallback: "#f7d66f",
       numberText: "oklch(10.18% 0.015 94.76)",
       title: "oklch(97.22% 0.008 92.87)",
       text: "oklch(88.62% 0.016 91.83)",
@@ -1689,8 +2100,10 @@ function tutorialBlockPalette(options: DcExportOptions) {
     background: "oklch(98.38% 0.01 97.33)",
     fallbackBackground: dcTableFallbackColors.articleBackground,
     cardBackground: "oklch(99.1% 0.009 93.08)",
+    cardFallbackBackground: dcLightPageBackground,
     border: "oklch(85.31% 0.027 84.92)",
     accent: "oklch(61.2% 0.049 77.83)",
+    accentFallback: "#948163",
     numberText: "oklch(99.1% 0.006 93.08)",
     title: "oklch(25.72% 0.021 255.63)",
     text: "oklch(31.82% 0.02 255.28)",
@@ -1701,18 +2114,20 @@ function tutorialBlockPalette(options: DcExportOptions) {
 function comparisonBlockPalette(options: DcExportOptions) {
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
-      background: "oklch(8.84% 0.013 94.3)",
-      fallbackBackground: "#080808",
+      background: dcDarkPageBackground,
+      fallbackBackground: dcDarkPageBackground,
       leftBackground: "oklch(13.02% 0.026 24.58)",
       leftFallbackBackground: "#160b0a",
       leftBorder: "oklch(75.02% 0.17 24.82)",
+      leftBorderFallback: "#f87171",
       leftTitle: "oklch(93.14% 0.03 24.92)",
       rightBackground: "oklch(12.42% 0.022 154.8)",
       rightFallbackBackground: "#07130d",
       rightBorder: "oklch(76.71% 0.151 154.54)",
+      rightBorderFallback: "#4ade80",
       rightTitle: "oklch(92.34% 0.029 154.17)",
       text: "oklch(91.88% 0.016 91.83)",
-      divider: "oklch(31.22% 0.028 84.54)",
+      divider: "#353535",
     };
   }
 
@@ -1722,10 +2137,12 @@ function comparisonBlockPalette(options: DcExportOptions) {
     leftBackground: "oklch(97.18% 0.032 24.18)",
     leftFallbackBackground: "#fff0ee",
     leftBorder: "oklch(62.42% 0.178 24.04)",
+    leftBorderFallback: "#ef4444",
     leftTitle: "oklch(34.1% 0.098 24.62)",
     rightBackground: "oklch(96.78% 0.033 154.76)",
     rightFallbackBackground: "#e9f9ef",
     rightBorder: "oklch(66.42% 0.152 154.12)",
+    rightBorderFallback: "#22c55e",
     rightTitle: "oklch(29.24% 0.08 154.12)",
     text: "oklch(31.82% 0.02 255.28)",
     divider: "oklch(85.31% 0.027 84.92)",
@@ -1738,6 +2155,10 @@ function tutorialStepTitle(node: JSONContent, index: number): string {
   }
 
   return `단계 ${index + 1}`;
+}
+
+function tutorialStepNumber(node: JSONContent, index: number): string {
+  return normalizeTutorialStepNumber(node.attrs?.number, index + 1);
 }
 
 async function renderTutorialBlock(node: JSONContent, options: DcExportOptions): Promise<string> {
@@ -1775,7 +2196,7 @@ async function renderTutorialBlockModern(
   const wrapperStyle = joinStyle({
     margin: "0 0 18px",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.66,
   });
   const cardStyle = joinStyle({
@@ -1799,31 +2220,32 @@ async function renderTutorialBlockModern(
   });
   const numberStyle = joinStyle({
     display: "inline-block",
-    "min-width": "30px",
-    padding: "4px 0",
-    "border-radius": "999px",
+    "min-width": "34px",
+    height: "22px",
+    padding: "0",
+    "border-radius": "4px",
     "background-color": palette.accent,
     color: palette.numberText,
     "font-size": "12px",
-    "font-weight": 900,
-    "line-height": 1.1,
+    "font-weight": 700,
+    "line-height": "22px",
     "text-align": "center",
   });
   const titleStyle = joinStyle({
     display: "table-cell",
     color: palette.title,
     "font-size": "18px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.32,
     "vertical-align": "middle",
   });
   const bodyStyle = joinStyle({
     color: palette.text,
-    "padding-left": "42px",
+    "padding-left": "34px",
   });
   const cards = await Promise.all(
     steps.map(async (step, index) => {
-      const number = String(index + 1).padStart(2, "0");
+      const number = tutorialStepNumber(step, index);
       const title = escapeHtml(tutorialStepTitle(step, index));
       const body = await renderTutorialStepBody(
         step,
@@ -1853,24 +2275,17 @@ async function renderTutorialBlockTable(
     border: `1px solid ${palette.border}`,
     "border-left": `4px solid ${palette.accent}`,
   });
-  const numberStyle = joinStyle({
-    display: "inline-block",
-    "min-width": "30px",
-    padding: "4px 0",
-    "border-radius": "999px",
-    "background-color": palette.accent,
-    color: palette.numberText,
-    "font-size": "12px",
-    "font-weight": 900,
-    "line-height": 1.1,
-    "text-align": "center",
+  const numberCellStyle = joinStyle({
+    width: "62px",
+    padding: "14px 0 8px 28px",
+    "vertical-align": "middle",
   });
   const headCellStyle = joinStyle({
-    padding: "14px 16px 8px 28px",
+    padding: "14px 16px 8px 0",
     color: palette.title,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "18px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.32,
     "vertical-align": "middle",
   });
@@ -1878,20 +2293,24 @@ async function renderTutorialBlockTable(
     color: palette.title,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "18px",
-    "font-weight": 900,
+    "font-weight": 700,
     "line-height": 1.32,
     "vertical-align": "middle",
   });
   const bodyCellStyle = joinStyle({
-    padding: "0 16px 14px 74px",
+    padding: "0 16px 14px 0",
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.66,
+  });
+  const bodySpacerCellStyle = joinStyle({
+    width: "62px",
+    padding: "0",
   });
   const cards = await Promise.all(
     steps.map(async (step, index) => {
-      const number = String(index + 1).padStart(2, "0");
+      const number = tutorialStepNumber(step, index);
       const title = escapeHtml(tutorialStepTitle(step, index));
       const body = await renderTutorialStepBody(
         step,
@@ -1899,9 +2318,20 @@ async function renderTutorialBlockTable(
         palette.text,
         palette.cardBackground,
       );
-      const bodyRow = body ? `<tr><td style="${bodyCellStyle}">${body}</td></tr>` : "";
+      const badge = renderDcRoundedBadge({
+        text: number,
+        backgroundColor: palette.accent,
+        fallbackBackgroundColor: palette.accentFallback,
+        textColor: palette.numberText,
+        width: 34,
+        height: 22,
+        fontSize: 12,
+      });
+      const bodyRow = body
+        ? `<tr><td style="${bodySpacerCellStyle}">&nbsp;</td><td style="${bodyCellStyle}">${body}</td></tr>`
+        : "";
 
-      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${headCellStyle}"><span style="${numberStyle}">${number}</span>&nbsp;&nbsp;&nbsp;<strong style="${titleStyle}">${title}</strong></td></tr>${bodyRow}</tbody></table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.cardFallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}">${badge}</td><td style="${headCellStyle}"><strong style="${titleStyle}">${title}</strong></td></tr>${bodyRow}</tbody></table>`;
     }),
   );
 
@@ -1957,7 +2387,7 @@ async function renderComparisonBlockModern(
     "border-spacing": "10px 0",
     "table-layout": "fixed",
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.64,
   });
   const titleStyle = (color: string) =>
@@ -1966,7 +2396,7 @@ async function renderComparisonBlockModern(
       margin: "0 0 8px",
       color,
       "font-size": "12px",
-      "font-weight": 900,
+      "font-weight": 700,
       "letter-spacing": "0",
     });
   const columnStyle = (side: "left" | "right") => {
@@ -2009,8 +2439,7 @@ async function renderComparisonBlockTable(
   const tableStyle = joinStyle({
     width: "100%",
     margin: "0 0 18px",
-    "border-collapse": "separate",
-    "border-spacing": "8px 0",
+    "border-collapse": "collapse",
     "background-color": palette.background,
     "table-layout": "fixed",
   });
@@ -2021,30 +2450,50 @@ async function renderComparisonBlockTable(
       color,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
       "font-size": "12px",
-      "font-weight": 900,
+      "font-weight": 700,
       "line-height": 1.2,
     });
   const cellStyle = (side: "left" | "right") => {
     const isRight = side === "right";
 
     return joinStyle({
-      width: "50%",
+      width: "49%",
       padding: "13px 15px",
       border: `1px solid ${palette.divider}`,
-      "border-left": `4px solid ${isRight ? palette.rightBorder : palette.leftBorder}`,
+      "border-left": "0",
       "background-color": isRight ? palette.rightBackground : palette.leftBackground,
       color: palette.text,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
-      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-size": safeBodyFontSize(options),
       "line-height": 1.64,
       "vertical-align": "top",
+    });
+  };
+  const spacerCellStyle = joinStyle({
+    width: "2%",
+    padding: "0",
+    "font-size": "0",
+    "line-height": "0",
+    "background-color": palette.background,
+  });
+  const accentCellStyle = (side: "left" | "right") => {
+    const isRight = side === "right";
+
+    return joinStyle({
+      width: "4px",
+      padding: "0",
+      "background-color": isRight ? palette.rightBorder : palette.leftBorder,
+      "font-size": "0",
+      "line-height": "0",
     });
   };
   const cells = await Promise.all(
     columns.map(async (column, index) => {
       const side = index === 1 ? "right" : "left";
+      const isRight = side === "right";
       const fallbackBackground =
-        side === "right" ? palette.rightFallbackBackground : palette.leftFallbackBackground;
+        isRight ? palette.rightFallbackBackground : palette.leftFallbackBackground;
+      const accentColor = isRight ? palette.rightBorderFallback : palette.leftBorderFallback;
       const title = escapeHtml(
         comparisonColumnTitle(column, side === "right" ? "After" : "Before"),
       );
@@ -2052,11 +2501,11 @@ async function renderComparisonBlockTable(
       const backgroundColor = side === "right" ? palette.rightBackground : palette.leftBackground;
       const body = await renderComparisonColumnBody(column, options, palette.text, backgroundColor);
 
-      return `<td width="50%" bgcolor="${fallbackBackground}" style="${cellStyle(side)}"><strong style="${titleStyle(titleColor)}">${title}</strong>${body}</td>`;
+      return `<td width="4" bgcolor="${accentColor}" style="${accentCellStyle(side)}">&nbsp;</td><td width="49%" bgcolor="${fallbackBackground}" style="${cellStyle(side)}"><strong style="${titleStyle(titleColor)}">${title}</strong>${body}</td>`;
     }),
   );
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells.join("")}</tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells[0]}<td width="2%" bgcolor="${palette.fallbackBackground}" style="${spacerCellStyle}">&nbsp;</td>${cells[1]}</tr></tbody></table>`;
 }
 
 async function renderBlockAsync(
@@ -2125,13 +2574,13 @@ export async function exportDocumentToDcHtml(
   options: DcExportOptions,
 ): Promise<string> {
   const palette = documentPalette(options);
-  const body = await renderBlockAsync(document, options);
+  const body = await renderBlockAsync(document, options, { proseTableSafe: true });
   const wrapperStyle = joinStyle({
     display: "block",
     "background-color": palette.articleBackground,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeSize(options.bodyFontSize, "15px"),
+    "font-size": safeBodyFontSize(options),
     "line-height": 1.7,
     padding: "18px",
     "box-sizing": "border-box",
@@ -2144,7 +2593,7 @@ export async function exportDocumentToDcHtml(
       "background-color": palette.articleBackground,
       color: palette.text,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
-      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-size": safeBodyFontSize(options),
       "line-height": 1.7,
     });
     const cellStyle = joinStyle({
@@ -2152,13 +2601,16 @@ export async function exportDocumentToDcHtml(
       "background-color": palette.articleBackground,
       color: palette.text,
       "font-family": safeProseFontFamily(options.bodyFontFamily),
-      "font-size": safeSize(options.bodyFontSize, "15px"),
+      "font-size": safeBodyFontSize(options),
       "line-height": 1.7,
       "box-sizing": "border-box",
     });
 
-    return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
+    return compactInheritedProseStyles(
+      `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`,
+      options,
+    );
   }
 
-  return `<div style="${wrapperStyle}">${body}</div>`;
+  return compactInheritedProseStyles(`<div style="${wrapperStyle}">${body}</div>`, options);
 }

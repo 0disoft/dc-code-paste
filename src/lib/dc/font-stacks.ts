@@ -39,25 +39,12 @@ export const proseFallbackFonts = [
   "Pretendard",
   "Noto Sans KR",
   "Noto Sans CJK KR",
-  "SUIT",
-  "Wanted Sans",
-  "Spoqa Han Sans Neo",
-  "Spoqa Han Sans",
-  "Source Han Sans K",
-  "Source Han Sans KR",
   "본고딕",
   "Nanum Gothic",
-  "NanumGothic",
-  "NanumSquare",
   "NanumSquare Neo",
-  "NanumBarunGothic",
   "나눔고딕",
   "나눔스퀘어",
   "나눔바른고딕",
-  "IBM Plex Sans KR",
-  "Gmarket Sans",
-  "Arial Unicode MS",
-  "Apple SD Gothic Neo",
   "AppleGothic",
   "Segoe UI",
   "Malgun Gothic",
@@ -89,43 +76,19 @@ export const serifFallbackFonts = [
 
 export const codeFallbackFonts = [
   "Cascadia Mono",
-  "Cascadia Code",
-  "Cascadia Mono PL",
-  "Cascadia Code PL",
+  "Pretendard",
   "D2Coding",
-  "D2Coding ligature",
-  "D2CodingLigature",
   "나눔고딕코딩",
-  "NanumGothicCoding",
-  "Nanum Gothic Coding",
-  "Noto Sans Mono CJK KR",
   "Noto Sans Mono CJK",
-  "Noto Sans Mono",
-  "Source Han Mono K",
-  "Source Han Mono KR",
-  "Sarasa Mono K",
-  "Sarasa Gothic K",
   "JetBrains Mono",
   "Fira Code",
-  "Fira Mono",
   "Hack",
   "Source Code Pro",
   "IBM Plex Mono",
   "Roboto Mono",
-  "Iosevka",
-  "Iosevka Fixed",
-  "Monaspace Neon",
-  "Monaspace Argon",
-  "DejaVu Sans Mono",
-  "Liberation Mono",
-  "Ubuntu Mono",
-  "Bitstream Vera Sans Mono",
   "Consolas",
-  "SFMono-Regular",
   "Menlo",
   "Monaco",
-  "Lucida Console",
-  "Courier New",
   "monospace",
 ] as const;
 
@@ -195,6 +158,14 @@ function fallbackFontsFor(
   return proseFallbackFonts;
 }
 
+function compactProseFallbackFonts(primaryFonts: readonly string[]): readonly string[] {
+  if (hasAnySignal(primaryFonts, serifSignals)) {
+    return ["Batang", "serif"];
+  }
+
+  return ["Malgun Gothic", "맑은 고딕", "sans-serif"];
+}
+
 export function buildFontStack(
   primaryFonts: readonly string[],
   mode: "prose" | "code" = "prose",
@@ -213,6 +184,17 @@ export function safeProseFontFamily(value = ""): string {
 
 export function safeCodeFontFamily(value = ""): string {
   return buildFontStack(parseFontFamily(value), "code");
+}
+
+export function safeDcProseFontFamily(value = ""): string {
+  const primaryFonts = parseFontFamily(value);
+  const selectedFonts = primaryFonts.length > 0 ? primaryFonts : ["Malgun Gothic"];
+
+  return appendFallbackFonts(selectedFonts.slice(0, 1), compactProseFallbackFonts(selectedFonts));
+}
+
+export function safeDcCodeFontFamily(): string {
+  return appendFallbackFonts([], ["Cascadia Mono", "Pretendard", "D2Coding", "monospace"]);
 }
 
 export const defaultProseFontFamily = safeProseFontFamily();
