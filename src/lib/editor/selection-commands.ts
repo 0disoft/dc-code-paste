@@ -2,6 +2,8 @@ import type { Command } from "@tiptap/core";
 import type { Fragment, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { calloutNodeNameByKind, defaultCalloutLabel, type CalloutKind } from "./callout";
+import { normalizeCalloutToneColor } from "./callout-palette";
+import { normalizeEditableLinkHref } from "./link";
 
 type Dispatch = (transaction: Transaction) => void;
 
@@ -74,6 +76,7 @@ export function replaceSelectedInlineRangeWithCallout(
   state: EditorState,
   dispatch: Dispatch | undefined,
   kind: CalloutKind,
+  toneColor?: string,
 ): boolean {
   const calloutType = state.schema.nodes[calloutNodeNameByKind[kind]];
   const paragraphType = state.schema.nodes.paragraph;
@@ -83,7 +86,10 @@ export function replaceSelectedInlineRangeWithCallout(
     return false;
   }
 
-  const attrs = { label: defaultCalloutLabel(kind) };
+  const attrs = {
+    label: defaultCalloutLabel(kind),
+    toneColor: normalizeCalloutToneColor(toneColor, kind),
+  };
 
   if (blockContent) {
     return dispatchReplacement(state, dispatch, calloutType.create(attrs, blockContent));
@@ -108,6 +114,8 @@ export function replaceSelectedInlineRangeWithCodeBlock(
   language: string,
   highlightLines = "",
   filename = "",
+  additionLines = "",
+  deletionLines = "",
 ): boolean {
   const codeBlockType = state.schema.nodes.codeBlock;
   const text = selectedInlineText(state);
@@ -119,7 +127,10 @@ export function replaceSelectedInlineRangeWithCodeBlock(
   return dispatchReplacement(
     state,
     dispatch,
-    codeBlockType.create({ language, highlightLines, filename }, state.schema.text(text)),
+    codeBlockType.create(
+      { language, highlightLines, filename, additionLines, deletionLines },
+      state.schema.text(text),
+    ),
   );
 }
 
@@ -131,13 +142,14 @@ export function replaceSelectedInlineRangeWithLinkBox(
   const linkBoxType = state.schema.nodes.linkBox;
   const paragraphType = state.schema.nodes.paragraph;
   const blockContent = selectedBlockContent(state);
+  const normalizedHref = normalizeEditableLinkHref(href);
 
-  if (!linkBoxType || !paragraphType || !href) {
+  if (!linkBoxType || !paragraphType || !normalizedHref) {
     return false;
   }
 
   if (blockContent) {
-    return dispatchReplacement(state, dispatch, linkBoxType.create({ href }, blockContent));
+    return dispatchReplacement(state, dispatch, linkBoxType.create({ href: normalizedHref }, blockContent));
   }
 
   const inlineContent = selectedInlineContent(state);
@@ -149,7 +161,7 @@ export function replaceSelectedInlineRangeWithLinkBox(
   return dispatchReplacement(
     state,
     dispatch,
-    linkBoxType.create({ href }, paragraphType.create(null, inlineContent)),
+    linkBoxType.create({ href: normalizedHref }, paragraphType.create(null, inlineContent)),
   );
 }
 
@@ -171,11 +183,11 @@ export function replaceSelectedInlineRangeWithCtaButton(
   state: EditorState,
   dispatch: Dispatch | undefined,
   href: string,
-  fallbackLabel = "바로가기",
 ): boolean {
   const ctaButtonType = state.schema.nodes.ctaButton;
+  const normalizedHref = normalizeEditableLinkHref(href);
 
-  if (!ctaButtonType || !href) {
+  if (!ctaButtonType || !normalizedHref) {
     return false;
   }
 
@@ -188,21 +200,35 @@ export function replaceSelectedInlineRangeWithCtaButton(
   return dispatchReplacement(
     state,
     dispatch,
-    ctaButtonType.create({ href }, inlineContent || state.schema.text(fallbackLabel)),
+    ctaButtonType.create({ href: normalizedHref }, inlineContent),
   );
 }
 
-export function selectedInlineRangeToCalloutCommand(kind: CalloutKind): Command {
-  return ({ state, dispatch }) => replaceSelectedInlineRangeWithCallout(state, dispatch, kind);
+export function selectedInlineRangeToCalloutCommand(
+  kind: CalloutKind,
+  toneColor?: string,
+): Command {
+  return ({ state, dispatch }) =>
+    replaceSelectedInlineRangeWithCallout(state, dispatch, kind, toneColor);
 }
 
 export function selectedInlineRangeToCodeBlockCommand(
   language: string,
   highlightLines = "",
   filename = "",
+  additionLines = "",
+  deletionLines = "",
 ): Command {
   return ({ state, dispatch }) =>
-    replaceSelectedInlineRangeWithCodeBlock(state, dispatch, language, highlightLines, filename);
+    replaceSelectedInlineRangeWithCodeBlock(
+      state,
+      dispatch,
+      language,
+      highlightLines,
+      filename,
+      additionLines,
+      deletionLines,
+    );
 }
 
 export function selectedInlineRangeToLinkBoxCommand(href: string): Command {
@@ -213,10 +239,7 @@ export function selectedInlineRangeToSectionHeadingCommand(): Command {
   return ({ state, dispatch }) => replaceSelectedInlineRangeWithSectionHeading(state, dispatch);
 }
 
-export function selectedInlineRangeToCtaButtonCommand(
-  href: string,
-  fallbackLabel?: string,
-): Command {
+export function selectedInlineRangeToCtaButtonCommand(href: string): Command {
   return ({ state, dispatch }) =>
-    replaceSelectedInlineRangeWithCtaButton(state, dispatch, href, fallbackLabel);
+    replaceSelectedInlineRangeWithCtaButton(state, dispatch, href);
 }

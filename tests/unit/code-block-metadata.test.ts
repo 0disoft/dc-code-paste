@@ -7,4 +7,8 @@ describe("code block metadata", () => {
     expect(normalizeCodeFilename("bad<script>.ts")).toBe("badscript.ts");
     expect(normalizeCodeFilename("app   config.ts")).toBe("app config.ts");
   });
+
+  it("preserves full unicode code points while filtering control characters", () => {
+    expect(normalizeCodeFilename("go-🚀\u0000-main.go")).toBe("go-🚀-main.go");
+  });
 });

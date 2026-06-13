@@ -134,6 +134,25 @@ describe("highlightForDcHtml", () => {
     expect(html).not.toContain("oklch(");
   }, 15_000);
 
+  it("adds manual addition and deletion colors to selected code lines", async () => {
+    const html = await highlightForDcHtml("int oldValue = 1;\nint newValue = 2;\nreturn newValue;", {
+      language: "cpp",
+      theme: "github-dark",
+      showBackground: true,
+      showLineNumbers: true,
+      additionLines: "2",
+      deletionLines: "1",
+    });
+
+    expect(html).toContain(">1</span>");
+    expect(html).toContain(">2</span>");
+    expect(html).toContain("oldValue");
+    expect(html).toContain("newValue");
+    expect(html.match(/border-left:4px solid #[0-9a-f]{6}/g)).toHaveLength(2);
+    expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
+    expect(html).not.toContain("oklch(");
+  }, 15_000);
+
   it("renders a filename header for code blocks", async () => {
     const html = await highlightForDcHtml("export const value = 1;", {
       language: "typescript",

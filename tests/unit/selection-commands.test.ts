@@ -59,7 +59,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "he" }] },
         {
           type: "tipBox",
-          attrs: { label: "TIP" },
+          attrs: { label: "TIP", toneColor: "#16a34a" },
           content: [
             {
               type: "paragraph",
@@ -128,7 +128,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "al" }] },
         {
           type: "referenceBox",
-          attrs: { label: "REF" },
+          attrs: { label: "REF", toneColor: "#2563eb" },
           content: [
             { type: "paragraph", content: [{ type: "text", text: "pha beta" }] },
             { type: "paragraph", content: [{ type: "text", text: "gamma" }] },
@@ -161,7 +161,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "watch " }] },
         {
           type: "emphasisBox",
-          attrs: { label: "POINT" },
+          attrs: { label: "POINT", toneColor: "#9333ea" },
           content: [
             {
               type: "paragraph",
@@ -196,7 +196,7 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: "challenge " }] },
         {
           type: "rebuttalBox",
-          attrs: { label: "반박" },
+          attrs: { label: "반박", toneColor: "#db2777" },
           content: [
             {
               type: "paragraph",
@@ -241,6 +241,25 @@ describe("selection commands", () => {
         },
       ],
     });
+  });
+
+  it("rejects unsafe link box href values before creating editor nodes", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("read the reference")]),
+    ]);
+    const state = createState(doc, 10, 19);
+    let dispatched = false;
+
+    const handled = replaceSelectedInlineRangeWithLinkBox(
+      state,
+      () => {
+        dispatched = true;
+      },
+      "javascript:alert(1)",
+    );
+
+    expect(handled).toBe(false);
+    expect(dispatched).toBe(false);
   });
 
   it("turns a selected range into an editorial section heading", () => {
@@ -296,6 +315,25 @@ describe("selection commands", () => {
         { type: "paragraph", content: [{ type: "text", text: " now" }] },
       ],
     });
+  });
+
+  it("rejects unsafe CTA href values before creating editor nodes", () => {
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("open archive now")]),
+    ]);
+    const state = createState(doc, 6, 13);
+    let dispatched = false;
+
+    const handled = replaceSelectedInlineRangeWithCtaButton(
+      state,
+      () => {
+        dispatched = true;
+      },
+      "data:text/html,<script>alert(1)</script>",
+    );
+
+    expect(handled).toBe(false);
+    expect(dispatched).toBe(false);
   });
 
   it("turns a partial multi-paragraph selection into one code block", () => {

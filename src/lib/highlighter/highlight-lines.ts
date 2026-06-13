@@ -1,3 +1,5 @@
+export const maxHighlightLineNumber = 10_000;
+
 export function normalizeHighlightLines(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -18,7 +20,13 @@ export function normalizeHighlightLines(value: unknown): string {
 
     const from = Math.min(start, end);
     const to = Math.max(start, end);
-    const key = from === to ? String(from) : `${from}-${to}`;
+
+    if (from > maxHighlightLineNumber) {
+      continue;
+    }
+
+    const cappedTo = Math.min(to, maxHighlightLineNumber);
+    const key = from === cappedTo ? String(from) : `${from}-${cappedTo}`;
 
     if (!seen.has(key)) {
       seen.add(key);
@@ -47,7 +55,7 @@ export function highlightedLineIndexes(value: unknown, lineCount: number): Set<n
     }
 
     const from = Math.max(1, Math.min(start, end));
-    const to = Math.min(lineCount, Math.max(start, end));
+    const to = Math.min(lineCount, maxHighlightLineNumber, Math.max(start, end));
 
     for (let line = from; line <= to; line += 1) {
       indexes.add(line - 1);

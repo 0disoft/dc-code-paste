@@ -10,10 +10,15 @@ import { normalizeQuoteStyle } from "$lib/editor/quote-style";
 import { calloutExtensions } from "./callout-extension";
 import { editorialExtensions } from "./editorial-extension";
 import { LinkBox } from "./link-box-extension";
+import { createCodeBlockHighlightPlugin } from "./code-block-highlight";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 
 const DcCodeBlock = CodeBlock.extend({
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() ?? []), createCodeBlockHighlightPlugin()];
+  },
+
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -24,6 +29,24 @@ const DcCodeBlock = CodeBlock.extend({
           const highlightLines = normalizeHighlightLines(attributes.highlightLines);
 
           return highlightLines ? { "data-highlight-lines": highlightLines } : {};
+        },
+      },
+      additionLines: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-addition-lines") ?? "",
+        renderHTML: (attributes) => {
+          const additionLines = normalizeHighlightLines(attributes.additionLines);
+
+          return additionLines ? { "data-addition-lines": additionLines } : {};
+        },
+      },
+      deletionLines: {
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-deletion-lines") ?? "",
+        renderHTML: (attributes) => {
+          const deletionLines = normalizeHighlightLines(attributes.deletionLines);
+
+          return deletionLines ? { "data-deletion-lines": deletionLines } : {};
         },
       },
       filename: {

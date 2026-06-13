@@ -87,8 +87,12 @@ function isJsonContent(value: unknown, depth = 0): value is JSONContent {
   return typeof value.type === "string" || typeof value.text === "string";
 }
 
-function isExportStructure(value: unknown): value is DcExportStructure {
-  return value === "modern" || value === "dcTable";
+function normalizeExportStructure(value: unknown): DcExportStructure | undefined {
+  if (value === "dcTable" || value === "modern") {
+    return "dcTable";
+  }
+
+  return undefined;
 }
 
 function isDocumentTheme(value: unknown): value is DcDocumentTheme {
@@ -99,6 +103,8 @@ function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined
   if (!isRecord(value)) {
     return undefined;
   }
+
+  const structure = normalizeExportStructure(value.structure);
 
   if (
     typeof value.language !== "string" ||
@@ -111,7 +117,7 @@ function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined
     typeof value.selectionFontSize !== "string" ||
     typeof value.codeFontSize !== "string" ||
     typeof value.showLineNumbers !== "boolean" ||
-    !isExportStructure(value.structure)
+    !structure
   ) {
     return undefined;
   }
@@ -126,7 +132,7 @@ function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined
     codeFontSize: value.codeFontSize,
     showLineNumbers: value.showLineNumbers,
     documentTheme: isDocumentTheme(value.documentTheme) ? value.documentTheme : "lightLecture",
-    structure: value.structure,
+    structure,
   };
 }
 

@@ -15,12 +15,12 @@ import {
 
 const preferences: DraftPreferences = {
   language: "cpp",
-  theme: "github-dark",
+  theme: "catppuccin-mocha",
   bodyFontFamily: "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif",
-  bodyFontSize: "15px",
+  bodyFontSize: "18px",
   selectionFontFamily: "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif",
-  selectionFontSize: "15px",
-  codeFontSize: "14px",
+  selectionFontSize: "18px",
+  codeFontSize: "16px",
   showLineNumbers: true,
   documentTheme: "darkEditorial",
   structure: "dcTable",
@@ -106,6 +106,19 @@ describe("preset storage", () => {
 
     expect(nextPresets).toHaveLength(1);
     expect(nextPresets[0]?.id).toBe(second.id);
+
+    const writeFailingStorage = {
+      getItem: storage.getItem.bind(storage),
+      setItem() {
+        throw new Error("blocked");
+      },
+      removeItem: storage.removeItem.bind(storage),
+    };
+
+    const preservedPresets = deletePresetSnapshot(writeFailingStorage, second.id);
+
+    expect(preservedPresets).toHaveLength(1);
+    expect(preservedPresets[0]?.id).toBe(second.id);
   });
 
   it("renames presets without changing their saved content", () => {

@@ -1,5 +1,10 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 import { defaultCalloutLabel, type CalloutKind, type CalloutNodeName } from "./callout";
+import {
+  calloutEditorStyleAttribute,
+  defaultCalloutToneColor,
+  normalizeCalloutToneColor,
+} from "./callout-palette";
 
 function createCalloutExtension(kind: CalloutKind, name: CalloutNodeName) {
   return Node.create({
@@ -17,6 +22,18 @@ function createCalloutExtension(kind: CalloutKind, name: CalloutNodeName) {
           renderHTML: (attributes) => {
             const label = typeof attributes.label === "string" ? attributes.label.trim() : "";
             return label ? { "data-label": label } : {};
+          },
+        },
+        toneColor: {
+          default: defaultCalloutToneColor(kind),
+          parseHTML: (element) =>
+            normalizeCalloutToneColor(element.getAttribute("data-tone-color"), kind),
+          renderHTML: (attributes) => {
+            const toneColor = normalizeCalloutToneColor(attributes.toneColor, kind);
+            return {
+              "data-tone-color": toneColor,
+              style: calloutEditorStyleAttribute(toneColor, kind),
+            };
           },
         },
       };

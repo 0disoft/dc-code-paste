@@ -149,8 +149,9 @@ export function renamePresetSnapshot(
 }
 
 export function deletePresetSnapshot(storage: PresetStorage, id: string): PresetSnapshot[] {
-  const nextPresets = readPresetSnapshots(storage).filter((preset) => preset.id !== id);
-  return writePresetSnapshots(storage, nextPresets) ? nextPresets : readPresetSnapshots(storage);
+  const current = readPresetSnapshots(storage);
+  const nextPresets = current.filter((preset) => preset.id !== id);
+  return writePresetSnapshots(storage, nextPresets) ? nextPresets : current;
 }
 
 export function clearPresetSnapshots(storage: PresetStorage): boolean {

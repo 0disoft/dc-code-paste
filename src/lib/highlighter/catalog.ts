@@ -77,7 +77,7 @@ export type DcLanguageId = (typeof supportedLanguages)[number]["id"];
 export type DcThemeId = (typeof supportedThemes)[number]["id"];
 
 export const defaultLanguage: DcLanguageId = "cpp";
-export const defaultTheme: DcThemeId = "github-dark";
+export const defaultTheme: DcThemeId = "catppuccin-mocha";
 
 export function isSupportedLanguage(value: string): value is DcLanguageId {
   return supportedLanguages.some((language) => language.id === value);

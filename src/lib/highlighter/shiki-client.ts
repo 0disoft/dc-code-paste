@@ -94,6 +94,20 @@ const themeInputs: Record<DcThemeId, ThemeInput> = {
 let highlighterPromise: Promise<HighlighterCore> | undefined;
 const languagePromises = new Map<string, Promise<void>>();
 const themePromises = new Map<DcThemeId, Promise<void>>();
+const lightThemes = new Set<DcThemeId>([
+  "github-light",
+  "github-light-high-contrast",
+  "vitesse-light",
+  "min-light",
+  "one-light",
+  "catppuccin-latte",
+  "night-owl-light",
+  "kanagawa-lotus",
+  "rose-pine-dawn",
+  "gruvbox-light-medium",
+  "solarized-light",
+  "light-plus",
+]);
 
 function getHighlighter(): Promise<HighlighterCore> {
   highlighterPromise ??= createHighlighterCore({
@@ -151,20 +165,17 @@ export type HighlightOptions = {
   filename?: string;
   fontSize?: string;
   highlightLines?: string;
+  additionLines?: string;
+  deletionLines?: string;
 };
 
 function isLightTheme(theme: DcThemeId) {
-  return (
-    theme.includes("light") ||
-    theme.includes("latte") ||
-    theme.includes("dawn") ||
-    theme.includes("lotus")
-  );
+  return lightThemes.has(theme);
 }
 
-function diffLineDecorations(code: string, theme: DcThemeId) {
+function diffDecorationPalette(theme: DcThemeId) {
   const light = isLightTheme(theme);
-  const palette = light
+  return light
     ? {
         additionBackground: "oklch(93.52% 0.05 145.61 / 0.72)",
         additionForeground: "oklch(36.62% 0.116 145.55)",
@@ -187,22 +198,35 @@ function diffLineDecorations(code: string, theme: DcThemeId) {
         hunkForeground: "oklch(84.11% 0.09 254.12)",
         hunkBorder: "oklch(66.24% 0.136 253.1)",
       };
+}
 
+type DiffDecorationPalette = ReturnType<typeof diffDecorationPalette>;
+
+function additionDecoration(palette: DiffDecorationPalette) {
+  return {
+    background: palette.additionBackground,
+    foreground: palette.additionForeground,
+    borderColor: palette.additionBorder,
+  };
+}
+
+function deletionDecoration(palette: DiffDecorationPalette) {
+  return {
+    background: palette.deletionBackground,
+    foreground: palette.deletionForeground,
+    borderColor: palette.deletionBorder,
+  };
+}
+
+function diffLineDecorations(code: string, theme: DcThemeId) {
+  const palette = diffDecorationPalette(theme);
   return code.split("\n").map((line) => {
     if (line.startsWith("+") && !line.startsWith("+++")) {
-      return {
-        background: palette.additionBackground,
-        foreground: palette.additionForeground,
-        borderColor: palette.additionBorder,
-      };
+      return additionDecoration(palette);
     }
 
     if (line.startsWith("-") && !line.startsWith("---")) {
-      return {
-        background: palette.deletionBackground,
-        foreground: palette.deletionForeground,
-        borderColor: palette.deletionBorder,
-      };
+      return deletionDecoration(palette);
     }
 
     if (line.startsWith("@@")) {
@@ -211,6 +235,35 @@ function diffLineDecorations(code: string, theme: DcThemeId) {
         foreground: palette.hunkForeground,
         borderColor: palette.hunkBorder,
       };
+    }
+
+    return undefined;
+  });
+}
+
+function changedLineDecorations(
+  code: string,
+  theme: DcThemeId,
+  additionLines: string | undefined,
+  deletionLines: string | undefined,
+) {
+  const lines = code.split("\n");
+  const additionIndexes = highlightedLineIndexes(additionLines, lines.length);
+  const deletionIndexes = highlightedLineIndexes(deletionLines, lines.length);
+
+  if (additionIndexes.size === 0 && deletionIndexes.size === 0) {
+    return undefined;
+  }
+
+  const palette = diffDecorationPalette(theme);
+
+  return lines.map((_, index) => {
+    if (deletionIndexes.has(index)) {
+      return deletionDecoration(palette);
+    }
+
+    if (additionIndexes.has(index)) {
+      return additionDecoration(palette);
     }
 
     return undefined;
@@ -282,6 +335,12 @@ export async function highlightForDcHtml(code: string, options: HighlightOptions
   });
   const diffDecorations =
     shikiLanguage === "diff" ? diffLineDecorations(sourceCode, options.theme) : undefined;
+  const changedLines = changedLineDecorations(
+    sourceCode,
+    options.theme,
+    options.additionLines,
+    options.deletionLines,
+  );
   const lineHighlights = highlightedLineDecorations(
     sourceCode,
     options.theme,
@@ -296,6 +355,9 @@ export async function highlightForDcHtml(code: string, options: HighlightOptions
     fontSize: options.fontSize,
     showBackground: options.showBackground,
     showLineNumbers: options.showLineNumbers,
-    lineDecorations: mergeLineDecorations(diffDecorations, lineHighlights),
+    lineDecorations: mergeLineDecorations(
+      diffDecorations,
+      mergeLineDecorations(changedLines, lineHighlights),
+    ),
   });
 }

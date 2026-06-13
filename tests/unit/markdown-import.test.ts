@@ -94,6 +94,60 @@ describe("markdown import", () => {
     });
   });
 
+  it("keeps inline formatting inside markdown list items", () => {
+    expect(
+      parseMarkdownToDocument(
+        [
+          "- **굵게** 표시하고 [문서](https://example.com/docs)를 연결한다.",
+          "- `channel` 값을 확인한다.",
+        ].join("\n"),
+      ).content?.[0],
+    ).toEqual({
+      type: "bulletList",
+      content: [
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "굵게", marks: [{ type: "bold" }] },
+                { type: "text", text: " 표시하고 " },
+                {
+                  type: "text",
+                  text: "문서",
+                  marks: [
+                    {
+                      type: "link",
+                      attrs: {
+                        href: "https://example.com/docs",
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                      },
+                    },
+                  ],
+                },
+                { type: "text", text: "를 연결한다." },
+              ],
+            },
+          ],
+        },
+        {
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "channel", marks: [{ type: "code" }] },
+                { type: "text", text: " 값을 확인한다." },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("keeps diff and patch code fences as diff-style code blocks", () => {
     expect(
       parseMarkdownToDocument(["```patch", "-old", "+new", "```"].join("\n")).content?.[0],
@@ -138,6 +192,47 @@ describe("markdown import", () => {
     });
   });
 
+  it("keeps fenced code addition and deletion metadata", () => {
+    expect(
+      parseMarkdownToDocument(
+        [
+          '```cpp {5-6} add=7 delete=2 title="main.cpp"',
+          "#include <iostream>",
+          "using namespace std;",
+          "",
+          "int main() {",
+          "  ios::sync_with_stdio(false);",
+          "  cin.tie(nullptr);",
+          "}",
+          "```",
+        ].join("\n"),
+      ).content?.[0],
+    ).toEqual({
+      type: "codeBlock",
+      attrs: {
+        language: "cpp",
+        highlightLines: "5-6",
+        additionLines: "7",
+        deletionLines: "2",
+        filename: "main.cpp",
+      },
+      content: [
+        {
+          type: "text",
+          text: [
+            "#include <iostream>",
+            "using namespace std;",
+            "",
+            "int main() {",
+            "  ios::sync_with_stdio(false);",
+            "  cin.tie(nullptr);",
+            "}",
+          ].join("\n"),
+        },
+      ],
+    });
+  });
+
   it("turns standalone links into link boxes", () => {
     expect(
       parseMarkdownToDocument(
@@ -169,11 +264,14 @@ describe("markdown import", () => {
         ":::",
         "",
         ":::summary",
+        "label: 빠른 체크",
         "- 입력 크기를 본다.",
         "- 출력 횟수를 본다.",
         ":::",
         "",
         ":::tip",
+        "label: 습관",
+        "color: #22c55e",
         "반복문 안에서는 `endl`을 피한다.",
         ":::",
         "",
@@ -201,7 +299,9 @@ describe("markdown import", () => {
       "ctaGroup",
     ]);
     expect(document.content?.[0]?.attrs).toEqual({ label: "GUIDE" });
+    expect(document.content?.[1]?.attrs).toEqual({ label: "빠른 체크" });
     expect(document.content?.[1]?.content?.[0]?.type).toBe("summaryItem");
+    expect(document.content?.[2]?.attrs).toEqual({ label: "습관", toneColor: "#22c55e" });
     expect(document.content?.[2]?.content?.[0]?.type).toBe("paragraph");
     expect(document.content?.[3]?.content?.map((node) => node.type)).toEqual([
       "comparisonColumn",
@@ -220,6 +320,21 @@ describe("markdown import", () => {
   it("keeps unsupported inline links as plain text", () => {
     expect(parseMarkdownInline("[bad](javascript:alert)")).toEqual([
       { type: "text", text: "[bad](javascript:alert)" },
+    ]);
+  });
+
+  it("does not absorb the rest of the document when a custom block is not closed", () => {
+    expect(
+      parseMarkdownToDocument([":::tip", "닫히지 않은 블록", "", "## 다음 제목"].join("\n")).content,
+    ).toEqual([
+      {
+        type: "paragraph",
+        content: [{ type: "text", text: ":::tip 닫히지 않은 블록" }],
+      },
+      {
+        type: "sectionHeading",
+        content: [{ type: "text", text: "다음 제목" }],
+      },
     ]);
   });
 });

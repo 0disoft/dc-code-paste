@@ -22,12 +22,12 @@ import {
 
 const preferences: DraftPreferences = {
   language: "cpp",
-  theme: "github-dark",
+  theme: "catppuccin-mocha",
   bodyFontFamily: "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif",
-  bodyFontSize: "15px",
+  bodyFontSize: "18px",
   selectionFontFamily: "Malgun Gothic, Apple SD Gothic Neo, Segoe UI, sans-serif",
-  selectionFontSize: "15px",
-  codeFontSize: "14px",
+  selectionFontSize: "18px",
+  codeFontSize: "16px",
   showLineNumbers: true,
   documentTheme: "darkEditorial",
   structure: "dcTable",
@@ -75,6 +75,21 @@ describe("draft storage", () => {
 
     expect(clearDraftSnapshot(storage)).toBe(true);
     expect(storage.getItem(draftStorageKey)).toBeNull();
+  });
+
+  it("normalizes legacy modern export preferences to DC table", () => {
+    const snapshot = createDraftSnapshot(sampleDocument, preferences);
+    const restored = parseDraftSnapshot(
+      JSON.stringify({
+        ...snapshot,
+        preferences: {
+          ...snapshot.preferences,
+          structure: "modern",
+        },
+      }),
+    );
+
+    expect(restored?.preferences.structure).toBe("dcTable");
   });
 
   it("rejects malformed or unsupported draft payloads", () => {

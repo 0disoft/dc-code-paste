@@ -1,4 +1,5 @@
 import { mergeAttributes, Node } from "@tiptap/core";
+import { normalizeEditableLinkHref } from "./link";
 
 export const LinkBox = Node.create({
   name: "linkBox",
@@ -10,9 +11,10 @@ export const LinkBox = Node.create({
     return {
       href: {
         default: "",
-        parseHTML: (element) => element.getAttribute("data-href") ?? "",
+        parseHTML: (element) => normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
         renderHTML: (attributes) => {
-          const href = typeof attributes.href === "string" ? attributes.href : "";
+          const href =
+            typeof attributes.href === "string" ? normalizeEditableLinkHref(attributes.href) : "";
           return href ? { "data-href": href } : {};
         },
       },

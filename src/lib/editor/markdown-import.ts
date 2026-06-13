@@ -1,5 +1,11 @@
 import type { JSONContent } from "@tiptap/core";
-import { calloutNodeNameByKind, isCalloutKind, type CalloutKind } from "$lib/editor/callout";
+import {
+  calloutNodeNameByKind,
+  defaultCalloutLabel,
+  isCalloutKind,
+  type CalloutKind,
+} from "$lib/editor/callout";
+import { normalizeCalloutToneColor } from "$lib/editor/callout-palette";
 import { createComparisonBlockFromText } from "$lib/editor/comparison-block";
 import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
 import { createHeroBlockFromText } from "$lib/editor/hero-block";
@@ -22,6 +28,16 @@ type ParsedListItem = {
 
 type MarkdownImportOptions = {
   defaultLanguage?: DcLanguageId;
+};
+
+type CustomBlockMetadata = {
+  label?: string;
+  color?: string;
+};
+
+type CustomBlockParts = {
+  metadata: CustomBlockMetadata;
+  body: string;
 };
 
 const fencePattern = /^```([^\s`]*)?(?:\s+(.+))?\s*$/i;
@@ -91,6 +107,17 @@ function parseFenceHighlightLines(value: string | undefined): string {
   return assigned ? normalizeHighlightLines(assigned[1]) : "";
 }
 
+function parseFenceLineRange(value: string | undefined, names: string[]): string {
+  if (!value) {
+    return "";
+  }
+
+  const namePattern = names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const assigned = new RegExp(`(?:^|\\s)(?:${namePattern})=([0-9,\\s-]+)`, "i").exec(value);
+
+  return assigned ? normalizeHighlightLines(assigned[1]) : "";
+}
+
 function parseFenceFilename(value: string | undefined): string {
   if (!value) {
     return "";
@@ -109,6 +136,8 @@ function parseFenceFilename(value: string | undefined): string {
   const bare = value
     .replace(/\{[^}]+}/g, "")
     .replace(/(?:^|\s)(?:highlight|highlights|hl|lines)=[0-9,\s-]+/gi, "")
+    .replace(/(?:^|\s)(?:add|adds|added|addition|additionLines|plus)=[0-9,\s-]+/gi, "")
+    .replace(/(?:^|\s)(?:delete|deletes|deleted|deletion|deletionLines|remove|removed|minus)=[0-9,\s-]+/gi, "")
     .trim();
 
   return /^[\w@./\\ -]+\.[\w-]+$/.test(bare) ? normalizeCodeFilename(bare) : "";
@@ -268,18 +297,81 @@ function collectCustomBlock(
     index += 1;
   }
 
-  return { body: body.join("\n"), nextIndex: index };
+  return undefined;
 }
 
 function calloutKindFromCustomBlockName(name: string): CalloutKind | undefined {
   return isCalloutKind(name) ? name : undefined;
 }
 
+function metadataKey(line: string): { key: keyof CustomBlockMetadata; value: string } | undefined {
+  const match = /^(label|라벨|title|제목|color|색상|toneColor|tone-color)\s*[:：]\s*(.+)$/i.exec(
+    line.trim(),
+  );
+
+  if (!match) {
+    return undefined;
+  }
+
+  const rawKey = (match[1] ?? "").toLowerCase();
+  const value = match[2]?.trim() ?? "";
+
+  if (!value) {
+    return undefined;
+  }
+
+  return {
+    key:
+      rawKey === "color" ||
+      rawKey === "색상" ||
+      rawKey === "tonecolor" ||
+      rawKey === "tone-color"
+        ? "color"
+        : "label",
+    value,
+  };
+}
+
+function extractCustomBlockParts(body: string, allowedKeys: Array<keyof CustomBlockMetadata>) {
+  const allowed = new Set<keyof CustomBlockMetadata>(allowedKeys);
+  const lines = body.replace(/\r\n?/g, "\n").split("\n");
+  const metadata: CustomBlockMetadata = {};
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+
+    if (!line.trim()) {
+      index += 1;
+      continue;
+    }
+
+    const parsed = metadataKey(line);
+    if (!parsed || !allowed.has(parsed.key)) {
+      break;
+    }
+
+    metadata[parsed.key] = parsed.value;
+    index += 1;
+  }
+
+  return {
+    metadata,
+    body: lines.slice(index).join("\n").trim(),
+  } satisfies CustomBlockParts;
+}
+
 function createCalloutBlock(kind: CalloutKind, body: string, fallbackLanguage: DcLanguageId) {
+  const { metadata, body: contentBody } = extractCustomBlockParts(body, ["label", "color"]);
+
   return {
     type: calloutNodeNameByKind[kind],
+    attrs: {
+      label: metadata.label?.trim() || defaultCalloutLabel(kind),
+      toneColor: normalizeCalloutToneColor(metadata.color, kind),
+    },
     content: contentOrEmptyParagraph(
-      parseMarkdownToDocument(body.trim() || " ", {
+      parseMarkdownToDocument(contentBody || " ", {
         defaultLanguage: fallbackLanguage,
       }),
     ),
@@ -356,7 +448,12 @@ function customBlockNode(
   }
 
   if (name === "summary") {
-    return createSummaryBoxFromText(body);
+    const { metadata, body: contentBody } = extractCustomBlockParts(body, ["label"]);
+    const summary = createSummaryBoxFromText(contentBody || body);
+
+    return summary && metadata.label?.trim()
+      ? { ...summary, attrs: { ...summary.attrs, label: metadata.label.trim() } }
+      : summary;
   }
 
   if (name === "tutorial") {
@@ -460,6 +557,24 @@ export function parseMarkdownToDocument(
       const codeLines: string[] = [];
       const language = normalizeLanguage(fence[1], fallbackLanguage);
       const highlightLines = parseFenceHighlightLines(fence[2]);
+      const additionLines = parseFenceLineRange(fence[2], [
+        "add",
+        "adds",
+        "added",
+        "addition",
+        "additionLines",
+        "plus",
+      ]);
+      const deletionLines = parseFenceLineRange(fence[2], [
+        "delete",
+        "deletes",
+        "deleted",
+        "deletion",
+        "deletionLines",
+        "remove",
+        "removed",
+        "minus",
+      ]);
       const filename = parseFenceFilename(fence[2]);
       index += 1;
 
@@ -475,6 +590,12 @@ export function parseMarkdownToDocument(
       const attrs: Record<string, string> = { language };
       if (highlightLines) {
         attrs.highlightLines = highlightLines;
+      }
+      if (additionLines) {
+        attrs.additionLines = additionLines;
+      }
+      if (deletionLines) {
+        attrs.deletionLines = deletionLines;
       }
       if (filename) {
         attrs.filename = filename;

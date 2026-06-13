@@ -10,6 +10,7 @@
         Highlighter,
         History,
         Italic,
+        LayoutTemplate,
         Link2,
         LinkIcon,
         List,
@@ -29,7 +30,8 @@
     } from "lucide-svelte";
     import { onDestroy, onMount } from "svelte";
     import type { Editor, JSONContent } from "@tiptap/core";
-    import type { ResolvedPos } from "@tiptap/pm/model";
+    import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
+    import type { EditorView } from "@tiptap/pm/view";
     import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
     import { defaultProseFontFamily } from "$lib/dc/font-stacks";
     import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
@@ -37,7 +39,6 @@
         exportDocumentToDcHtml,
         type DcDocumentTheme,
         type DcExportOptions,
-        type DcExportStructure,
     } from "$lib/dc/export-document";
     import { sampleDocument } from "$lib/editor/sample-document";
     import {
@@ -57,6 +58,11 @@
         calloutNodeNames,
         type CalloutKind,
     } from "$lib/editor/callout";
+    import {
+        defaultCalloutToneColor,
+        defaultCalloutToneColors,
+        normalizeCalloutToneColor,
+    } from "$lib/editor/callout-palette";
     import {
         selectedInlineRangeToCalloutCommand,
         selectedInlineRangeToCodeBlockCommand,
@@ -107,7 +113,9 @@
     } from "$lib/editor/summary-box";
     import {
         createDefaultTutorialBlock,
+        createTutorialStep,
         createTutorialBlockFromText,
+        normalizeTutorialStepNumber,
     } from "$lib/editor/tutorial-block";
     import {
         createComparisonBlockFromText,
@@ -126,13 +134,17 @@
 
     const bodyFontFamily = defaultProseFontFamily;
     const selectionFontFamily = defaultProseFontFamily;
-    const bodySizes = ["14px", "15px", "16px", "17px", "18px"];
-    const codeSizes = ["13px", "14px", "15px", "16px"];
-    const exportStructures: { label: string; value: DcExportStructure }[] = [
-        { label: "DC 테이블", value: "dcTable" },
-        { label: "기본", value: "modern" },
-    ];
+    const defaultBodyFontSize = "17px";
+    const defaultCodeFontSize = "15px";
+    const bodySizes = ["14px", "15px", "16px", "17px", "18px", "19px", "20px"];
+    const codeSizes = ["12px", "13px", "14px", "15px", "16px", "17px", "18px"];
+    const emptyDocument: JSONContent = {
+        type: "doc",
+        content: [{ type: "paragraph" }],
+    };
     const draftHistoryAutoIntervalMs = 30_000;
+    const previewRenderDebounceMs = 90;
+    const draftPersistDebounceMs = 450;
     const documentThemes: { label: string; value: DcDocumentTheme }[] = [
         { label: "강의 라이트", value: "lightLecture" },
         { label: "다크 에디토리얼", value: "darkEditorial" },
@@ -157,43 +169,62 @@
         "oklch(57.8% 0.18 31.88)",
         "oklch(47.55% 0.145 302.98)",
     ];
-    const calloutToneOptions: { label: string; value: CalloutKind }[] = [
-        { label: "팁", value: "tip" },
-        { label: "주의", value: "warning" },
-        { label: "참고", value: "reference" },
-        { label: "강조", value: "emphasis" },
-        { label: "성공", value: "success" },
-        { label: "실패", value: "failure" },
-        { label: "실험", value: "experiment" },
-        { label: "결론", value: "conclusion" },
-        { label: "반박", value: "rebuttal" },
+    const calloutColorOptions: {
+        label: string;
+        kind: CalloutKind;
+        color: string;
+    }[] = [
+        { label: "초록", kind: "tip", color: defaultCalloutToneColors.tip },
+        { label: "노랑", kind: "warning", color: defaultCalloutToneColors.warning },
+        { label: "파랑", kind: "reference", color: defaultCalloutToneColors.reference },
+        { label: "보라", kind: "emphasis", color: defaultCalloutToneColors.emphasis },
+        { label: "빨강", kind: "failure", color: defaultCalloutToneColors.failure },
+        { label: "분홍", kind: "rebuttal", color: defaultCalloutToneColors.rebuttal },
     ];
     type ToolPanelId = "blocks" | "code" | "style";
     type EditableBlockLabelTarget = {
         type: string;
         pos: number;
         fallback: string;
+        attrName: "label" | "number";
+    };
+    type TutorialBlockTarget = {
+        pos: number;
     };
     type RenameTarget =
         | { kind: "preset"; id: string }
         | { kind: "draft"; id: string };
+    type CodeLineMarker = "highlightLines" | "additionLines" | "deletionLines";
+    type CodeLineContextMenu = {
+        x: number;
+        y: number;
+        line: number;
+        pos: number;
+    };
+    const codeLineMarkers: CodeLineMarker[] = [
+        "highlightLines",
+        "additionLines",
+        "deletionLines",
+    ];
 
     let editorHost = $state<HTMLDivElement>();
     let editor = $state<Editor>();
     let documentJson = $state<JSONContent>(structuredClone(sampleDocument));
     let language = $state<DcLanguageId>(defaultLanguage);
     let theme = $state<DcThemeId>(defaultTheme);
-    let bodyFontSize = $state("15px");
-    let selectionFontSize = $state("15px");
+    let bodyFontSize = $state(defaultBodyFontSize);
+    let selectionFontSize = $state(defaultBodyFontSize);
     let quoteStyle = $state<QuoteStyle>("literary");
     let ctaGroupLayout = $state<CtaGroupLayout>("horizontal");
     let activeCalloutKind = $state<CalloutKind>("tip");
-    let codeFontSize = $state("14px");
+    let activeCalloutColor = $state(defaultCalloutToneColor("tip"));
+    let codeFontSize = $state(defaultCodeFontSize);
     let codeLineHighlights = $state("");
+    let codeAdditionLines = $state("");
+    let codeDeletionLines = $state("");
     let codeFilename = $state("");
     let showLineNumbers = $state(false);
     let documentTheme = $state<DcDocumentTheme>("lightLecture");
-    let exportStructure = $state<DcExportStructure>("dcTable");
     let html = $state("");
     let isRendering = $state(false);
     let previewMode = $state<"rendered" | "source">("rendered");
@@ -210,6 +241,7 @@
     let activeToolPanel = $state<ToolPanelId | null>(null);
     let blockLabelDraft = $state("");
     let blockLabelTarget = $state<EditableBlockLabelTarget | null>(null);
+    let tutorialBlockTarget = $state<TutorialBlockTarget | null>(null);
     let presetName = $state("");
     let presets = $state<PresetSnapshot[]>([]);
     let presetState = $state<"idle" | "saved" | "error">("idle");
@@ -217,11 +249,15 @@
     let draftHistoryState = $state<"idle" | "saved" | "error">("idle");
     let renameTarget = $state<RenameTarget | null>(null);
     let renameDraft = $state("");
+    let calloutColorInput = $state<HTMLInputElement>();
+    let codeLineContextMenu = $state<CodeLineContextMenu | null>(null);
     let editorSignal = $state(0);
     let canPersistDraft = $state(false);
     let lastDraftHistoryFingerprint = "";
     let lastDraftHistorySavedAt = 0;
     let cardApplyTimer: ReturnType<typeof setTimeout> | undefined;
+    let previewRenderTimer: ReturnType<typeof setTimeout> | undefined;
+    let draftPersistTimer: ReturnType<typeof setTimeout> | undefined;
     let renderTurn = 0;
 
     const htmlSize = $derived(
@@ -230,10 +266,6 @@
     const copyLabel = $derived(copyState === "copied" ? "복사됨" : "디씨 복사");
     const sourceCopyLabel = $derived(
         sourceCopyState === "copied" ? "복사됨" : "원문 복사",
-    );
-    const exportStructureLabel = $derived(
-        exportStructures.find((item) => item.value === exportStructure)
-            ?.label ?? "DC 테이블",
     );
     const documentThemeLabel = $derived(
         documentThemes.find((item) => item.value === documentTheme)?.label ??
@@ -277,10 +309,10 @@
             language: defaultLanguage,
             theme: defaultTheme,
             bodyFontFamily,
-            bodyFontSize: "15px",
+            bodyFontSize: defaultBodyFontSize,
             selectionFontFamily,
-            selectionFontSize: "15px",
-            codeFontSize: "14px",
+            selectionFontSize: defaultBodyFontSize,
+            codeFontSize: defaultCodeFontSize,
             showLineNumbers: false,
             documentTheme: "lightLecture",
             structure: "dcTable",
@@ -298,7 +330,7 @@
             codeFontSize,
             showLineNumbers,
             documentTheme,
-            structure: exportStructure,
+            structure: "dcTable",
         };
     }
 
@@ -319,7 +351,7 @@
     function replaceEditorDocument(document: JSONContent) {
         const nextDocument = cloneDocumentContent(document);
         documentJson = nextDocument;
-        editor?.commands.setContent(cloneDocumentContent(nextDocument));
+        editor?.commands.setContent(nextDocument);
 
         if (editor) {
             refreshEditorState(editor);
@@ -339,16 +371,15 @@
         theme = preferences.theme;
         bodyFontSize = isKnownBodySize(preferences.bodyFontSize)
             ? preferences.bodyFontSize
-            : "15px";
+            : defaultBodyFontSize;
         selectionFontSize = isKnownBodySize(preferences.selectionFontSize)
             ? preferences.selectionFontSize
-            : "15px";
+            : defaultBodyFontSize;
         codeFontSize = isKnownCodeSize(preferences.codeFontSize)
             ? preferences.codeFontSize
-            : "14px";
+            : defaultCodeFontSize;
         showLineNumbers = preferences.showLineNumbers;
         documentTheme = preferences.documentTheme;
-        exportStructure = preferences.structure;
     }
 
     function firstCodeBlockLanguage(
@@ -452,6 +483,20 @@
         if (cardApplyTimer) {
             clearTimeout(cardApplyTimer);
             cardApplyTimer = undefined;
+        }
+    }
+
+    function clearScheduledPreviewRender() {
+        if (previewRenderTimer) {
+            clearTimeout(previewRenderTimer);
+            previewRenderTimer = undefined;
+        }
+    }
+
+    function clearScheduledDraftPersist() {
+        if (draftPersistTimer) {
+            clearTimeout(draftPersistTimer);
+            draftPersistTimer = undefined;
         }
     }
 
@@ -727,7 +772,7 @@
             codeFontSize,
             showLineNumbers,
             documentTheme,
-            structure: exportStructure,
+            structure: "dcTable",
         };
     }
 
@@ -754,23 +799,79 @@
         }
     }
 
+    function schedulePreviewRender(
+        nextDocument: JSONContent,
+        options: DcExportOptions,
+    ) {
+        clearScheduledPreviewRender();
+        previewRenderTimer = setTimeout(() => {
+            previewRenderTimer = undefined;
+            void renderPreview(nextDocument, options);
+        }, previewRenderDebounceMs);
+    }
+
+    function persistCurrentDraftSnapshot(
+        nextDocument: JSONContent,
+        preferences: DraftPreferences,
+    ) {
+        const storage = draftStorage();
+        if (!storage) {
+            return;
+        }
+
+        writeDraftSnapshot(
+            storage,
+            createDraftSnapshot(
+                cloneDocumentContent(nextDocument),
+                cloneDraftPreferences(preferences),
+            ),
+        );
+        maybeSaveAutomaticDraftHistory();
+    }
+
+    function scheduleDraftPersist(
+        nextDocument: JSONContent,
+        preferences: DraftPreferences,
+    ) {
+        clearScheduledDraftPersist();
+        draftPersistTimer = setTimeout(() => {
+            draftPersistTimer = undefined;
+            persistCurrentDraftSnapshot(nextDocument, preferences);
+        }, draftPersistDebounceMs);
+    }
+
     function normalizeBlockLabel(value: unknown) {
         return typeof value === "string"
             ? value.trim().replace(/\s+/g, " ").slice(0, 40)
             : "";
     }
 
+    function normalizeEditableBlockValue(
+        value: unknown,
+        target: Pick<EditableBlockLabelTarget, "attrName" | "fallback">,
+    ) {
+        return target.attrName === "number"
+            ? normalizeTutorialStepNumber(value, Number(target.fallback))
+            : normalizeBlockLabel(value);
+    }
+
     function editableBlockLabelFallback(nodeName: string) {
         if (nodeName === "heroBlock") {
-            return "CODING GUIDE";
+            return { attrName: "label" as const, fallback: "CODING GUIDE" };
         }
 
         if (nodeName === "summaryBox") {
-            return defaultSummaryBoxLabel;
+            return { attrName: "label" as const, fallback: defaultSummaryBoxLabel };
+        }
+
+        if (nodeName === "tutorialStep") {
+            return { attrName: "number" as const, fallback: "1" };
         }
 
         const calloutKind = calloutKindFromNodeName(nodeName);
-        return calloutKind ? defaultCalloutLabel(calloutKind) : undefined;
+        return calloutKind
+            ? { attrName: "label" as const, fallback: defaultCalloutLabel(calloutKind) }
+            : undefined;
     }
 
     function findEditableBlockLabelTargetFromResolvedPos(
@@ -780,19 +881,28 @@
         | null {
         for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
             const node = resolvedPos.node(depth);
-            const fallback = editableBlockLabelFallback(node.type.name);
+            const config = editableBlockLabelFallback(node.type.name);
 
-            if (!fallback) {
+            if (!config) {
                 continue;
             }
 
-            const label = normalizeBlockLabel(node.attrs.label) || fallback;
+            const fallback =
+                node.type.name === "tutorialStep" && depth > 0
+                    ? String(resolvedPos.index(depth - 1) + 1)
+                    : config.fallback;
+            const value =
+                normalizeEditableBlockValue(node.attrs[config.attrName], {
+                    attrName: config.attrName,
+                    fallback,
+                }) || normalizeEditableBlockValue(fallback, config);
 
             return {
                 type: node.type.name,
                 pos: resolvedPos.before(depth),
                 fallback,
-                label,
+                attrName: config.attrName,
+                label: value,
             };
         }
 
@@ -812,6 +922,7 @@
             type: target.type,
             pos: target.pos,
             fallback: target.fallback,
+            attrName: target.attrName,
         };
         blockLabelDraft = target.label;
     }
@@ -834,42 +945,75 @@
         );
     }
 
-    function selectedCalloutKindFromResolvedPos(resolvedPos: ResolvedPos) {
+    function findTutorialBlockTargetFromResolvedPos(
+        resolvedPos: ResolvedPos,
+    ): TutorialBlockTarget | null {
         for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
-            const kind = calloutKindFromNodeName(resolvedPos.node(depth).type.name);
+            const node = resolvedPos.node(depth);
+
+            if (node.type.name === "tutorialBlock") {
+                return { pos: resolvedPos.before(depth) };
+            }
+        }
+
+        return null;
+    }
+
+    function syncTutorialBlockTarget(current: Editor) {
+        tutorialBlockTarget = findTutorialBlockTargetFromResolvedPos(
+            current.state.selection.$from,
+        );
+    }
+
+    function syncTutorialBlockTargetFromPosition(current: Editor, pos: number) {
+        tutorialBlockTarget = findTutorialBlockTargetFromResolvedPos(
+            current.state.doc.resolve(pos),
+        );
+    }
+
+    function selectedCalloutFromResolvedPos(resolvedPos: ResolvedPos) {
+        for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+            const node = resolvedPos.node(depth);
+            const kind = calloutKindFromNodeName(node.type.name);
 
             if (kind) {
-                return kind;
+                return {
+                    kind,
+                    color: normalizeCalloutToneColor(node.attrs.toneColor, kind),
+                };
             }
         }
 
         return undefined;
     }
 
-    function syncCalloutToneDraft(current: Editor) {
-        const kind = selectedCalloutKindFromResolvedPos(
+    function syncCalloutColorDraft(current: Editor) {
+        const callout = selectedCalloutFromResolvedPos(
             current.state.selection.$from,
         );
 
-        if (kind) {
-            activeCalloutKind = kind;
+        if (callout) {
+            activeCalloutKind = callout.kind;
+            activeCalloutColor = callout.color;
         }
     }
 
-    function syncCalloutToneDraftFromPosition(current: Editor, pos: number) {
-        const kind = selectedCalloutKindFromResolvedPos(
+    function syncCalloutColorDraftFromPosition(current: Editor, pos: number) {
+        const callout = selectedCalloutFromResolvedPos(
             current.state.doc.resolve(pos),
         );
 
-        if (kind) {
-            activeCalloutKind = kind;
+        if (callout) {
+            activeCalloutKind = callout.kind;
+            activeCalloutColor = callout.color;
         }
     }
 
     function refreshEditorState(nextEditor: Editor) {
         documentJson = nextEditor.getJSON();
         syncBlockLabelDraft(nextEditor);
-        syncCalloutToneDraft(nextEditor);
+        syncTutorialBlockTarget(nextEditor);
+        syncCalloutColorDraft(nextEditor);
         editorSignal += 1;
     }
 
@@ -927,13 +1071,15 @@
                 return false;
             }
 
-            const label = normalizeBlockLabel(blockLabelDraft) || fallback;
+            const label =
+                normalizeEditableBlockValue(blockLabelDraft, target) ||
+                normalizeEditableBlockValue(target.fallback, target);
             current.commands.focus();
             current.view.dispatch(
                 current.state.tr
                     .setNodeMarkup(target.pos, undefined, {
                         ...node.attrs,
-                        label,
+                        [target.attrName]: label,
                     })
                     .scrollIntoView(),
             );
@@ -952,9 +1098,18 @@
     }
 
     function applyCodeBlock() {
-        const highlightLines = normalizeHighlightLines(codeLineHighlights);
+        const { highlightLines, additionLines, deletionLines } =
+            normalizeCodeLineMarkers({
+                highlightLines: codeLineHighlights,
+                additionLines: codeAdditionLines,
+                deletionLines: codeDeletionLines,
+            });
         const filename = normalizeCodeFilename(codeFilename);
-        codeLineHighlights = highlightLines;
+        syncCodeLineMarkerDrafts({
+            highlightLines,
+            additionLines,
+            deletionLines,
+        });
         codeFilename = filename;
 
         runEditorCommand((current) => {
@@ -975,6 +1130,8 @@
                             language,
                             highlightLines,
                             filename,
+                            additionLines,
+                            deletionLines,
                         ),
                     )
                     .run()
@@ -986,7 +1143,12 @@
                 .chain()
                 .focus()
                 .setCodeBlock({ language })
-                .updateAttributes("codeBlock", { highlightLines, filename })
+                .updateAttributes("codeBlock", {
+                    highlightLines,
+                    filename,
+                    additionLines,
+                    deletionLines,
+                })
                 .run();
         });
     }
@@ -1004,15 +1166,318 @@
     }
 
     function applyCodeLineHighlights() {
-        const highlightLines = normalizeHighlightLines(codeLineHighlights);
-        codeLineHighlights = highlightLines;
+        const markerAttrs = normalizeCodeLineMarkers(
+            {
+                highlightLines: codeLineHighlights,
+                additionLines: codeAdditionLines,
+                deletionLines: codeDeletionLines,
+            },
+            "highlightLines",
+        );
+        syncCodeLineMarkerDrafts(markerAttrs);
         runEditorCommand((current) =>
             current
                 .chain()
                 .focus()
-                .updateAttributes("codeBlock", { highlightLines })
+                .updateAttributes("codeBlock", markerAttrs)
                 .run(),
         );
+    }
+
+    function applyCodeAdditionLines() {
+        const markerAttrs = normalizeCodeLineMarkers(
+            {
+                highlightLines: codeLineHighlights,
+                additionLines: codeAdditionLines,
+                deletionLines: codeDeletionLines,
+            },
+            "additionLines",
+        );
+        syncCodeLineMarkerDrafts(markerAttrs);
+        runEditorCommand((current) =>
+            current
+                .chain()
+                .focus()
+                .updateAttributes("codeBlock", markerAttrs)
+                .run(),
+        );
+    }
+
+    function applyCodeDeletionLines() {
+        const markerAttrs = normalizeCodeLineMarkers(
+            {
+                highlightLines: codeLineHighlights,
+                additionLines: codeAdditionLines,
+                deletionLines: codeDeletionLines,
+            },
+            "deletionLines",
+        );
+        syncCodeLineMarkerDrafts(markerAttrs);
+        runEditorCommand((current) =>
+            current
+                .chain()
+                .focus()
+                .updateAttributes("codeBlock", markerAttrs)
+                .run(),
+        );
+    }
+
+    function syncCodeLineMarkerDrafts(attrs: Record<CodeLineMarker, string>) {
+        codeLineHighlights = normalizeHighlightLines(attrs.highlightLines);
+        codeAdditionLines = normalizeHighlightLines(attrs.additionLines);
+        codeDeletionLines = normalizeHighlightLines(attrs.deletionLines);
+    }
+
+    function lineSetFromRange(value: unknown): Set<number> {
+        const lines = new Set<number>();
+        const normalized = normalizeHighlightLines(value);
+
+        for (const token of normalized.split(",")) {
+            if (!token) {
+                continue;
+            }
+
+            const [startValue, endValue] = token.split("-").map(Number);
+            const start = Number.isFinite(startValue) ? startValue : 0;
+            const end = Number.isFinite(endValue) ? endValue : start;
+
+            for (let line = start; line <= end; line += 1) {
+                if (line > 0) {
+                    lines.add(line);
+                }
+            }
+        }
+
+        return lines;
+    }
+
+    function compactLineSet(lines: Set<number>) {
+        const sorted = [...lines].sort((a, b) => a - b);
+        const ranges: string[] = [];
+        let start = sorted[0];
+        let previous = sorted[0];
+
+        for (const line of sorted.slice(1)) {
+            if (line === previous + 1) {
+                previous = line;
+                continue;
+            }
+
+            ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+            start = line;
+            previous = line;
+        }
+
+        if (start !== undefined && previous !== undefined) {
+            ranges.push(start === previous ? `${start}` : `${start}-${previous}`);
+        }
+
+        return ranges.join(",");
+    }
+
+    function removeLines(target: Set<number>, lines: Set<number>) {
+        for (const line of lines) {
+            target.delete(line);
+        }
+    }
+
+    function normalizeCodeLineMarkers(
+        attrs: Record<CodeLineMarker, unknown>,
+        winner?: CodeLineMarker,
+    ): Record<CodeLineMarker, string> {
+        const highlightLines = lineSetFromRange(attrs.highlightLines);
+        const additionLines = lineSetFromRange(attrs.additionLines);
+        const deletionLines = lineSetFromRange(attrs.deletionLines);
+
+        if (winner === "highlightLines") {
+            removeLines(additionLines, highlightLines);
+            removeLines(deletionLines, highlightLines);
+        } else if (winner === "additionLines") {
+            removeLines(highlightLines, additionLines);
+            removeLines(deletionLines, additionLines);
+        } else if (winner === "deletionLines") {
+            removeLines(highlightLines, deletionLines);
+            removeLines(additionLines, deletionLines);
+        } else {
+            removeLines(additionLines, deletionLines);
+            removeLines(highlightLines, deletionLines);
+            removeLines(highlightLines, additionLines);
+        }
+
+        return {
+            highlightLines: compactLineSet(highlightLines),
+            additionLines: compactLineSet(additionLines),
+            deletionLines: compactLineSet(deletionLines),
+        };
+    }
+
+    function toggleLineInRange(value: unknown, line: number) {
+        const lines = lineSetFromRange(value);
+
+        if (lines.has(line)) {
+            lines.delete(line);
+        } else {
+            lines.add(line);
+        }
+
+        return compactLineSet(lines);
+    }
+
+    function isLineInRange(value: unknown, line: number) {
+        return lineSetFromRange(value).has(line);
+    }
+
+    function codeLineMarkerLabel(marker: CodeLineMarker) {
+        if (marker === "additionLines") {
+            return "추가줄";
+        }
+
+        if (marker === "deletionLines") {
+            return "삭제줄";
+        }
+
+        return "강조줄";
+    }
+
+    function closestCodePre(target: EventTarget | null): HTMLElement | undefined {
+        if (!(target instanceof Element)) {
+            return undefined;
+        }
+
+        const pre = target.closest("pre.dc-editor-code");
+
+        return pre instanceof HTMLElement ? pre : undefined;
+    }
+
+    function codeBlockAtPosition(view: EditorView, pos: number) {
+        const resolved = view.state.doc.resolve(pos);
+
+        for (let depth = resolved.depth; depth > 0; depth -= 1) {
+            const node = resolved.node(depth);
+
+            if (node.type.name === "codeBlock") {
+                return {
+                    node,
+                    pos: resolved.before(depth),
+                };
+            }
+        }
+
+        return undefined;
+    }
+
+    function clickedCodeLine(pre: HTMLElement, lineCount: number, event: MouseEvent) {
+        const code = pre.querySelector("code") ?? pre;
+        const rect = code.getBoundingClientRect();
+        const style = getComputedStyle(code);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const parsedLineHeight = Number.parseFloat(style.lineHeight);
+        const lineHeight = Number.isFinite(parsedLineHeight)
+            ? parsedLineHeight
+            : fontSize * 1.4;
+        const y = event.clientY - rect.top + pre.scrollTop;
+        const line = Math.floor(Math.max(0, y) / lineHeight) + 1;
+
+        return Math.max(1, Math.min(lineCount, line));
+    }
+
+    function openCodeLineContextMenu(view: EditorView, event: MouseEvent) {
+        const pre = closestCodePre(event.target);
+
+        if (!pre) {
+            codeLineContextMenu = null;
+            return false;
+        }
+
+        const position = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+        });
+
+        if (!position) {
+            return false;
+        }
+
+        const codeBlock = codeBlockAtPosition(view, position.pos);
+
+        if (!codeBlock) {
+            return false;
+        }
+
+        event.preventDefault();
+        const lineCount = Math.max(1, codeBlock.node.textContent.split("\n").length);
+        codeLineContextMenu = {
+            x: Math.min(event.clientX, Math.max(8, window.innerWidth - 184)),
+            y: Math.min(event.clientY, Math.max(8, window.innerHeight - 160)),
+            line: clickedCodeLine(pre, lineCount, event),
+            pos: codeBlock.pos,
+        };
+
+        return true;
+    }
+
+    function closeCodeLineContextMenu() {
+        codeLineContextMenu = null;
+    }
+
+    function codeLineContextMenuActive(marker: CodeLineMarker) {
+        if (!editor || !codeLineContextMenu) {
+            return false;
+        }
+
+        const node = editor.state.doc.nodeAt(codeLineContextMenu.pos);
+
+        if (!node) {
+            return false;
+        }
+
+        return isLineInRange(
+            normalizeCodeLineMarkers({
+                highlightLines: node.attrs.highlightLines,
+                additionLines: node.attrs.additionLines,
+                deletionLines: node.attrs.deletionLines,
+            })[marker],
+            codeLineContextMenu.line,
+        );
+    }
+
+    function toggleCodeLineMarker(marker: CodeLineMarker) {
+        if (!editor || !codeLineContextMenu) {
+            return;
+        }
+
+        const node = editor.state.doc.nodeAt(codeLineContextMenu.pos);
+
+        if (!node || node.type.name !== "codeBlock") {
+            closeCodeLineContextMenu();
+            return;
+        }
+
+        const nextMarkerAttrs = normalizeCodeLineMarkers(
+            {
+                highlightLines: node.attrs.highlightLines,
+                additionLines: node.attrs.additionLines,
+                deletionLines: node.attrs.deletionLines,
+                [marker]: toggleLineInRange(
+                    node.attrs[marker],
+                    codeLineContextMenu.line,
+                ),
+            },
+            marker,
+        );
+
+        editor.view.dispatch(
+            editor.state.tr
+                .setNodeMarkup(codeLineContextMenu.pos, undefined, {
+                    ...node.attrs,
+                    ...nextMarkerAttrs,
+                })
+                .scrollIntoView(),
+        );
+
+        syncCodeLineMarkerDrafts(nextMarkerAttrs);
+        refreshEditorState(editor);
+        closeCodeLineContextMenu();
     }
 
     function calloutLabelAfterToneChange(
@@ -1035,6 +1500,7 @@
         current: Editor,
         pos: number,
         kind: CalloutKind,
+        toneColor = activeCalloutColor,
     ) {
         const targetType = current.schema.nodes[calloutNodeNameByKind[kind]];
         const node = current.state.doc.nodeAt(pos);
@@ -1054,6 +1520,7 @@
                 .setNodeMarkup(pos, targetType, {
                     ...node.attrs,
                     label,
+                    toneColor: normalizeCalloutToneColor(toneColor, kind),
                 })
                 .scrollIntoView(),
         );
@@ -1066,7 +1533,11 @@
         return true;
     }
 
-    function retargetActiveCallout(current: Editor, kind: CalloutKind) {
+    function retargetActiveCallout(
+        current: Editor,
+        kind: CalloutKind,
+        toneColor = activeCalloutColor,
+    ) {
         const selectionFrom = current.state.selection.$from;
 
         for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
@@ -1077,6 +1548,7 @@
                     current,
                     selectionFrom.before(depth),
                     kind,
+                    toneColor,
                 );
             }
         }
@@ -1094,7 +1566,12 @@
                 current
                     .chain()
                     .focus()
-                    .command(selectedInlineRangeToCalloutCommand(kind))
+                    .command(
+                        selectedInlineRangeToCalloutCommand(
+                            kind,
+                            activeCalloutColor,
+                        ),
+                    )
                     .run()
             ) {
                 return true;
@@ -1105,6 +1582,7 @@
                 .focus()
                 .wrapIn(calloutNodeNameByKind[kind], {
                     label: defaultCalloutLabel(kind),
+                    toneColor: normalizeCalloutToneColor(activeCalloutColor, kind),
                 })
                 .run();
         });
@@ -1114,7 +1592,10 @@
         applyCallout(activeCalloutKind);
     }
 
-    function updateActiveCalloutTone() {
+    function updateActiveCalloutColor(kind = activeCalloutKind) {
+        activeCalloutKind = kind;
+        activeCalloutColor = normalizeCalloutToneColor(activeCalloutColor, kind);
+
         if (!editor) {
             return;
         }
@@ -1125,11 +1606,12 @@
             retargetCalloutAtPosition(
                 editor,
                 trackedTarget.pos,
-                activeCalloutKind,
+                kind,
+                activeCalloutColor,
             );
 
         if (!didRetargetTrackedCallout) {
-            retargetActiveCallout(editor, activeCalloutKind);
+            retargetActiveCallout(editor, kind, activeCalloutColor);
         }
 
         refreshEditorState(editor);
@@ -1138,15 +1620,44 @@
             const node = editor.state.doc.nodeAt(trackedTarget.pos);
             const label =
                 normalizeBlockLabel(node?.attrs.label) ||
-                defaultCalloutLabel(activeCalloutKind);
+                defaultCalloutLabel(kind);
 
             syncBlockLabelTarget({
-                type: calloutNodeNameByKind[activeCalloutKind],
+                type: calloutNodeNameByKind[kind],
                 pos: trackedTarget.pos,
-                fallback: defaultCalloutLabel(activeCalloutKind),
+                fallback: defaultCalloutLabel(kind),
                 label,
             });
         }
+    }
+
+    function applyCalloutPresetColor(kind: CalloutKind, color: string) {
+        activeCalloutColor = normalizeCalloutToneColor(color, kind);
+        updateActiveCalloutColor(kind);
+    }
+
+    function calloutSwatchColor(kind: CalloutKind, color: string) {
+        return activeCalloutKind === kind ? activeCalloutColor : color;
+    }
+
+    function updateCalloutPickerColor() {
+        updateActiveCalloutColor(activeCalloutKind);
+    }
+
+    function openCalloutColorPicker(kind: CalloutKind, color: string) {
+        activeCalloutColor = normalizeCalloutToneColor(color, kind);
+        activeCalloutKind = kind;
+
+        if (!calloutColorInput) {
+            return;
+        }
+
+        if (typeof calloutColorInput.showPicker === "function") {
+            calloutColorInput.showPicker();
+            return;
+        }
+
+        calloutColorInput.click();
     }
 
     function selectedText() {
@@ -1176,8 +1687,8 @@
                     current.state.tr
                         .setNodeMarkup(
                             selectionFrom.before(depth),
-                            linkBoxType,
-                            { href },
+                            node.type,
+                            { ...node.attrs, href },
                         )
                         .scrollIntoView(),
                 );
@@ -1315,8 +1826,8 @@
                     current.state.tr
                         .setNodeMarkup(
                             selectionFrom.before(depth),
-                            ctaButtonType,
-                            { href },
+                            node.type,
+                            { ...node.attrs, href },
                         )
                         .scrollIntoView(),
                 );
@@ -1354,12 +1865,7 @@
                 current
                     .chain()
                     .focus()
-                    .command(
-                        selectedInlineRangeToCtaButtonCommand(
-                            href,
-                            fallbackLabel,
-                        ),
-                    )
+                    .command(selectedInlineRangeToCtaButtonCommand(href))
                     .run()
             ) {
                 return true;
@@ -1444,13 +1950,84 @@
         );
     }
 
+    function selectedTutorialBlock(current: Editor) {
+        const selectionTarget = findTutorialBlockTargetFromResolvedPos(
+            current.state.selection.$from,
+        );
+
+        for (const target of [selectionTarget, tutorialBlockTarget]) {
+            if (!target) {
+                continue;
+            }
+
+            const node = current.state.doc.nodeAt(target.pos);
+
+            if (node?.type.name === "tutorialBlock") {
+                return {
+                    node,
+                    pos: target.pos,
+                };
+            }
+        }
+
+        return null;
+    }
+
+    function nextTutorialStepNumber(node: ProseMirrorNode) {
+        let maxNumber = 0;
+        let stepCount = 0;
+
+        node.forEach((child) => {
+            if (child.type.name !== "tutorialStep") {
+                return;
+            }
+
+            stepCount += 1;
+            const normalized = normalizeTutorialStepNumber(child.attrs.number);
+            const numeric = Number.parseInt(normalized, 10);
+
+            if (Number.isFinite(numeric)) {
+                maxNumber = Math.max(maxNumber, numeric);
+            }
+        });
+
+        return normalizeTutorialStepNumber(maxNumber > 0 ? maxNumber + 1 : stepCount + 1);
+    }
+
     function applyTutorialBlock() {
-        const tutorialBlock =
-            createTutorialBlockFromText(selectedText()) ??
-            createDefaultTutorialBlock();
+        const text = selectedText();
+
+        if (!text.trim()) {
+            runEditorCommand((current) => {
+                const target = selectedTutorialBlock(current);
+
+                if (!target) {
+                    return current
+                        .chain()
+                        .focus()
+                        .insertContent(createDefaultTutorialBlock())
+                        .run();
+                }
+
+                const insertPos = target.pos + target.node.nodeSize - 1;
+                return current
+                    .chain()
+                    .focus()
+                    .insertContentAt(
+                        insertPos,
+                        createTutorialStep("새 단계", "", nextTutorialStepNumber(target.node)),
+                    )
+                    .run();
+            });
+            return;
+        }
+
+        const tutorialBlock = createTutorialBlockFromText(text);
 
         runEditorCommand((current) =>
-            current.chain().focus().insertContent(tutorialBlock).run(),
+            tutorialBlock
+                ? current.chain().focus().insertContent(tutorialBlock).run()
+                : false,
         );
     }
 
@@ -1532,6 +2109,16 @@
         }
 
         applyDraftPreferences(defaultDraftPreferences());
+        replaceEditorDocument(emptyDocument);
+        isLinkPanelOpen = false;
+        linkDraft = "";
+        linkError = false;
+        lastDraftHistoryFingerprint = currentDraftHistoryFingerprint();
+        lastDraftHistorySavedAt = Date.now();
+    }
+
+    function applyExampleTemplate() {
+        applyDraftPreferences(defaultDraftPreferences());
         replaceEditorDocument(sampleDocument);
         isLinkPanelOpen = false;
         linkDraft = "";
@@ -1586,12 +2173,26 @@
         activeToolPanel = activeToolPanel === panel ? null : panel;
     }
 
-    onDestroy(clearPendingCardApply);
+    onDestroy(() => {
+        clearPendingCardApply();
+        clearScheduledPreviewRender();
+        clearScheduledDraftPersist();
+    });
 
     onMount(() => {
         let disposed = false;
         let mountedEditor: Editor | undefined;
         const savedDraft = readDraftSnapshot(window.localStorage);
+        const closeFloatingMenus = () => closeCodeLineContextMenu();
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                closeCodeLineContextMenu();
+            }
+        };
+
+        window.addEventListener("resize", closeFloatingMenus);
+        window.addEventListener("scroll", closeFloatingMenus, true);
+        window.addEventListener("keydown", closeOnEscape);
         refreshPresetSnapshots();
         refreshDraftHistorySnapshots();
 
@@ -1627,22 +2228,35 @@
                         class: "article-editor",
                         spellcheck: "false",
                     },
+                    handleDOMEvents: {
+                        contextmenu: (view, event) =>
+                            event instanceof MouseEvent
+                                ? openCodeLineContextMenu(view, event)
+                                : false,
+                    },
                     handleClick: (view, pos) => {
+                        closeCodeLineContextMenu();
                         if (editor) {
                             syncBlockLabelDraftFromPosition(editor, pos);
-                            syncCalloutToneDraftFromPosition(editor, pos);
+                            syncTutorialBlockTargetFromPosition(editor, pos);
+                            syncCalloutColorDraftFromPosition(editor, pos);
                         } else {
                             syncBlockLabelTarget(
                                 findEditableBlockLabelTargetFromResolvedPos(
                                     view.state.doc.resolve(pos),
                                 ),
                             );
-                            const kind = selectedCalloutKindFromResolvedPos(
+                            tutorialBlockTarget =
+                                findTutorialBlockTargetFromResolvedPos(
+                                    view.state.doc.resolve(pos),
+                                );
+                            const callout = selectedCalloutFromResolvedPos(
                                 view.state.doc.resolve(pos),
                             );
 
-                            if (kind) {
-                                activeCalloutKind = kind;
+                            if (callout) {
+                                activeCalloutKind = callout.kind;
+                                activeCalloutColor = callout.color;
                             }
                         }
 
@@ -1659,7 +2273,8 @@
                 },
                 onSelectionUpdate: ({ editor: current }) => {
                     syncBlockLabelDraft(current);
-                    syncCalloutToneDraft(current);
+                    syncTutorialBlockTarget(current);
+                    syncCalloutColorDraft(current);
                     editorSignal += 1;
                     const attrs = current.getAttributes("codeBlock");
                     if (
@@ -1668,8 +2283,12 @@
                     ) {
                         language = attrs.language;
                     }
-                    codeLineHighlights = normalizeHighlightLines(
-                        attrs.highlightLines,
+                    syncCodeLineMarkerDrafts(
+                        normalizeCodeLineMarkers({
+                            highlightLines: attrs.highlightLines,
+                            additionLines: attrs.additionLines,
+                            deletionLines: attrs.deletionLines,
+                        }),
                     );
                     codeFilename = normalizeCodeFilename(attrs.filename);
                     const blockquoteAttrs = current.getAttributes("blockquote");
@@ -1704,32 +2323,27 @@
 
         return () => {
             disposed = true;
+            window.removeEventListener("resize", closeFloatingMenus);
+            window.removeEventListener("scroll", closeFloatingMenus, true);
+            window.removeEventListener("keydown", closeOnEscape);
             mountedEditor?.destroy();
         };
     });
 
     $effect(() => {
-        void renderPreview(documentJson, exportOptions());
+        schedulePreviewRender(documentJson, exportOptions());
+        return clearScheduledPreviewRender;
     });
 
     $effect(() => {
+        clearScheduledDraftPersist();
+
         if (!canPersistDraft) {
             return;
         }
 
-        const storage = draftStorage();
-        if (!storage) {
-            return;
-        }
-
-        writeDraftSnapshot(
-            storage,
-            createDraftSnapshot(
-                cloneDocumentContent(documentJson),
-                currentDraftPreferences(),
-            ),
-        );
-        maybeSaveAutomaticDraftHistory();
+        scheduleDraftPersist(documentJson, currentDraftPreferences());
+        return clearScheduledDraftPersist;
     });
 </script>
 
@@ -1768,6 +2382,15 @@
             >
                 <RotateCcw size={17} />
                 <span>초기화</span>
+            </button>
+            <button
+                type="button"
+                title="예시 템플릿"
+                aria-label="예시 템플릿"
+                onclick={applyExampleTemplate}
+            >
+                <LayoutTemplate size={17} />
+                <span>예시 템플릿</span>
             </button>
             <button
                 class="copy-button"
@@ -2110,17 +2733,35 @@
                 <Sparkles size={17} />
                 <span>콜아웃</span>
             </button>
-            <label>
-                <span><Paintbrush size={15} /> 톤</span>
-                <select
-                    bind:value={activeCalloutKind}
-                    aria-label="콜아웃 톤"
-                    onchange={updateActiveCalloutTone}
-                >
-                    {#each calloutToneOptions as item}
-                        <option value={item.value}>{item.label}</option>
-                    {/each}
-                </select>
+            <label class="callout-color-field">
+                <span><Paintbrush size={15} /> 색상</span>
+                <div class="callout-color-controls">
+                    <div class="callout-color-swatches" aria-label="콜아웃 색상 프리셋">
+                        {#each calloutColorOptions as item}
+                            <button
+                                class:active={activeCalloutKind === item.kind}
+                                class="callout-color-swatch"
+                                type="button"
+                                aria-label={`${item.label} 콜아웃`}
+                                title={`${item.label} 콜아웃`}
+                                style={`--swatch:${calloutSwatchColor(item.kind, item.color)}`}
+                                onclick={() =>
+                                    applyCalloutPresetColor(item.kind, item.color)}
+                                ondblclick={() =>
+                                    openCalloutColorPicker(item.kind, item.color)}
+                            ></button>
+                        {/each}
+                    </div>
+                    <input
+                        bind:this={calloutColorInput}
+                        class="callout-color-input"
+                        type="color"
+                        bind:value={activeCalloutColor}
+                        aria-label="사용자 콜아웃 색상"
+                        tabindex="-1"
+                        oninput={updateCalloutPickerColor}
+                    />
+                </div>
             </label>
             <button
                 class:active={isActive("ctaButton")}
@@ -2178,22 +2819,6 @@
                 <span>코드</span>
             </button>
             <label>
-                <span><Rows3 size={15} /> 복붙</span>
-                <select bind:value={exportStructure} aria-label="복붙 구조">
-                    {#each exportStructures as item}
-                        <option value={item.value}>{item.label}</option>
-                    {/each}
-                </select>
-            </label>
-            <label>
-                <span><Paintbrush size={15} /> 문서</span>
-                <select bind:value={documentTheme} aria-label="문서 테마">
-                    {#each documentThemes as item}
-                        <option value={item.value}>{item.label}</option>
-                    {/each}
-                </select>
-            </label>
-            <label>
                 <span><Code2 size={15} /> 언어</span>
                 <select
                     bind:value={language}
@@ -2245,6 +2870,38 @@
                 />
             </label>
             <label>
+                <span>추가줄</span>
+                <input
+                    class="line-highlight-input"
+                    type="text"
+                    bind:value={codeAdditionLines}
+                    aria-label="코드 추가 줄"
+                    placeholder="2,4-6"
+                    onblur={applyCodeAdditionLines}
+                    onkeydown={(event) => {
+                        if (event.key === "Enter") {
+                            applyCodeAdditionLines();
+                        }
+                    }}
+                />
+            </label>
+            <label>
+                <span>삭제줄</span>
+                <input
+                    class="line-highlight-input"
+                    type="text"
+                    bind:value={codeDeletionLines}
+                    aria-label="코드 삭제 줄"
+                    placeholder="2,4-6"
+                    onblur={applyCodeDeletionLines}
+                    onkeydown={(event) => {
+                        if (event.key === "Enter") {
+                            applyCodeDeletionLines();
+                        }
+                    }}
+                />
+            </label>
+            <label>
                 <span><Paintbrush size={15} /> 테마</span>
                 <select bind:value={theme} aria-label="코드 테마">
                     {#each supportedThemes as item}
@@ -2252,11 +2909,31 @@
                     {/each}
                 </select>
             </label>
+            <label>
+                <span>크기</span>
+                <select bind:value={codeFontSize} aria-label="코드 크기">
+                    {#each codeSizes as item}
+                        <option value={item}>{item}</option>
+                    {/each}
+                </select>
+            </label>
+            <label class="switch">
+                <input type="checkbox" bind:checked={showLineNumbers} />
+                <span>줄번호</span>
+            </label>
             </div>
         {/if}
 
         {#if activeToolPanel === "style"}
             <div id="style-tools" class="tool-group tool-panel tool-group-wide typography-group">
+            <label>
+                <span><Paintbrush size={15} /> 문서</span>
+                <select bind:value={documentTheme} aria-label="문서 테마">
+                    {#each documentThemes as item}
+                        <option value={item.value}>{item.label}</option>
+                    {/each}
+                </select>
+            </label>
             <label>
                 <span>본문</span>
                 <select bind:value={bodyFontSize} aria-label="기본 크기">
@@ -2276,18 +2953,6 @@
                         <option value={item}>{item}</option>
                     {/each}
                 </select>
-            </label>
-            <label>
-                <span>코드</span>
-                <select bind:value={codeFontSize} aria-label="코드 크기">
-                    {#each codeSizes as item}
-                        <option value={item}>{item}</option>
-                    {/each}
-                </select>
-            </label>
-            <label class="switch">
-                <input type="checkbox" bind:checked={showLineNumbers} />
-                <span>줄번호</span>
             </label>
             <div class="swatches" aria-label="글자색">
                 {#each swatches as color}
@@ -2549,8 +3214,32 @@
             <div
                 class="editor-surface"
                 class:editor-surface-dark={documentTheme === "darkEditorial"}
+                style={`--editor-body-font-size:${bodyFontSize};--editor-code-font-size:${codeFontSize}`}
                 bind:this={editorHost}
             ></div>
+            {#if codeLineContextMenu}
+                <div
+                    class="code-line-context-menu"
+                    role="menu"
+                    aria-label={`코드 ${codeLineContextMenu.line}번 줄`}
+                    style={`left:${codeLineContextMenu.x}px;top:${codeLineContextMenu.y}px`}
+                    onpointerdown={(event) => event.stopPropagation()}
+                >
+                    <span class="code-line-context-title"
+                        >{codeLineContextMenu.line}번 줄</span
+                    >
+                    {#each codeLineMarkers as marker}
+                        <button
+                            class:active={codeLineContextMenuActive(marker)}
+                            type="button"
+                            role="menuitem"
+                            onclick={() => toggleCodeLineMarker(marker)}
+                        >
+                            {codeLineMarkerLabel(marker)}
+                        </button>
+                    {/each}
+                </div>
+            {/if}
         </div>
 
         <aside class="preview-panel" aria-live="polite">
@@ -2564,9 +3253,7 @@
                     <span>미리보기</span>
                 </div>
                 <div class="preview-tools">
-                    <span class="status-pill" aria-label="현재 복붙 구조"
-                        >{exportStructureLabel}</span
-                    >
+                    <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>
                     <span class="status-pill" aria-label="현재 문서 테마"
                         >{documentThemeLabel}</span
                     >
@@ -2753,7 +3440,7 @@
         border-radius: 7px;
         background: var(--panel-2);
         color: var(--text);
-        font-weight: 800;
+        font-weight: 500;
         cursor: pointer;
     }
 
@@ -2783,7 +3470,7 @@
         border-color: color-mix(in oklch, var(--accent) 72%, oklch(0% 0 0));
         background: var(--accent);
         color: oklch(22.89% 0.055 118.8);
-        font-weight: 900;
+        font-weight: 500;
     }
 
     .toolbar .copy-button:disabled {
@@ -2797,7 +3484,7 @@
         gap: 7px;
         color: var(--muted);
         font-size: 13px;
-        font-weight: 800;
+        font-weight: 500;
     }
 
     label span {
@@ -2859,6 +3546,45 @@
         width: 150px;
     }
 
+    .callout-color-field {
+        gap: 8px;
+    }
+
+    .callout-color-controls {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .callout-color-swatches {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .toolbar .callout-color-swatch {
+        width: 24px;
+        min-width: 24px;
+        height: 24px;
+        padding: 0;
+        border-radius: 999px;
+        background: var(--swatch);
+    }
+
+    .toolbar .callout-color-swatch.active {
+        box-shadow:
+            0 0 0 2px var(--panel-2),
+            0 0 0 4px var(--accent);
+    }
+
+    .callout-color-input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
     .code-filename-input,
     .line-highlight-input {
         width: 170px;
@@ -2915,43 +3641,18 @@
         padding: 12px;
         font-family:
             Cascadia Mono,
-            Cascadia Code,
-            Cascadia Mono PL,
-            Cascadia Code PL,
             D2Coding,
-            D2Coding ligature,
-            D2CodingLigature,
             나눔고딕코딩,
-            NanumGothicCoding,
-            Nanum Gothic Coding,
-            Noto Sans Mono CJK KR,
             Noto Sans Mono CJK,
-            Noto Sans Mono,
-            Source Han Mono K,
-            Source Han Mono KR,
-            Sarasa Mono K,
-            Sarasa Gothic K,
             JetBrains Mono,
             Fira Code,
-            Fira Mono,
             Hack,
             Source Code Pro,
             IBM Plex Mono,
             Roboto Mono,
-            Iosevka,
-            Iosevka Fixed,
-            Monaspace Neon,
-            Monaspace Argon,
-            DejaVu Sans Mono,
-            Liberation Mono,
-            Ubuntu Mono,
-            Bitstream Vera Sans Mono,
             Consolas,
-            SFMono-Regular,
             Menlo,
             Monaco,
-            Lucida Console,
-            Courier New,
             monospace;
         font-size: 13px;
         line-height: 1.6;
@@ -3299,6 +4000,44 @@
         color: oklch(94.12% 0.012 93.37);
     }
 
+    .code-line-context-menu {
+        position: fixed;
+        z-index: 50;
+        display: grid;
+        min-width: 176px;
+        gap: 4px;
+        padding: 7px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        box-shadow: 0 14px 34px oklch(0% 0 0 / 0.32);
+    }
+
+    .code-line-context-title {
+        padding: 5px 7px 4px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    .code-line-context-menu button {
+        justify-content: flex-start;
+        min-height: 32px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .code-line-context-menu button:hover,
+    .code-line-context-menu button.active {
+        border-color: color-mix(in oklch, var(--accent) 48%, transparent);
+        background: color-mix(in oklch, var(--accent) 16%, transparent);
+        color: var(--accent);
+    }
+
     .editor-surface :global(.article-editor) {
         min-height: 640px;
         outline: none;
@@ -3306,25 +4045,12 @@
             Pretendard,
             Noto Sans KR,
             Noto Sans CJK KR,
-            SUIT,
-            Wanted Sans,
-            Spoqa Han Sans Neo,
-            Spoqa Han Sans,
-            Source Han Sans K,
-            Source Han Sans KR,
             본고딕,
             Nanum Gothic,
-            NanumGothic,
-            NanumSquare,
             NanumSquare Neo,
-            NanumBarunGothic,
             나눔고딕,
             나눔스퀘어,
             나눔바른고딕,
-            IBM Plex Sans KR,
-            Gmarket Sans,
-            Arial Unicode MS,
-            Apple SD Gothic Neo,
             AppleGothic,
             Segoe UI,
             Malgun Gothic,
@@ -3334,8 +4060,10 @@
             Helvetica Neue,
             Helvetica,
             sans-serif;
-        font-size: 15px;
+        font-size: var(--editor-body-font-size, 17px);
         line-height: 1.7;
+        overflow-wrap: break-word;
+        word-break: keep-all;
     }
 
     .editor-surface :global(.article-editor > *:first-child) {
@@ -3345,7 +4073,8 @@
     .editor-surface :global(.article-editor h1) {
         margin: 0 0 14px;
         color: oklch(24.19% 0.019 255.77);
-        font-size: 28px;
+        font-size: 26px;
+        font-weight: 700;
         line-height: 1.22;
     }
 
@@ -3362,57 +4091,84 @@
     }
 
     .editor-surface :global(.article-editor pre) {
+        position: relative;
         margin: 0 0 16px;
         overflow: auto;
+        border: 1px solid oklch(25.36% 0.021 258.42);
         border-radius: 7px;
         background: oklch(18.22% 0.017 258.21);
         color: oklch(90.2% 0.018 258.33);
         padding: 14px 16px;
+        box-shadow: inset 0 1px 0 oklch(100% 0 0 / 0.04);
+        font-size: var(--editor-code-font-size, 15px);
         line-height: 1.4;
         font-family:
             Cascadia Mono,
-            Cascadia Code,
-            Cascadia Mono PL,
-            Cascadia Code PL,
             D2Coding,
-            D2Coding ligature,
-            D2CodingLigature,
             나눔고딕코딩,
-            NanumGothicCoding,
-            Nanum Gothic Coding,
-            Noto Sans Mono CJK KR,
             Noto Sans Mono CJK,
-            Noto Sans Mono,
-            Source Han Mono K,
-            Source Han Mono KR,
-            Sarasa Mono K,
-            Sarasa Gothic K,
             JetBrains Mono,
             Fira Code,
-            Fira Mono,
             Hack,
             Source Code Pro,
             IBM Plex Mono,
             Roboto Mono,
-            Iosevka,
-            Iosevka Fixed,
-            Monaspace Neon,
-            Monaspace Argon,
-            DejaVu Sans Mono,
-            Liberation Mono,
-            Ubuntu Mono,
-            Bitstream Vera Sans Mono,
             Consolas,
-            SFMono-Regular,
             Menlo,
             Monaco,
-            Lucida Console,
-            Courier New,
             monospace;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
+    .editor-surface :global(.article-editor pre.dc-editor-code[data-filename]) {
+        padding-top: 46px;
+    }
+
+    .editor-surface
+        :global(.article-editor pre.dc-editor-code[data-filename]::before) {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        display: block;
+        padding: 8px 16px;
+        border-bottom: 1px solid oklch(28.89% 0.019 258.78);
+        background: oklch(13.54% 0.017 258.36);
+        color: oklch(92.34% 0.018 258.5);
+        content: attr(data-filename);
+        font-size: 13px;
+        font-weight: 800;
+        line-height: 1.1;
     }
 
     .editor-surface :global(.article-editor pre code) {
+        display: block;
+        min-width: max-content;
         font-family: inherit;
+    }
+
+    .editor-surface :global(.article-editor .dc-code-token-keyword) {
+        color: oklch(74.26% 0.139 304.74);
+        font-weight: 800;
+    }
+
+    .editor-surface :global(.article-editor .dc-code-token-string) {
+        color: oklch(78.2% 0.144 145.22);
+    }
+
+    .editor-surface :global(.article-editor .dc-code-token-comment) {
+        color: oklch(62.18% 0.027 257.46);
+        font-style: italic;
+    }
+
+    .editor-surface :global(.article-editor .dc-code-token-number) {
+        color: oklch(80.21% 0.118 69.52);
+    }
+
+    .editor-surface :global(.article-editor .dc-code-token-function) {
+        color: oklch(78.12% 0.098 235.62);
+        font-weight: 700;
     }
 
     .editor-surface :global(.article-editor :not(pre) > code) {
@@ -3421,43 +4177,18 @@
         color: oklch(34.86% 0.087 278.64);
         font-family:
             Cascadia Mono,
-            Cascadia Code,
-            Cascadia Mono PL,
-            Cascadia Code PL,
             D2Coding,
-            D2Coding ligature,
-            D2CodingLigature,
             나눔고딕코딩,
-            NanumGothicCoding,
-            Nanum Gothic Coding,
-            Noto Sans Mono CJK KR,
             Noto Sans Mono CJK,
-            Noto Sans Mono,
-            Source Han Mono K,
-            Source Han Mono KR,
-            Sarasa Mono K,
-            Sarasa Gothic K,
             JetBrains Mono,
             Fira Code,
-            Fira Mono,
             Hack,
             Source Code Pro,
             IBM Plex Mono,
             Roboto Mono,
-            Iosevka,
-            Iosevka Fixed,
-            Monaspace Neon,
-            Monaspace Argon,
-            DejaVu Sans Mono,
-            Liberation Mono,
-            Ubuntu Mono,
-            Bitstream Vera Sans Mono,
             Consolas,
-            SFMono-Regular,
             Menlo,
             Monaco,
-            Lucida Console,
-            Courier New,
             monospace;
         padding: 1px 4px;
     }
@@ -3658,10 +4389,11 @@
         display: grid;
         grid-template-columns: 34px minmax(0, 1fr);
         gap: 10px;
+        align-items: center;
         margin: 0;
         padding: 11px 14px 11px 12px;
         border-bottom: 1px solid oklch(88.91% 0.035 247.16);
-        line-height: 1.62;
+        line-height: 1.18;
     }
 
     .editor-surface :global(.dc-reference-item:last-child) {
@@ -3672,15 +4404,23 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 26px;
+        min-width: 30px;
         height: 18px;
-        border-radius: 999px;
+        border-radius: 4px;
         background: oklch(56.77% 0.154 252.96);
         color: oklch(99.21% 0.006 247.8);
         content: counter(list-item, decimal-leading-zero);
         font-size: 11px;
         font-weight: 900;
-        line-height: 1;
+        line-height: 18px;
+        align-self: center;
+    }
+
+    .editor-surface :global(.dc-reference-item a) {
+        display: inline-block;
+        margin: 0;
+        line-height: 1.18;
+        vertical-align: middle;
     }
 
     .editor-surface-dark :global(.dc-reference-list) {
@@ -3726,12 +4466,12 @@
     }
 
     .editor-surface :global(.dc-summary-item) {
-        display: grid;
-        grid-template-columns: 22px minmax(0, 1fr);
-        gap: 0;
+        position: relative;
         margin: 0 0 7px;
+        padding-left: 28px;
         line-height: 1.62;
         list-style: none;
+        min-width: 0;
     }
 
     .editor-surface :global(.dc-summary-item:last-child) {
@@ -3739,9 +4479,12 @@
     }
 
     .editor-surface :global(.dc-summary-item::before) {
+        position: absolute;
+        top: 0.81em;
+        left: 0;
         width: 8px;
         height: 8px;
-        margin-top: 8px;
+        transform: translateY(-50%);
         border-radius: 999px;
         background: oklch(61.2% 0.049 77.83);
         content: "";
@@ -3787,8 +4530,8 @@
     .editor-surface :global(.dc-hero-body h1) {
         margin: 0 0 12px;
         color: oklch(24.19% 0.019 255.77);
-        font-size: 30px;
-        font-weight: 900;
+        font-size: 28px;
+        font-weight: 700;
         line-height: 1.22;
     }
 
@@ -3848,15 +4591,19 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-width: 30px;
-        min-height: 22px;
-        border-radius: 999px;
+        min-width: 34px;
+        height: 22px;
+        border-radius: 4px;
         background: oklch(61.2% 0.049 77.83);
         color: oklch(99.1% 0.006 93.08);
-        content: counter(dc-tutorial-step, decimal-leading-zero);
+        content: attr(data-number);
         font-size: 12px;
         font-weight: 900;
-        line-height: 1.1;
+        line-height: 22px;
+    }
+
+    .editor-surface :global(.dc-tutorial-number:not([data-number])::before) {
+        content: counter(dc-tutorial-step, decimal-leading-zero);
     }
 
     .editor-surface :global(.dc-tutorial-title) {
@@ -3867,7 +4614,7 @@
     }
 
     .editor-surface :global(.dc-tutorial-body) {
-        padding-left: 42px;
+        padding-left: 34px;
     }
 
     .editor-surface :global(.dc-tutorial-body > *:last-child) {
@@ -3954,115 +4701,124 @@
     .editor-surface :global(.dc-callout) {
         margin: 0 0 16px;
         padding: 12px 14px;
+        border-left: 4px solid var(--dc-callout-border);
         border-radius: 7px;
+        background: var(--dc-callout-background);
+        color: var(--dc-callout-text);
+    }
+
+    .editor-surface-dark :global(.dc-callout) {
+        border-left-color: var(--dc-callout-dark-border);
+        background: var(--dc-callout-dark-background);
+        color: var(--dc-callout-dark-text);
     }
 
     .editor-surface :global(.dc-callout-tip) {
-        border-left: 4px solid oklch(70.89% 0.156 142.5);
-        background: oklch(96.48% 0.047 142.49);
-        color: oklch(30.18% 0.073 145.31);
+        --dc-callout-border: oklch(70.89% 0.156 142.5);
+        --dc-callout-background: oklch(96.48% 0.047 142.49);
+        --dc-callout-text: oklch(30.18% 0.073 145.31);
     }
 
     .editor-surface-dark :global(.dc-callout-tip) {
-        border-left-color: oklch(76.13% 0.153 142.04);
-        background: oklch(11.88% 0.018 142.78);
-        color: oklch(91.89% 0.026 143.2);
+        --dc-callout-dark-border: oklch(76.13% 0.153 142.04);
+        --dc-callout-dark-background: oklch(11.88% 0.018 142.78);
+        --dc-callout-dark-text: oklch(91.89% 0.026 143.2);
     }
 
     .editor-surface :global(.dc-callout-warning) {
-        border-left: 4px solid oklch(73.08% 0.151 60.74);
-        background: oklch(96.87% 0.048 75.17);
-        color: oklch(34.21% 0.082 52.58);
+        --dc-callout-border: oklch(73.08% 0.151 60.74);
+        --dc-callout-background: oklch(96.87% 0.048 75.17);
+        --dc-callout-text: oklch(34.21% 0.082 52.58);
     }
 
     .editor-surface-dark :global(.dc-callout-warning) {
-        border-left-color: oklch(78.46% 0.145 69.41);
-        background: oklch(12.26% 0.018 58.76);
-        color: oklch(92.96% 0.03 76.33);
+        --dc-callout-dark-border: oklch(78.46% 0.145 69.41);
+        --dc-callout-dark-background: oklch(12.26% 0.018 58.76);
+        --dc-callout-dark-text: oklch(92.96% 0.03 76.33);
     }
 
     .editor-surface :global(.dc-callout-reference) {
-        border-left: 4px solid oklch(68.74% 0.127 246.28);
-        background: oklch(96.27% 0.036 247.39);
-        color: oklch(32.26% 0.07 249.42);
+        --dc-callout-border: oklch(68.74% 0.127 246.28);
+        --dc-callout-background: oklch(96.27% 0.036 247.39);
+        --dc-callout-text: oklch(32.26% 0.07 249.42);
     }
 
     .editor-surface-dark :global(.dc-callout-reference) {
-        border-left-color: oklch(72.52% 0.142 232.16);
-        background: oklch(11.62% 0.021 245.9);
-        color: oklch(91.87% 0.029 233.82);
+        --dc-callout-dark-border: oklch(72.52% 0.142 232.16);
+        --dc-callout-dark-background: oklch(11.62% 0.021 245.9);
+        --dc-callout-dark-text: oklch(91.87% 0.029 233.82);
     }
 
     .editor-surface :global(.dc-callout-emphasis) {
-        border-left: 4px solid oklch(64.73% 0.162 303.08);
-        background: oklch(96.21% 0.036 302.35);
-        color: oklch(33.84% 0.091 303.69);
+        --dc-callout-border: oklch(64.73% 0.162 303.08);
+        --dc-callout-background: oklch(96.21% 0.036 302.35);
+        --dc-callout-text: oklch(33.84% 0.091 303.69);
     }
 
     .editor-surface-dark :global(.dc-callout-emphasis) {
-        border-left-color: oklch(73.79% 0.151 303.45);
-        background: oklch(12.04% 0.022 302.17);
-        color: oklch(93.04% 0.029 303.2);
+        --dc-callout-dark-border: oklch(73.79% 0.151 303.45);
+        --dc-callout-dark-background: oklch(12.04% 0.022 302.17);
+        --dc-callout-dark-text: oklch(93.04% 0.029 303.2);
     }
 
     .editor-surface :global(.dc-callout-success) {
-        border-left: 4px solid oklch(66.42% 0.152 154.12);
-        background: oklch(96.12% 0.041 152.76);
-        color: oklch(29.24% 0.08 154.12);
+        --dc-callout-border: oklch(66.42% 0.152 154.12);
+        --dc-callout-background: oklch(96.12% 0.041 152.76);
+        --dc-callout-text: oklch(29.24% 0.08 154.12);
     }
 
     .editor-surface-dark :global(.dc-callout-success) {
-        border-left-color: oklch(76.71% 0.151 154.54);
-        background: oklch(11.76% 0.02 154.8);
-        color: oklch(92.34% 0.029 154.17);
+        --dc-callout-dark-border: oklch(76.71% 0.151 154.54);
+        --dc-callout-dark-background: oklch(11.76% 0.02 154.8);
+        --dc-callout-dark-text: oklch(92.34% 0.029 154.17);
     }
 
     .editor-surface :global(.dc-callout-failure) {
-        border-left: 4px solid oklch(62.42% 0.178 24.04);
-        background: oklch(96.23% 0.039 24.18);
-        color: oklch(34.1% 0.098 24.62);
+        --dc-callout-border: oklch(62.42% 0.178 24.04);
+        --dc-callout-background: oklch(96.23% 0.039 24.18);
+        --dc-callout-text: oklch(34.1% 0.098 24.62);
     }
 
     .editor-surface-dark :global(.dc-callout-failure) {
-        border-left-color: oklch(75.02% 0.17 24.82);
-        background: oklch(12.02% 0.021 24.58);
-        color: oklch(93.14% 0.03 24.92);
+        --dc-callout-dark-border: oklch(75.02% 0.17 24.82);
+        --dc-callout-dark-background: oklch(12.02% 0.021 24.58);
+        --dc-callout-dark-text: oklch(93.14% 0.03 24.92);
     }
 
     .editor-surface :global(.dc-callout-experiment) {
-        border-left: 4px solid oklch(62.11% 0.15 263.9);
-        background: oklch(96.2% 0.032 264.42);
-        color: oklch(31.56% 0.081 264.1);
+        --dc-callout-border: oklch(62.11% 0.15 263.9);
+        --dc-callout-background: oklch(96.2% 0.032 264.42);
+        --dc-callout-text: oklch(31.56% 0.081 264.1);
     }
 
     .editor-surface-dark :global(.dc-callout-experiment) {
-        border-left-color: oklch(73.44% 0.145 264.2);
-        background: oklch(11.48% 0.022 264.32);
-        color: oklch(92.52% 0.031 264.14);
+        --dc-callout-dark-border: oklch(73.44% 0.145 264.2);
+        --dc-callout-dark-background: oklch(11.48% 0.022 264.32);
+        --dc-callout-dark-text: oklch(92.52% 0.031 264.14);
     }
 
     .editor-surface :global(.dc-callout-conclusion) {
-        border-left: 4px solid oklch(72.44% 0.119 91.73);
-        background: oklch(96.87% 0.042 94.2);
-        color: oklch(34.5% 0.065 88.3);
+        --dc-callout-border: oklch(72.44% 0.119 91.73);
+        --dc-callout-background: oklch(96.87% 0.042 94.2);
+        --dc-callout-text: oklch(34.5% 0.065 88.3);
     }
 
     .editor-surface-dark :global(.dc-callout-conclusion) {
-        border-left-color: oklch(80.18% 0.126 91.43);
-        background: oklch(12.18% 0.018 91.22);
-        color: oklch(93.56% 0.027 91.42);
+        --dc-callout-dark-border: oklch(80.18% 0.126 91.43);
+        --dc-callout-dark-background: oklch(12.18% 0.018 91.22);
+        --dc-callout-dark-text: oklch(93.56% 0.027 91.42);
     }
 
     .editor-surface :global(.dc-callout-rebuttal) {
-        border-left: 4px solid oklch(64.8% 0.157 330.2);
-        background: oklch(96.1% 0.038 330.12);
-        color: oklch(34.4% 0.096 329.55);
+        --dc-callout-border: oklch(64.8% 0.157 330.2);
+        --dc-callout-background: oklch(96.1% 0.038 330.12);
+        --dc-callout-text: oklch(34.4% 0.096 329.55);
     }
 
     .editor-surface-dark :global(.dc-callout-rebuttal) {
-        border-left-color: oklch(75.91% 0.154 330.36);
-        background: oklch(12.11% 0.023 330.24);
-        color: oklch(93.11% 0.031 330.24);
+        --dc-callout-dark-border: oklch(75.91% 0.154 330.36);
+        --dc-callout-dark-background: oklch(12.11% 0.023 330.24);
+        --dc-callout-dark-text: oklch(93.11% 0.031 330.24);
     }
 
     .editor-surface :global(.dc-link-box) {
@@ -4105,43 +4861,18 @@
         padding: 18px;
         font-family:
             Cascadia Mono,
-            Cascadia Code,
-            Cascadia Mono PL,
-            Cascadia Code PL,
             D2Coding,
-            D2Coding ligature,
-            D2CodingLigature,
             나눔고딕코딩,
-            NanumGothicCoding,
-            Nanum Gothic Coding,
-            Noto Sans Mono CJK KR,
             Noto Sans Mono CJK,
-            Noto Sans Mono,
-            Source Han Mono K,
-            Source Han Mono KR,
-            Sarasa Mono K,
-            Sarasa Gothic K,
             JetBrains Mono,
             Fira Code,
-            Fira Mono,
             Hack,
             Source Code Pro,
             IBM Plex Mono,
             Roboto Mono,
-            Iosevka,
-            Iosevka Fixed,
-            Monaspace Neon,
-            Monaspace Argon,
-            DejaVu Sans Mono,
-            Liberation Mono,
-            Ubuntu Mono,
-            Bitstream Vera Sans Mono,
             Consolas,
-            SFMono-Regular,
             Menlo,
             Monaco,
-            Lucida Console,
-            Courier New,
             monospace;
         font-size: 13px;
         line-height: 1.6;
@@ -4157,43 +4888,18 @@
         color: oklch(51.52% 0.02 87.11);
         font-family:
             Cascadia Mono,
-            Cascadia Code,
-            Cascadia Mono PL,
-            Cascadia Code PL,
             D2Coding,
-            D2Coding ligature,
-            D2CodingLigature,
             나눔고딕코딩,
-            NanumGothicCoding,
-            Nanum Gothic Coding,
-            Noto Sans Mono CJK KR,
             Noto Sans Mono CJK,
-            Noto Sans Mono,
-            Source Han Mono K,
-            Source Han Mono KR,
-            Sarasa Mono K,
-            Sarasa Gothic K,
             JetBrains Mono,
             Fira Code,
-            Fira Mono,
             Hack,
             Source Code Pro,
             IBM Plex Mono,
             Roboto Mono,
-            Iosevka,
-            Iosevka Fixed,
-            Monaspace Neon,
-            Monaspace Argon,
-            DejaVu Sans Mono,
-            Liberation Mono,
-            Ubuntu Mono,
-            Bitstream Vera Sans Mono,
             Consolas,
-            SFMono-Regular,
             Menlo,
             Monaco,
-            Lucida Console,
-            Courier New,
             monospace;
     }
 

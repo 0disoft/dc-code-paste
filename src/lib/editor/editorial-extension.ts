@@ -1,6 +1,8 @@
 import { mergeAttributes, Node } from "@tiptap/core";
 import { normalizeCtaGroupLayout } from "./cta-group";
+import { normalizeEditableLinkHref } from "./link";
 import { defaultSummaryBoxLabel } from "./summary-box";
+import { normalizeTutorialStepNumber } from "./tutorial-block";
 
 export const SectionHeading = Node.create({
   name: "sectionHeading",
@@ -34,9 +36,10 @@ export const CtaButton = Node.create({
     return {
       href: {
         default: "",
-        parseHTML: (element) => element.getAttribute("data-href") ?? "",
+        parseHTML: (element) => normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
         renderHTML: (attributes) => {
-          const href = typeof attributes.href === "string" ? attributes.href : "";
+          const href =
+            typeof attributes.href === "string" ? normalizeEditableLinkHref(attributes.href) : "";
           return href ? { "data-href": href } : {};
         },
       },
@@ -111,9 +114,10 @@ export const ReferenceItem = Node.create({
     return {
       href: {
         default: "",
-        parseHTML: (element) => element.getAttribute("data-href") ?? "",
+        parseHTML: (element) => normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
         renderHTML: (attributes) => {
-          const href = typeof attributes.href === "string" ? attributes.href : "";
+          const href =
+            typeof attributes.href === "string" ? normalizeEditableLinkHref(attributes.href) : "";
           return href ? { "data-href": href } : {};
         },
       },
@@ -271,6 +275,21 @@ export const TutorialStep = Node.create({
           return title ? { "data-title": title } : {};
         },
       },
+      number: {
+        default: "",
+        parseHTML: (element) => {
+          const number =
+            element.getAttribute("data-number") ??
+            element.querySelector(".dc-tutorial-number")?.getAttribute("data-number") ??
+            "";
+
+          return normalizeTutorialStepNumber(number);
+        },
+        renderHTML: (attributes) => {
+          const number = normalizeTutorialStepNumber(attributes.number);
+          return number ? { "data-number": number } : {};
+        },
+      },
     };
   },
 
@@ -281,6 +300,10 @@ export const TutorialStep = Node.create({
   renderHTML({ HTMLAttributes }) {
     const title =
       typeof HTMLAttributes["data-title"] === "string" ? HTMLAttributes["data-title"] : "단계";
+    const number = normalizeTutorialStepNumber(HTMLAttributes["data-number"]);
+    const numberAttributes = number
+      ? { class: "dc-tutorial-number", "data-number": number }
+      : { class: "dc-tutorial-number" };
 
     return [
       "section",
@@ -291,7 +314,7 @@ export const TutorialStep = Node.create({
       [
         "div",
         { class: "dc-tutorial-head" },
-        ["span", { class: "dc-tutorial-number" }],
+        ["span", numberAttributes],
         ["strong", { class: "dc-tutorial-title" }, title],
       ],
       ["div", { class: "dc-tutorial-body" }, 0],
