@@ -6,6 +6,7 @@
         Clipboard,
         Code2,
         FileText,
+        Github,
         Heading1,
         Highlighter,
         History,
@@ -2451,6 +2452,16 @@
                 <Save size={17} />
                 <span>저장함</span>
             </button>
+            <a
+                class="tool-link"
+                href="https://github.com/0disoft/dc-code-paste"
+                target="_blank"
+                rel="noreferrer"
+                title="GitHub 저장소"
+                aria-label="GitHub 저장소 새 탭으로 열기"
+            >
+                <Github size={17} />
+            </a>
         </div>
 
         <div class="tool-group inline-group">
@@ -3432,6 +3443,7 @@
     }
 
     .toolbar button,
+    .toolbar .tool-link,
     .toolbar label,
     .switch {
         height: 36px;
@@ -3439,7 +3451,8 @@
         white-space: nowrap;
     }
 
-    .toolbar button {
+    .toolbar button,
+    .toolbar .tool-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -3452,6 +3465,7 @@
         color: var(--text);
         font-weight: 500;
         cursor: pointer;
+        text-decoration: none;
     }
 
     .toolbar :global(svg) {

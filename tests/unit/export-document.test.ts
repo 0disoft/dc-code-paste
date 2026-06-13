@@ -42,7 +42,7 @@ describe("exportDocumentToDcHtml", () => {
     const footerStart = html.indexOf("Created with dc-code-paste");
 
     expect(footerStart).toBeGreaterThan(html.indexOf("본문 내용"));
-    expect(html).toContain('href="https://github.com/0disoft/dc-code-paste"');
+    expect(html).toContain('href="https://0disoft.github.io/dc-code-paste/"');
     expect(html).toContain('target="_blank"');
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain('align="right"');

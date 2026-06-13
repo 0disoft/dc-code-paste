@@ -48,7 +48,7 @@ const defaultCodeFontSize = "15px";
 const dcLightPageBackground = "#ffffff";
 const dcDarkPageBackground = "#151515";
 const dcDarkPanelBackground = "#1b1b1b";
-const attributionHref = "https://github.com/0disoft/dc-code-paste";
+const attributionHref = "https://0disoft.github.io/dc-code-paste/";
 const attributionText = "Created with dc-code-paste";
 
 type DocumentPalette = {
