@@ -1,252 +1,161 @@
 import type { JSONContent } from "@tiptap/core";
-import { createDefaultComparisonBlock } from "$lib/editor/comparison-block";
-import { createDefaultCtaGroup } from "$lib/editor/cta-group";
-import { createDefaultHeroBlock } from "$lib/editor/hero-block";
-import { createDefaultReferenceList } from "$lib/editor/reference-list";
-import { createDefaultSummaryBox } from "$lib/editor/summary-box";
-import { createDefaultTutorialBlock } from "$lib/editor/tutorial-block";
+
+function text(value: string, marks?: JSONContent["marks"]): JSONContent {
+  return marks ? { type: "text", text: value, marks } : { type: "text", text: value };
+}
+
+function codeText(value: string): JSONContent {
+  return text(value, [{ type: "code" }]);
+}
+
+function paragraph(content: JSONContent[]): JSONContent {
+  return { type: "paragraph", content };
+}
+
+function summaryItem(content: JSONContent[]): JSONContent {
+  return { type: "summaryItem", content };
+}
+
+function codeBlock(filename: string, highlightLines: string, source: string): JSONContent {
+  return {
+    type: "codeBlock",
+    attrs: { language: "go", filename, highlightLines },
+    content: [{ type: "text", text: source }],
+  };
+}
+
+function callout(
+  type: "tipBox" | "warningBox" | "conclusionBox",
+  label: string,
+  toneColor: string,
+  content: JSONContent[],
+): JSONContent {
+  return {
+    type,
+    attrs: { label, toneColor },
+    content: [paragraph(content)],
+  };
+}
+
+function referenceItem(label: string, href: string): JSONContent {
+  return {
+    type: "referenceItem",
+    attrs: { href },
+    content: [text(label)],
+  };
+}
+
+function ctaButton(label: string, href: string): JSONContent {
+  return {
+    type: "ctaButton",
+    attrs: { href },
+    content: [text(label)],
+  };
+}
 
 export const sampleDocument: JSONContent = {
   type: "doc",
   content: [
-    createDefaultHeroBlock(),
-    createDefaultSummaryBox(),
     {
-      type: "paragraph",
+      type: "heroBlock",
+      attrs: { label: "GO의 유일한 반복자" },
       content: [
-        { type: "text", text: "Go는 메모리 공유 대신 " },
-        { type: "text", text: "통신을 통한 메모리 공유", marks: [{ type: "bold" }] },
         {
-          type: "text",
-          text: "를 지향한다. 고루틴과 채널을 같이 보면 동시성 코드의 흐름이 훨씬 또렷해진다.",
+          type: "heading",
+          attrs: { level: 1 },
+          content: [text("Go 반복문 정복: for 하나로 모든 루프를 제어한다")],
         },
+        paragraph([
+          text(
+            "C 언어 계열의 while, do-while 없이 오직 for만으로 모든 반복 패턴을 구현하는 Go의 간결한 설계를 실전 예제로 익힌다.",
+          ),
+        ]),
       ],
     },
     {
-      type: "blockquote",
-      attrs: { quoteStyle: "pull" },
+      type: "summaryBox",
+      attrs: { label: "for문 기본기" },
       content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "Do not communicate by sharing memory; instead, share memory by communicating.",
-            },
-          ],
-        },
+        summaryItem([
+          text("Go에는 "),
+          codeText("for"),
+          text(" 키워드 하나만 존재하며, 초기문·조건문·증감문을 모두 생략할 수 있다."),
+        ]),
+        summaryItem([
+          text("조건문만 남기면 "),
+          codeText("while"),
+          text("처럼, 아무것도 쓰지 않으면 무한 루프로 동작한다."),
+        ]),
+        summaryItem([
+          codeText("range"),
+          text("를 통해 배열·슬라이스·맵·채널을 인덱스와 값으로 안전하게 순회한다."),
+        ]),
+        summaryItem([
+          text("사용하지 않는 변수는 "),
+          codeText("_"),
+          text("로 명시적으로 버려야 컴파일 오류를 피할 수 있다."),
+        ]),
+      ],
+    },
+    codeBlock(
+      "basic_for.go",
+      "6",
+      'package main\n\nimport "fmt"\n\nfunc main() {\n    for i := 0; i < 5; i++ {\n        fmt.Println(i)\n    }\n}',
+    ),
+    codeBlock(
+      "while_style.go",
+      "7",
+      'package main\n\nimport "fmt"\n\nfunc main() {\n    sum := 1\n    for sum < 1000 {\n        sum += sum\n    }\n    fmt.Println(sum)\n}',
+    ),
+    codeBlock(
+      "infinite_loop.go",
+      "4",
+      "package main\n\nfunc main() {\n    for {\n        // 무한 반복이 필요할 때\n    }\n}",
+    ),
+    codeBlock(
+      "range_with_index.go",
+      "6",
+      'package main\n\nimport "fmt"\n\nfunc main() {\n    fruits := []string{"사과", "바나나", "체리"}\n    for idx, name := range fruits {\n        fmt.Printf("%d: %s\\n", idx, name)\n    }\n}',
+    ),
+    callout("tipBox", "조건문으로 변신한 for", "#16a34a", [
+      text("초기문과 증감문을 생략하면 일반적인 "),
+      codeText("while"),
+      text(
+        " 루프와 동일한 형태가 된다. 조건이 거짓이 될 때까지 블록을 반복 실행하므로, 종료 조건을 명확히 설정해야 무한 루프를 방지할 수 있다.",
+      ),
+    ]),
+    callout("warningBox", "range는 값 복사에 주의", "#d97706", [
+      codeText("for range"),
+      text("로 슬라이스를 순회할 때 반환되는 "),
+      codeText("value"),
+      text(
+        "는 요소의 복사본이다. 원본 요소를 직접 수정하려면 인덱스를 사용하거나 포인터 슬라이스를 순회해야 한다.",
+      ),
+    ]),
+    callout("conclusionBox", "for 하나로 충분한 이유", "#a16207", [
+      text("Go는 "),
+      codeText("for"),
+      text("의 생략 가능한 구성 요소와 "),
+      codeText("range"),
+      text(
+        " 키워드만으로 반복 구조를 직교성 있게 표현한다. 문법이 적을수록 코드 리뷰는 빨라지고, 관용구를 익히는 데 걸리는 시간도 짧아진다.",
+      ),
+    ]),
+    {
+      type: "referenceList",
+      content: [
+        referenceItem("A Tour of Go - For", "https://go.dev/tour/flowcontrol/1"),
+        referenceItem("Effective Go - For", "https://go.dev/doc/effective_go#for"),
+        referenceItem("Go by Example: For", "https://gobyexample.com/for"),
       ],
     },
     {
-      type: "sectionHeading",
-      content: [{ type: "text", text: "고루틴" }],
-    },
-    {
-      type: "paragraph",
+      type: "ctaGroup",
+      attrs: { layout: "vertical" },
       content: [
-        { type: "text", text: "함수 호출 앞에 " },
-        { type: "text", text: "go", marks: [{ type: "code" }] },
-        {
-          type: "text",
-          text: "를 붙이면 새 고루틴이 생성된다. 고루틴은 OS 스레드보다 훨씬 가볍고, Go 런타임이 이를 효율적으로 스케줄링한다.",
-        },
-      ],
-    },
-    {
-      type: "codeBlock",
-      attrs: {
-        language: "go",
-        filename: "goroutine_basic.go",
-        highlightLines: "5-6",
-      },
-      content: [
-        {
-          type: "text",
-          text: 'package main\n\nimport "fmt"\n\nfunc main() {\n    go fmt.Println("비동기 실행")\n    fmt.Println("메인 함수 실행")\n    // 고루틴 완료를 보장하지 않으면 메인이 먼저 종료될 수 있다\n}',
-        },
-      ],
-    },
-    {
-      type: "tipBox",
-      attrs: { label: "스택 감각", toneColor: "#16a34a" },
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "고루틴 하나의 초기 스택은 작게 시작하고 필요할 때 늘어난다. 수천 개의 작업을 만들 수 있지만, 종료 경로는 반드시 설계해야 한다.",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "sectionHeading",
-      content: [{ type: "text", text: "채널 방향" }],
-    },
-    {
-      type: "paragraph",
-      content: [
-        { type: "text", text: "채널은 " },
-        { type: "text", text: "make(chan T)", marks: [{ type: "code" }] },
-        { type: "text", text: "로 만들고 " },
-        { type: "text", text: "<-", marks: [{ type: "code" }] },
-        {
-          type: "text",
-          text: " 연산자로 값을 주고받는다. 함수 시그니처에 방향을 적으면 실수를 컴파일 단계에서 줄일 수 있다.",
-        },
-      ],
-    },
-    {
-      type: "codeBlock",
-      attrs: {
-        language: "go",
-        filename: "directional_channel.go",
-        highlightLines: "1-2",
-        additionLines: "5",
-        deletionLines: "7",
-      },
-      content: [
-        {
-          type: "text",
-          text: "func sendOnly(ch chan<- int) {\n    ch <- 42\n}\n\nfunc recvOnly(ch <-chan int) {\n    val := <-ch\n    fmt.Println(val)\n}",
-        },
-      ],
-    },
-    {
-      type: "warningBox",
-      attrs: { label: "데드락 체크", toneColor: "#d97706" },
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "버퍼 없는 채널에서 송신자와 수신자가 동시에 준비되지 않으면 고루틴은 멈춘다. 작은 예제에서도 누가 보내고 누가 받는지 먼저 그려야 한다.",
-            },
-          ],
-        },
-      ],
-    },
-    createDefaultComparisonBlock(),
-    {
-      type: "horizontalRule",
-    },
-    {
-      type: "sectionHeading",
-      content: [{ type: "text", text: "실전 패턴" }],
-    },
-    {
-      type: "paragraph",
-      content: [
-        {
-          type: "text",
-          text: "여러 워커가 작업을 나눠 처리하고 결과를 모으는 Fan-Out / Fan-In 흐름은 채널의 쓰임을 가장 빨리 체감할 수 있는 패턴이다.",
-        },
-      ],
-    },
-    createDefaultTutorialBlock(),
-    {
-      type: "bulletList",
-      content: [
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "작업 큐는 버퍼 채널로 단순하게 시작한다." }],
-            },
-          ],
-        },
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                {
-                  type: "text",
-                  text: "종료 신호는 close와 context 중 어느 쪽이 책임지는지 정한다.",
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "orderedList",
-      content: [
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: "작은 입력으로 고루틴 종료를 먼저 확인한다." }],
-            },
-          ],
-        },
-        {
-          type: "listItem",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                { type: "text", text: "부하를 늘리기 전에 취소 경로와 타임아웃을 연결한다." },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      type: "referenceBox",
-      attrs: { label: "읽을거리", toneColor: "#2563eb" },
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "공식 문서의 " },
-            {
-              type: "text",
-              text: "A Tour of Go 동시성 장",
-              marks: [
-                {
-                  type: "link",
-                  attrs: {
-                    href: "https://go.dev/tour/concurrency/1",
-                    target: "_blank",
-                    rel: "noopener noreferrer",
-                  },
-                },
-              ],
-            },
-            { type: "text", text: "을 같이 열어두면 예제를 바로 실행해 보기 좋다." },
-          ],
-        },
-      ],
-    },
-    createDefaultReferenceList(),
-    {
-      type: "ctaButton",
-      attrs: { href: "https://go.dev/play/" },
-      content: [{ type: "text", text: "Go Playground 열기" }],
-    },
-    createDefaultCtaGroup("vertical"),
-    {
-      type: "linkBox",
-      attrs: { href: "https://go.dev/doc/effective_go#concurrency" },
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: "Effective Go의 동시성 문단은 링크박스로 따로 빼두면 다시 찾아보기 쉽다.",
-            },
-          ],
-        },
+        ctaButton("Go Playground", "https://go.dev/play/"),
+        ctaButton("Tour of Go", "https://go.dev/tour/"),
+        ctaButton("언어 명세 (For문)", "https://go.dev/ref/spec#For_statements"),
       ],
     },
   ],

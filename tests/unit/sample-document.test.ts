@@ -10,21 +10,11 @@ const requiredManualCheckNodes = [
   "summaryItem",
   "tipBox",
   "warningBox",
-  "referenceBox",
-  "linkBox",
-  "blockquote",
-  "sectionHeading",
-  "tutorialBlock",
-  "tutorialStep",
-  "comparisonBlock",
-  "comparisonColumn",
+  "conclusionBox",
   "ctaButton",
   "ctaGroup",
   "referenceList",
   "referenceItem",
-  "bulletList",
-  "orderedList",
-  "horizontalRule",
   "codeBlock",
 ] as const;
 
@@ -56,11 +46,14 @@ describe("sampleDocument", () => {
     }
   });
 
-  it("uses the current Go concurrency sample instead of the old C++ fast I/O sample", () => {
+  it("uses the current Go for-loop sample instead of the older examples", () => {
     const text = collectText(sampleDocument);
 
-    expect(text).toContain("Go 동시성 마스터하기: 고루틴과 채널");
-    expect(text).toContain("goroutine은 go 키워드로 실행되는 가벼운 작업 단위다.");
+    expect(text).toContain("Go 반복문 정복: for 하나로 모든 루프를 제어한다");
+    expect(text).toContain("Go에는 for 키워드 하나만 존재하며");
+    expect(text).toContain("for range로 슬라이스를 순회할 때 반환되는 value는 요소의 복사본이다.");
+    expect(text).not.toContain("Go 동시성 마스터하기: 고루틴과 채널");
+    expect(text).not.toContain("goroutine은 go 키워드로 실행되는 가벼운 작업 단위다.");
     expect(text).not.toContain("C++로 보는 입력 최적화");
     expect(text).not.toContain("sync_with_stdio");
   });

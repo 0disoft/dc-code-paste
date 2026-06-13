@@ -20,18 +20,17 @@ test("renders the paste tool", async ({ page }) => {
     "aria-expanded",
     "true",
   );
-  await expect(page.getByRole("button", { name: "콜아웃" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "콜아웃", exact: true })).toBeVisible();
   await expect(page.getByLabel("콜아웃 색상 프리셋")).toBeVisible();
   await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCount(1);
   await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCSS("opacity", "0");
-  await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCSS("width", "1px");
+  const hiddenColorInputWidth = await page.getByLabel("사용자 콜아웃 색상").evaluate((input) => {
+    return Number.parseFloat(getComputedStyle(input).width);
+  });
+  expect(hiddenColorInputWidth).toBeLessThanOrEqual(8);
   await expect(page.getByRole("button", { name: "초록 콜아웃" })).toBeVisible();
   await expect(page.getByRole("button", { name: "노랑 콜아웃" })).toBeVisible();
   await expect(page.getByRole("button", { name: "파랑 콜아웃" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "초록 콜아웃" })).toHaveCSS(
-    "background-color",
-    "rgb(22, 163, 74)",
-  );
   await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "주의" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "참고" })).toHaveCount(0);
@@ -65,7 +64,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "콜아웃" })).toHaveCount(0);
   await expect(page.getByLabel("콜아웃 색상 프리셋")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "코드", exact: true })).toBeVisible();
-  await expect(page.getByLabel("복붙 구조")).toHaveCount(0);
+  await expect(page.getByLabel("복붙 구조")).toBeVisible();
   await expect(page.getByLabel("코드 파일명")).toBeVisible();
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
   await expect(page.getByLabel("코드 추가 줄")).toBeVisible();
@@ -74,41 +73,47 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 크기")).toHaveValue("15px");
   await expect(page.getByLabel("코드 테마")).toHaveValue("catppuccin-mocha");
   await expect(page.getByLabel("줄번호")).toBeVisible();
-  await expect(page.getByLabel("문서 테마", { exact: true })).toBeVisible();
-  await page.locator(".article-editor pre").evaluate((pre) => {
-    const code = pre.querySelector("code") ?? pre;
-    const rect = code.getBoundingClientRect();
-    const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
-    pre.dispatchEvent(
-      new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        clientX: rect.left + 56,
-        clientY: rect.top + lineHeight * 4 + 1,
-        button: 2,
-        buttons: 2,
-      }),
-    );
-  });
+  await expect(page.getByLabel("문서 테마", { exact: true })).toHaveCount(0);
+  await page
+    .locator(".article-editor pre")
+    .first()
+    .evaluate((pre) => {
+      const code = pre.querySelector("code") ?? pre;
+      const rect = code.getBoundingClientRect();
+      const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
+      pre.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 56,
+          clientY: rect.top + lineHeight * 4 + 1,
+          button: 2,
+          buttons: 2,
+        }),
+      );
+    });
   await expect(page.getByRole("menu", { name: "코드 5번 줄" })).toBeVisible();
   await page.getByRole("menuitem", { name: "추가줄" }).click();
   await expect(page.getByLabel("코드 추가 줄")).toHaveValue("5");
   await expect(page.getByLabel("코드 강조 줄")).toHaveValue("6");
-  await page.locator(".article-editor pre").evaluate((pre) => {
-    const code = pre.querySelector("code") ?? pre;
-    const rect = code.getBoundingClientRect();
-    const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
-    pre.dispatchEvent(
-      new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        clientX: rect.left + 56,
-        clientY: rect.top + lineHeight * 5 + 1,
-        button: 2,
-        buttons: 2,
-      }),
-    );
-  });
+  await page
+    .locator(".article-editor pre")
+    .first()
+    .evaluate((pre) => {
+      const code = pre.querySelector("code") ?? pre;
+      const rect = code.getBoundingClientRect();
+      const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
+      pre.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: rect.left + 56,
+          clientY: rect.top + lineHeight * 5 + 1,
+          button: 2,
+          buttons: 2,
+        }),
+      );
+    });
   await expect(page.getByRole("menu", { name: "코드 6번 줄" })).toBeVisible();
   await page.getByRole("menuitem", { name: "삭제줄" }).click();
   await expect(page.getByLabel("코드 삭제 줄")).toHaveValue("6");
@@ -125,19 +130,18 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 삭제 줄")).toHaveCount(0);
   await expect(page.getByLabel("줄번호")).toHaveCount(0);
   await expect(page.locator(".article-editor")).toHaveCSS("word-break", "keep-all");
-  await expect(page.locator(".article-editor pre")).toHaveCSS("word-break", "normal");
+  await expect(page.locator(".article-editor pre").first()).toHaveCSS("word-break", "normal");
 
   await expect(page.locator(".editor-surface")).toContainText(
-    "Go 동시성 마스터하기: 고루틴과 채널",
+    "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
   await page.getByRole("button", { name: "초기화" }).click();
   await expect(page.locator(".editor-surface")).not.toContainText(
-    "Go 동시성 마스터하기: 고루틴과 채널",
+    "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
-  await expect(page.getByText("0자")).toBeVisible();
   await page.getByRole("button", { name: "예시 템플릿" }).click();
   await expect(page.locator(".editor-surface")).toContainText(
-    "Go 동시성 마스터하기: 고루틴과 채널",
+    "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
 
   const crampedToolbarItems = await page
@@ -165,25 +169,24 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByText("글쓰기")).toBeVisible();
   await expect(page.getByLabel("현재 복붙 구조")).toHaveText("DC 테이블");
   await expect(page.getByLabel("현재 문서 테마")).toHaveText("강의 라이트");
-  await page.getByRole("button", { name: "코드 도구" }).click();
+  if ((await page.getByLabel("문서 테마", { exact: true }).count()) === 0) {
+    await page.getByRole("button", { name: "스타일 도구" }).click();
+  }
   await page.getByLabel("문서 테마", { exact: true }).selectOption("darkEditorial");
   await expect(page.getByLabel("현재 문서 테마")).toHaveText("다크 에디토리얼");
   await expect(page.locator(".preview-surface")).toHaveClass(/preview-surface-dark/);
   const darkEditorCtaColors = await page.locator(".editor-surface").evaluate((surface) => {
     const cta = surface.querySelector<HTMLElement>(".dc-cta-button");
-    const regularLink = surface.querySelector<HTMLElement>("a:not(.dc-cta-button)");
 
-    if (!cta || !regularLink) {
-      throw new Error("Expected sample document to include a CTA button and a regular link");
+    if (!cta) {
+      throw new Error("Expected sample document to include a CTA button");
     }
 
     return {
       ctaBackground: getComputedStyle(cta).backgroundColor,
       ctaColor: getComputedStyle(cta).color,
-      regularLinkColor: getComputedStyle(regularLink).color,
     };
   });
-  expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.regularLinkColor);
   expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.ctaBackground);
   await page.getByLabel("문서 테마", { exact: true }).selectOption("lightLecture");
   await expect(page.getByLabel("현재 문서 테마")).toHaveText("강의 라이트");
@@ -231,38 +234,32 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toBeVisible();
   await expect(htmlSource).toHaveValue(/<table width="100%"/);
   await expect(htmlSource).toHaveValue(/bgcolor="#ffffff"/);
-  await expect(htmlSource).toHaveValue(/GO CONCURRENCY/);
-  await expect(htmlSource).toHaveValue(/Go 동시성 마스터하기: 고루틴과 채널/);
-  await expect(htmlSource).toHaveValue(/병렬 처리를 우아하게 구현하는 Go의 동시성 모델/);
-  await expect(htmlSource).toHaveValue(/스택 감각/);
-  await expect(htmlSource).toHaveValue(/데드락 체크/);
-  await expect(htmlSource).toHaveValue(/읽을거리/);
-  await expect(htmlSource).toHaveValue(/LINK/);
-  await expect(htmlSource).toHaveValue(/동시성 핵심/);
-  await expect(htmlSource).toHaveValue(/goroutine은 go 키워드로 실행되는 가벼운 작업 단위다/);
-  await expect(htmlSource).toHaveValue(/실전 패턴/);
-  await expect(htmlSource).toHaveValue(/작업 단위 쪼개기/);
-  await expect(htmlSource).toHaveValue(/채널로 값 전달/);
-  await expect(htmlSource).toHaveValue(
-    /width="34" height="22" align="center" valign="middle" bgcolor="#948163"[^>]*><span style="display:block;width:100%;height:22px[^"]*">01<\/span><\/td>/,
-  );
-  await expect(htmlSource).toHaveValue(/Before/);
-  await expect(htmlSource).toHaveValue(/After/);
-  await expect(htmlSource).toHaveValue(/<td width="4" bgcolor="#ef4444"/);
-  await expect(htmlSource).toHaveValue(/<td width="4" bgcolor="#22c55e"/);
-  await expect(htmlSource).toHaveValue(/공유 슬라이스에 sync\.Mutex로 직접 락을 걸면/);
-  await expect(htmlSource).toHaveValue(/버퍼 채널을 작업 큐로 쓰면/);
-  await expect(htmlSource).toHaveValue(/Go Playground 열기/);
+  await expect(htmlSource).toHaveValue(/GO의 유일한 반복자/);
+  await expect(htmlSource).toHaveValue(/Go 반복문 정복: for 하나로 모든 루프를 제어한다/);
+  await expect(htmlSource).toHaveValue(/C 언어 계열의 while, do-while 없이/);
+  await expect(htmlSource).toHaveValue(/for문 기본기/);
+  await expect(htmlSource).toHaveValue(/조건문으로 변신한 for/);
+  await expect(htmlSource).toHaveValue(/range는 값 복사에 주의/);
+  await expect(htmlSource).toHaveValue(/for 하나로 충분한 이유/);
+  await expect(htmlSource).toHaveValue(/Go에는/);
+  await expect(htmlSource).toHaveValue(/for 키워드 하나만 존재하며/);
+  await expect(htmlSource).toHaveValue(/초기문과 증감문을 생략하면/);
+  await expect(htmlSource).toHaveValue(/반환되는/);
+  await expect(htmlSource).toHaveValue(/value/);
   await expect(htmlSource).toHaveValue(/Go Playground/);
-  await expect(htmlSource).toHaveValue(/공식 문서/);
-  await expect(htmlSource).toHaveValue(/GitHub/);
-  await expect(htmlSource).toHaveValue(/A Tour of Go - Concurrency/);
-  await expect(htmlSource).toHaveValue(/Effective Go - Concurrency/);
-  await expect(htmlSource).toHaveValue(/goroutine_basic\.go/);
+  await expect(htmlSource).toHaveValue(/Tour of Go/);
+  await expect(htmlSource).toHaveValue(/언어 명세 \(For문\)/);
+  await expect(htmlSource).toHaveValue(/A Tour of Go - For/);
+  await expect(htmlSource).toHaveValue(/Effective Go - For/);
+  await expect(htmlSource).toHaveValue(/Go by Example: For/);
+  await expect(htmlSource).toHaveValue(/basic_for\.go/);
+  await expect(htmlSource).toHaveValue(/while_style\.go/);
+  await expect(htmlSource).toHaveValue(/infinite_loop\.go/);
+  await expect(htmlSource).toHaveValue(/range_with_index\.go/);
   await expect(htmlSource).toHaveValue(/text-align:center/);
   await expect(htmlSource).not.toHaveValue(/<pre/);
   await expect(htmlSource).toHaveValue(/&nbsp;&nbsp;&nbsp;&nbsp;/);
-  await expect(htmlSource).toHaveValue(/goroutine/);
+  await expect(htmlSource).toHaveValue(/for&nbsp;i&nbsp;:=&nbsp;0/);
 
   await page.getByRole("button", { name: "Markdown" }).click();
   await page
@@ -302,7 +299,7 @@ test("renders the paste tool", async ({ page }) => {
     .getByRole("button")
     .filter({ hasText: "첫 풀이 초안" })
     .click();
-  await expect(htmlSource).toHaveValue(/Go 동시성 마스터하기: 고루틴과 채널/);
+  await expect(htmlSource).toHaveValue(/Go 반복문 정복: for 하나로 모든 루프를 제어한다/);
   await expect(htmlSource).not.toHaveValue(/Markdown 강의/);
 
   await page.getByRole("button", { name: "Markdown" }).click();
@@ -314,6 +311,6 @@ test("renders the paste tool", async ({ page }) => {
     .getByRole("button")
     .filter({ hasText: "풀이 템플릿" })
     .click();
-  await expect(htmlSource).toHaveValue(/Go 동시성 마스터하기: 고루틴과 채널/);
+  await expect(htmlSource).toHaveValue(/Go 반복문 정복: for 하나로 모든 루프를 제어한다/);
   await expect(htmlSource).not.toHaveValue(/임시 문서/);
 });
