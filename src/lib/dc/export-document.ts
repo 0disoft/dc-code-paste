@@ -476,6 +476,8 @@ function renderDcTableBlock({
   fallbackBackground,
   borderColor,
   border,
+  borderTop,
+  borderBottom,
   padding = "12px 14px",
 }: {
   body: string;
@@ -483,6 +485,8 @@ function renderDcTableBlock({
   fallbackBackground: string;
   borderColor?: string;
   border?: string;
+  borderTop?: string;
+  borderBottom?: string;
   padding?: string;
 }): string {
   const tableStyle = joinStyle({
@@ -492,6 +496,8 @@ function renderDcTableBlock({
     "background-color": backgroundColor,
     "border-left": borderColor ? `4px solid ${borderColor}` : undefined,
     border,
+    "border-top": borderTop,
+    "border-bottom": borderBottom,
   });
   const cellStyle = joinStyle({
     padding,
@@ -1052,7 +1058,9 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
       body: content,
       backgroundColor: quoteBackground(quoteStyle, palette),
       fallbackBackground: quoteFallbackBackground(options),
-      border: quoteTableBorder(quoteStyle, palette),
+      border: quoteStyle === "pull" ? undefined : quoteTableBorder(quoteStyle, palette),
+      borderTop: quoteStyle === "pull" ? quoteTableBorder(quoteStyle, palette) : undefined,
+      borderBottom: quoteStyle === "pull" ? quoteTableBorder(quoteStyle, palette) : undefined,
       borderColor: quoteTableAccent(quoteStyle, palette),
       padding: quotePadding(quoteStyle),
     });

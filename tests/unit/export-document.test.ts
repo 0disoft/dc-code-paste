@@ -1433,6 +1433,43 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toMatch(/\sclass=/);
   });
 
+  it("keeps pull quote tables free of left and right borders", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "blockquote",
+          attrs: { quoteStyle: "pull" },
+          content: [
+            {
+              type: "paragraph",
+              content: [
+                {
+                  type: "text",
+                  text: "느린 코드는 대부분 한 줄짜리 비법보다 입출력 횟수와 자료 흐름에서 먼저 걸린다.",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      structure: "dcTable",
+    });
+
+    expect(html).toContain(
+      "느린 코드는 대부분 한 줄짜리 비법보다 입출력 횟수와 자료 흐름에서 먼저 걸린다.",
+    );
+    expect(html).toContain("border-top:1px solid");
+    expect(html).toContain("border-bottom:1px solid");
+    expect(html).not.toContain("border-left");
+    expect(html).not.toContain("border-right");
+    expect(html).not.toContain("border:1px solid");
+  });
+
   it("exports DC paste HTML without app-owned attributes or unsafe links", async () => {
     const document: JSONContent = {
       type: "doc",
