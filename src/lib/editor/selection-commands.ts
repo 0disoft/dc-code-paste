@@ -149,7 +149,11 @@ export function replaceSelectedInlineRangeWithLinkBox(
   }
 
   if (blockContent) {
-    return dispatchReplacement(state, dispatch, linkBoxType.create({ href: normalizedHref }, blockContent));
+    return dispatchReplacement(
+      state,
+      dispatch,
+      linkBoxType.create({ href: normalizedHref }, blockContent),
+    );
   }
 
   const inlineContent = selectedInlineContent(state);
@@ -240,6 +244,5 @@ export function selectedInlineRangeToSectionHeadingCommand(): Command {
 }
 
 export function selectedInlineRangeToCtaButtonCommand(href: string): Command {
-  return ({ state, dispatch }) =>
-    replaceSelectedInlineRangeWithCtaButton(state, dispatch, href);
+  return ({ state, dispatch }) => replaceSelectedInlineRangeWithCtaButton(state, dispatch, href);
 }

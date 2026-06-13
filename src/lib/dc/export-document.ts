@@ -448,7 +448,9 @@ function canCompactInheritedFontSize(tagName: string): boolean {
 
 function compactInheritedProseStyles(html: string, options: DcExportOptions): string {
   const inheritedFontSize = safeBodyFontSize(options);
+  const inheritedFontFamily = safeProseFontFamily(options.bodyFontFamily);
   let keptInheritedFontSizeCount = 0;
+  let keptInheritedFontFamilyCount = 0;
 
   return html.replace(
     /<([a-z][\w-]*)([^<>]*?)\sstyle="([^"]*)"/gi,
@@ -456,13 +458,18 @@ function compactInheritedProseStyles(html: string, options: DcExportOptions): st
       let style = rawStyle;
       const normalizedTagName = tagName.toLowerCase();
 
-      if (
-        canCompactInheritedFontSize(normalizedTagName) &&
-        styleHasDeclaration(style, "font-size", inheritedFontSize)
-      ) {
+      if (styleHasDeclaration(style, "font-family", inheritedFontFamily)) {
+        if (keptInheritedFontFamilyCount >= 2) {
+          style = removeStyleDeclaration(style, "font-family", inheritedFontFamily);
+        } else {
+          keptInheritedFontFamilyCount += 1;
+        }
+      }
+
+      if (styleHasDeclaration(style, "font-size", inheritedFontSize)) {
         if (keptInheritedFontSizeCount >= 2) {
           style = removeStyleDeclaration(style, "font-size", inheritedFontSize);
-        } else {
+        } else if (canCompactInheritedFontSize(normalizedTagName)) {
           keptInheritedFontSizeCount += 1;
         }
       }
@@ -475,8 +482,7 @@ function compactInheritedProseStyles(html: string, options: DcExportOptions): st
 function renderAttributionFooter(options: DcExportOptions): string {
   const palette = documentPalette(options);
   const isDarkDocument = normalizeDocumentTheme(options.documentTheme) === "darkEditorial";
-  const mutedColor =
-    isDarkDocument ? "#9a9a9a" : "#d2cbc0";
+  const mutedColor = isDarkDocument ? "#9a9a9a" : "#d2cbc0";
   const linkOpacity = isDarkDocument ? 0.42 : 0.22;
   const tableStyle = joinStyle({
     width: "100%",
@@ -1984,12 +1990,7 @@ async function renderHeroBlockModern(node: JSONContent, options: DcExportOptions
   const palette = heroBlockPalette(options);
   const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
-  const subtitle = renderHeroSubtitle(
-    subtitleNodes,
-    options,
-    palette.subtitle,
-    palette.background,
-  );
+  const subtitle = renderHeroSubtitle(subtitleNodes, options, palette.subtitle, palette.background);
   const wrapperStyle = joinStyle({
     margin: "0 0 22px",
     padding: "22px 24px",
@@ -2038,12 +2039,7 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
   const palette = heroBlockPalette(options);
   const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
-  const subtitle = renderHeroSubtitle(
-    subtitleNodes,
-    options,
-    palette.subtitle,
-    palette.background,
-  );
+  const subtitle = renderHeroSubtitle(subtitleNodes, options, palette.subtitle, palette.background);
   const tableStyle = joinStyle({
     width: "100%",
     margin: "0 0 22px",
@@ -2098,19 +2094,30 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
   ];
 
   if (title) {
-    rows.push(`<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">${title}</strong></td></tr>`);
+    rows.push(
+      `<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">${title}</strong></td></tr>`,
+    );
   }
 
   if (subtitle) {
-    rows.push(`<tr><td style="${subtitleCellStyle}"><span style="${subtitleStyle}">${subtitle}</span></td></tr>`);
+    rows.push(
+      `<tr><td style="${subtitleCellStyle}"><span style="${subtitleStyle}">${subtitle}</span></td></tr>`,
+    );
   }
 
   if (!title && !subtitle && bodyNodes.length === 0) {
-    rows.push(`<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">강의 노트</strong></td></tr>`);
+    rows.push(
+      `<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">강의 노트</strong></td></tr>`,
+    );
   }
 
   if (bodyNodes.length > 0) {
-    const body = await renderHeroBodyBlocks(bodyNodes, options, palette.subtitle, palette.background);
+    const body = await renderHeroBodyBlocks(
+      bodyNodes,
+      options,
+      palette.subtitle,
+      palette.background,
+    );
     rows.push(`<tr><td style="${bodyCellStyle}">${body}</td></tr>`);
   }
 
@@ -2529,8 +2536,9 @@ async function renderComparisonBlockTable(
     columns.map(async (column, index) => {
       const side = index === 1 ? "right" : "left";
       const isRight = side === "right";
-      const fallbackBackground =
-        isRight ? palette.rightFallbackBackground : palette.leftFallbackBackground;
+      const fallbackBackground = isRight
+        ? palette.rightFallbackBackground
+        : palette.leftFallbackBackground;
       const accentColor = isRight ? palette.rightBorderFallback : palette.leftBorderFallback;
       const title = escapeHtml(
         comparisonColumnTitle(column, side === "right" ? "After" : "Before"),

@@ -111,8 +111,8 @@ describe("highlightForDcHtml", () => {
       showLineNumbers: false,
     });
 
-    expect(html).toContain("old value");
-    expect(html).toContain("new value");
+    expect(html).toContain("old&nbsp;value");
+    expect(html).toContain("new&nbsp;value");
     expect(html).toContain("border-left:4px solid");
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).not.toContain("oklch(");
@@ -135,14 +135,17 @@ describe("highlightForDcHtml", () => {
   }, 15_000);
 
   it("adds manual addition and deletion colors to selected code lines", async () => {
-    const html = await highlightForDcHtml("int oldValue = 1;\nint newValue = 2;\nreturn newValue;", {
-      language: "cpp",
-      theme: "github-dark",
-      showBackground: true,
-      showLineNumbers: true,
-      additionLines: "2",
-      deletionLines: "1",
-    });
+    const html = await highlightForDcHtml(
+      "int oldValue = 1;\nint newValue = 2;\nreturn newValue;",
+      {
+        language: "cpp",
+        theme: "github-dark",
+        showBackground: true,
+        showLineNumbers: true,
+        additionLines: "2",
+        deletionLines: "1",
+      },
+    );
 
     expect(html).toContain(">1</span>");
     expect(html).toContain(">2</span>");

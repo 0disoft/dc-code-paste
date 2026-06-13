@@ -104,9 +104,7 @@ describe("font stacks", () => {
       "Inter, Malgun Gothic, 맑은 고딕, sans-serif",
     );
     expect(safeDcProseFontFamily()).toBe("Malgun Gothic, 맑은 고딕, sans-serif");
-    expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe(
-      "Georgia, Batang, serif",
-    );
+    expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe("Georgia, Batang, serif");
     expect(safeDcCodeFontFamily()).toBe("Cascadia Mono, Pretendard, D2Coding, monospace");
   });
 

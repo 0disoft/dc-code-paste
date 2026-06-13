@@ -11,7 +11,7 @@ describe("createSummaryBoxFromText", () => {
 
     expect(document).toEqual({
       type: "summaryBox",
-      attrs: { label: "핵심 요약" },
+      attrs: { label: "동시성 핵심" },
       content: [
         {
           type: "summaryItem",

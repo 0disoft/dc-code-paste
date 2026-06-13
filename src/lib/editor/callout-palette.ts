@@ -63,9 +63,7 @@ function relativeLuminance(value: string): number {
   const { red, green, blue } = hexToRgb(value);
   const channels = [red, green, blue].map((channel) => {
     const normalized = channel / 255;
-    return normalized <= 0.04045
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
+    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
   });
 
   return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];

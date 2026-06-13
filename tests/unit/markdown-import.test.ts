@@ -325,7 +325,8 @@ describe("markdown import", () => {
 
   it("does not absorb the rest of the document when a custom block is not closed", () => {
     expect(
-      parseMarkdownToDocument([":::tip", "닫히지 않은 블록", "", "## 다음 제목"].join("\n")).content,
+      parseMarkdownToDocument([":::tip", "닫히지 않은 블록", "", "## 다음 제목"].join("\n"))
+        .content,
     ).toEqual([
       {
         type: "paragraph",

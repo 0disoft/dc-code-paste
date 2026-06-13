@@ -450,7 +450,9 @@ function lineCommentPrefixes(language: DcLanguageId): readonly string[] {
   return [];
 }
 
-function blockCommentDelimiter(language: DcLanguageId): { open: string; close: string } | undefined {
+function blockCommentDelimiter(
+  language: DcLanguageId,
+): { open: string; close: string } | undefined {
   return cFamilyLanguages.has(language) || cssLikeLanguages.has(language)
     ? { open: "/*", close: "*/" }
     : undefined;
@@ -518,7 +520,7 @@ function scanProtectedTokens(
     }
 
     const char = line[index];
-    if (char === "\"" || char === "'" || char === "`") {
+    if (char === '"' || char === "'" || char === "`") {
       const quote = char;
       let end = index + 1;
       let escaped = false;

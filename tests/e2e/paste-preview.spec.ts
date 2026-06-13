@@ -55,10 +55,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "LLM 가이드 복사" })).toBeVisible();
   await expect(page.getByRole("button", { name: "저장함" })).toBeVisible();
   await expect(page.getByRole("button", { name: "초기화" })).toHaveCSS("font-weight", "500");
-  await expect(page.getByRole("button", { name: /디씨 복사/ })).toHaveCSS(
-    "font-weight",
-    "500",
-  );
+  await expect(page.getByRole("button", { name: /디씨 복사/ })).toHaveCSS("font-weight", "500");
   await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "초안 히스토리" })).toHaveCount(0);
   await expect(page.getByLabel("인용 스타일")).toBeVisible();

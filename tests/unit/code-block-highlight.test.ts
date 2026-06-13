@@ -12,23 +12,18 @@ describe("editor code block highlighting", () => {
     const code = [
       "package main",
       "",
-      "import \"fmt\"",
+      'import "fmt"',
       "",
       "func main() {",
-      "    go fmt.Println(\"비동기 실행\")",
+      '    go fmt.Println("비동기 실행")',
       "    // go keyword inside comment",
       "}",
     ].join("\n");
 
     const tokens = highlightCodeTokens(code, "go");
 
-    expect(tokenTexts(code, "keyword")).toEqual([
-      "package",
-      "import",
-      "func",
-      "go",
-    ]);
-    expect(tokenTexts(code, "string")).toEqual(["\"fmt\"", "\"비동기 실행\""]);
+    expect(tokenTexts(code, "keyword")).toEqual(["package", "import", "func", "go"]);
+    expect(tokenTexts(code, "string")).toEqual(['"fmt"', '"비동기 실행"']);
     expect(tokenTexts(code, "function")).toEqual(["main", "Println"]);
     expect(tokenTexts(code, "comment")).toEqual(["// go keyword inside comment"]);
     expect(tokens.every((token) => token.to > token.from)).toBe(true);
@@ -43,13 +38,12 @@ describe("editor code block highlighting", () => {
   });
 
   it("uses CSS block comments without treating double slashes as comments", () => {
-    const code = ["/* color token should stay protected */", ".card { color: //not-comment; }"].join(
-      "\n",
-    );
-
-    expect(tokenTexts(code, "comment", "css")).toEqual([
+    const code = [
       "/* color token should stay protected */",
-    ]);
+      ".card { color: //not-comment; }",
+    ].join("\n");
+
+    expect(tokenTexts(code, "comment", "css")).toEqual(["/* color token should stay protected */"]);
   });
 
   it("protects single-line C-family block comments", () => {

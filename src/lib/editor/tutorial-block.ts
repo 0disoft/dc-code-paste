@@ -85,9 +85,7 @@ function parseTutorialLineNumber(line: string): { number?: string; text: string 
 }
 
 function cleanTutorialLine(line: string): { number?: string; text: string } {
-  return line
-    ? parseTutorialLineNumber(line)
-    : { text: "" };
+  return line ? parseTutorialLineNumber(line) : { text: "" };
 }
 
 function splitTutorialLine(line: string): { title: string; body?: string } {

@@ -17,8 +17,7 @@ function createCalloutExtension(kind: CalloutKind, name: CalloutNodeName) {
       return {
         label: {
           default: defaultCalloutLabel(kind),
-          parseHTML: (element) =>
-            element.getAttribute("data-label") ?? defaultCalloutLabel(kind),
+          parseHTML: (element) => element.getAttribute("data-label") ?? defaultCalloutLabel(kind),
           renderHTML: (attributes) => {
             const label = typeof attributes.label === "string" ? attributes.label.trim() : "";
             return label ? { "data-label": label } : {};

@@ -137,7 +137,10 @@ function parseFenceFilename(value: string | undefined): string {
     .replace(/\{[^}]+}/g, "")
     .replace(/(?:^|\s)(?:highlight|highlights|hl|lines)=[0-9,\s-]+/gi, "")
     .replace(/(?:^|\s)(?:add|adds|added|addition|additionLines|plus)=[0-9,\s-]+/gi, "")
-    .replace(/(?:^|\s)(?:delete|deletes|deleted|deletion|deletionLines|remove|removed|minus)=[0-9,\s-]+/gi, "")
+    .replace(
+      /(?:^|\s)(?:delete|deletes|deleted|deletion|deletionLines|remove|removed|minus)=[0-9,\s-]+/gi,
+      "",
+    )
     .trim();
 
   return /^[\w@./\\ -]+\.[\w-]+$/.test(bare) ? normalizeCodeFilename(bare) : "";
@@ -322,10 +325,7 @@ function metadataKey(line: string): { key: keyof CustomBlockMetadata; value: str
 
   return {
     key:
-      rawKey === "color" ||
-      rawKey === "색상" ||
-      rawKey === "tonecolor" ||
-      rawKey === "tone-color"
+      rawKey === "color" || rawKey === "색상" || rawKey === "tonecolor" || rawKey === "tone-color"
         ? "color"
         : "label",
     value,

@@ -20,9 +20,7 @@ describe("llmAuthoringPrompt", () => {
     expect(llmAuthoringPrompt).toContain(
       "tip, warning, reference, emphasis, success, failure, experiment, conclusion, rebuttal",
     );
-    expect(llmAuthoringPrompt).toContain(
-      '```go {5-6} add=7 delete=8 title="goroutine_basic.go"',
-    );
+    expect(llmAuthoringPrompt).toContain('```go {5-6} add=7 delete=8 title="goroutine_basic.go"');
     expect(llmAuthoringPrompt).not.toContain("{2,4-6} add=8 delete=3");
     expect(llmAuthoringPrompt).not.toContain('```cpp {2,5} add=3 delete=4 title="main.cpp"');
     expect(llmAuthoringPrompt).toContain("HTML 변환 후 65,535자를 넘으면 실패할 수 있다");
@@ -41,7 +39,7 @@ describe("llmAuthoringPrompt", () => {
     expect(llmAuthoringPrompt).toContain("label: 데드락 체크");
     expect(llmAuthoringPrompt).toContain("label: 읽을거리");
     expect(llmAuthoringPrompt).toContain("- 04 취소 경로 연결");
-    expect(llmAuthoringPrompt).toContain("hero 안에는 제목과 짧은 설명만 넣어라");
+    expect(llmAuthoringPrompt).toContain("hero 안에는 대표 제목과 짧은 설명만 넣어라");
     expect(llmAuthoringPrompt).toContain(":::cta vertical");
     expect(llmAuthoringPrompt).toContain("references는 더 읽을 문서");
     expect(llmAuthoringPrompt).toContain("CTA는 사용자가 실제로 누를 행동 버튼");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codeFallbackFonts } from "../../src/lib/dc/font-stacks";
+import { safeDcCodeFontFamily } from "../../src/lib/dc/font-stacks";
 import { renderDcHtml } from "../../src/lib/dc/render-dc-html";
 
 describe("renderDcHtml", () => {
@@ -23,7 +23,7 @@ describe("renderDcHtml", () => {
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).toContain("font-weight:700");
-    expect(html).toContain(`font-family:${codeFallbackFonts.join(", ")}`);
+    expect(html).toContain(`font-family:${safeDcCodeFontFamily()}`);
     expect(html).not.toContain("<pre");
     expect(html).not.toContain("<code");
     expect(html).toContain("&lt;tag&gt;");
@@ -60,7 +60,6 @@ describe("renderDcHtml", () => {
     });
 
     expect(html).toContain("margin:0 0 16px");
-    expect(html).not.toContain("margin:0;");
   });
 
   it("renders optional line decorations as inline styles", () => {
@@ -109,7 +108,7 @@ describe("renderDcHtml", () => {
 
     expect(html).toContain("first");
     expect(html).toContain("second");
-    expect(html).toContain("</div><div style=\"");
+    expect(html).toContain('</div><div style="');
     expect(html).not.toContain("</div>\n<div");
   });
 

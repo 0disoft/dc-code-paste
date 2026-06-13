@@ -36,7 +36,8 @@ export const CtaButton = Node.create({
     return {
       href: {
         default: "",
-        parseHTML: (element) => normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
+        parseHTML: (element) =>
+          normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
         renderHTML: (attributes) => {
           const href =
             typeof attributes.href === "string" ? normalizeEditableLinkHref(attributes.href) : "";
@@ -114,7 +115,8 @@ export const ReferenceItem = Node.create({
     return {
       href: {
         default: "",
-        parseHTML: (element) => normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
+        parseHTML: (element) =>
+          normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ?? "",
         renderHTML: (attributes) => {
           const href =
             typeof attributes.href === "string" ? normalizeEditableLinkHref(attributes.href) : "";

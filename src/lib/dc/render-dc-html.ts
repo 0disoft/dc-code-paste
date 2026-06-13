@@ -42,8 +42,7 @@ function tokenStyle(token: DcToken, foreground: string): string {
     color: sanitizeColor(token.color, foreground),
     "font-style": fontStyle > 0 && (fontStyle & 1) === 1 ? "italic" : undefined,
     "font-weight": fontStyle > 0 && (fontStyle & 2) === 2 ? 700 : undefined,
-    "text-decoration":
-      fontStyle > 0 && (fontStyle & 4) === 4 ? "underline" : undefined,
+    "text-decoration": fontStyle > 0 && (fontStyle & 4) === 4 ? "underline" : undefined,
   });
 }
 
@@ -56,11 +55,7 @@ function renderToken(token: DcToken, foreground: string): string {
   return `<span style="${tokenStyle(token, foreground)}">${content}</span>`;
 }
 
-function renderLineNumber(
-  index: number,
-  foreground: string,
-  width: string,
-): string {
+function renderLineNumber(index: number, foreground: string, width: string): string {
   const style = joinStyle({
     color: foreground,
     opacity: "0.45",
@@ -105,9 +100,7 @@ export function renderDcHtml(input: DcRenderInput): string {
     const prefix = input.showLineNumbers
       ? renderLineNumber(index, lineForeground, lineNumberWidth)
       : "";
-    const body = line
-      .map((token) => renderToken(token, lineForeground))
-      .join("");
+    const body = line.map((token) => renderToken(token, lineForeground)).join("");
     const content = `${prefix}${body || "&nbsp;"}`;
 
     if (!decoration) {

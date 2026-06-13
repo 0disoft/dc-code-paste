@@ -165,7 +165,10 @@ export const sampleDocument: JSONContent = {
             {
               type: "paragraph",
               content: [
-                { type: "text", text: "종료 신호는 close와 context 중 어느 쪽이 책임지는지 정한다." },
+                {
+                  type: "text",
+                  text: "종료 신호는 close와 context 중 어느 쪽이 책임지는지 정한다.",
+                },
               ],
             },
           ],

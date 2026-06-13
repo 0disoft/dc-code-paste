@@ -15,7 +15,9 @@ type MutableComparisonColumnInput = {
 const defaultComparison = {
   left: {
     title: "Before",
-    lines: ["공유 슬라이스에 sync.Mutex로 직접 락을 걸면 락 누락과 순서 꼬임을 계속 의심해야 한다."],
+    lines: [
+      "공유 슬라이스에 sync.Mutex로 직접 락을 걸면 락 누락과 순서 꼬임을 계속 의심해야 한다.",
+    ],
   },
   right: {
     title: "After",
