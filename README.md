@@ -80,7 +80,8 @@ paste targets:
 
 `디씨 복사` writes both `text/html` and `text/plain` for rich paste targets. The preview panel can
 also switch to `HTML` mode, where `원문 복사` copies the exported inline HTML as plain text for
-editors that expect raw HTML source.
+editors that expect raw HTML source. Exported HTML adds a small centered `Created with
+dc-code-paste` attribution link at the bottom of the article.
 
 Older `calloutBox` documents with a `kind` attribute are still accepted by the exporter, but new
 editor content uses the explicit box node names above.

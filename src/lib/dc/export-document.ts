@@ -48,6 +48,8 @@ const defaultCodeFontSize = "15px";
 const dcLightPageBackground = "#ffffff";
 const dcDarkPageBackground = "#151515";
 const dcDarkPanelBackground = "#1b1b1b";
+const attributionHref = "https://github.com/0disoft/dc-code-paste";
+const attributionText = "Created with dc-code-paste";
 
 type DocumentPalette = {
   articleBackground: string;
@@ -468,6 +470,34 @@ function compactInheritedProseStyles(html: string, options: DcExportOptions): st
       return style ? `<${tagName}${beforeStyle} style="${style}"` : `<${tagName}${beforeStyle}`;
     },
   );
+}
+
+function renderAttributionFooter(options: DcExportOptions): string {
+  const palette = documentPalette(options);
+  const isDarkDocument = normalizeDocumentTheme(options.documentTheme) === "darkEditorial";
+  const mutedColor =
+    isDarkDocument ? "#9a9a9a" : "#d2cbc0";
+  const linkOpacity = isDarkDocument ? 0.42 : 0.22;
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "20px 0 0",
+    "border-collapse": "collapse",
+    "background-color": palette.articleBackground,
+  });
+  const cellStyle = joinStyle({
+    padding: "8px 0 0",
+    "text-align": "right",
+    color: mutedColor,
+    "font-size": "12px",
+    "line-height": 1.4,
+  });
+  const linkStyle = joinStyle({
+    color: mutedColor,
+    opacity: linkOpacity,
+    "text-decoration": "none",
+  });
+
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td align="right" style="${cellStyle}"><a href="${attributionHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${attributionText}</a></td></tr></tbody></table>`;
 }
 
 function renderDcTableBlock({
@@ -2583,6 +2613,7 @@ export async function exportDocumentToDcHtml(
 ): Promise<string> {
   const palette = documentPalette(options);
   const body = await renderBlockAsync(document, options, { proseTableSafe: true });
+  const bodyWithAttribution = `${body}${renderAttributionFooter(options)}`;
   const wrapperStyle = joinStyle({
     display: "block",
     "background-color": palette.articleBackground,
@@ -2615,10 +2646,13 @@ export async function exportDocumentToDcHtml(
     });
 
     return compactInheritedProseStyles(
-      `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`,
+      `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${bodyWithAttribution}</td></tr></tbody></table>`,
       options,
     );
   }
 
-  return compactInheritedProseStyles(`<div style="${wrapperStyle}">${body}</div>`, options);
+  return compactInheritedProseStyles(
+    `<div style="${wrapperStyle}">${bodyWithAttribution}</div>`,
+    options,
+  );
 }

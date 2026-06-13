@@ -27,6 +27,31 @@ function textOfTestDocument(node: JSONContent): string {
 }
 
 describe("exportDocumentToDcHtml", () => {
+  it("appends a subtle linked attribution footer to copied DC HTML", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "본문 내용" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+    const footerStart = html.indexOf("Created with dc-code-paste");
+
+    expect(footerStart).toBeGreaterThan(html.indexOf("본문 내용"));
+    expect(html).toContain('href="https://github.com/0disoft/dc-code-paste"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('align="right"');
+    expect(html).toContain("text-align:right");
+    expect(html).toContain("color:#d2cbc0");
+    expect(html).toContain("opacity:0.22");
+    expect(html.slice(footerStart - 200, footerStart + 120)).not.toContain("font-family:");
+  });
+
   it("renders prose, links, callouts, and code blocks as inline-style DC HTML", async () => {
     const document: JSONContent = {
       type: "doc",
