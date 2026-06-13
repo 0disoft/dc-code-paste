@@ -1528,6 +1528,7 @@
             type: calloutNodeNameByKind[kind],
             pos,
             fallback: defaultCalloutLabel(kind),
+            attrName: "label",
             label,
         });
         return true;
@@ -1626,6 +1627,7 @@
                 type: calloutNodeNameByKind[kind],
                 pos: trackedTarget.pos,
                 fallback: defaultCalloutLabel(kind),
+                attrName: "label",
                 label,
             });
         }
@@ -3223,6 +3225,7 @@
                 <div
                     class="code-line-context-menu"
                     role="menu"
+                    tabindex="-1"
                     aria-label={`코드 ${codeLineContextMenu.line}번 줄`}
                     style={`left:${codeLineContextMenu.x}px;top:${codeLineContextMenu.y}px`}
                     onpointerdown={(event) => event.stopPropagation()}

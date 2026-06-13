@@ -612,14 +612,20 @@ export function parseMarkdownToDocument(
     const customBlock = customBlockStart(trimmed);
     if (customBlock) {
       const collected = collectCustomBlock(lines, index);
-      const node = collected
-        ? customBlockNode(customBlock.name, customBlock.info, collected.body, fallbackLanguage)
-        : undefined;
 
-      if (node) {
-        content.push(node);
-        index = collected.nextIndex;
-        continue;
+      if (collected) {
+        const node = customBlockNode(
+          customBlock.name,
+          customBlock.info,
+          collected.body,
+          fallbackLanguage,
+        );
+
+        if (node) {
+          content.push(node);
+          index = collected.nextIndex;
+          continue;
+        }
       }
     }
 
