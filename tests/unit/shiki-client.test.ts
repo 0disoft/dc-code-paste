@@ -30,6 +30,8 @@ const requestedLanguageSamples = [
   { language: "yaml", code: "name: dc\nenabled: true", token: "enabled" },
   { language: "toml", code: 'name = "dc"\nenabled = true', token: "enabled" },
   { language: "sql", code: "SELECT title FROM posts WHERE id = 1;", token: "SELECT" },
+  { language: "markdown", code: "# 제목\n\n- 항목", token: "제목" },
+  { language: "mermaid", code: "graph TD\n  A --> B", token: "graph" },
   {
     language: "diff",
     code: "-const oldValue = 1;\n+const newValue = 2;",

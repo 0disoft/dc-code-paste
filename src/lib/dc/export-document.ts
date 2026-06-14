@@ -17,6 +17,7 @@ import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
 import {
   defaultProseFontFamily,
   safeDcCodeFontFamily as safeCodeFontFamily,
+  safeDcInlineCodeFontFamily as safeInlineCodeFontFamily,
   safeDcProseFontFamily as safeProseFontFamily,
 } from "./font-stacks";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
@@ -673,7 +674,7 @@ function applyMarks(
       const style = joinStyle({
         "background-color": context.inlineCodeBackground ?? palette.inlineCodeBackground,
         color: context.inlineCodeText ?? palette.inlineCodeText,
-        "font-family": safeCodeFontFamily(),
+        "font-family": safeInlineCodeFontFamily(),
         "font-size": "0.92em",
         padding: "1px 4px",
         "border-radius": "4px",

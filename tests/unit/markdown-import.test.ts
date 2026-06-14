@@ -199,6 +199,28 @@ describe("markdown import", () => {
     }
   });
 
+  it("normalizes markdown and mermaid code fence aliases", () => {
+    for (const fence of ["md", "markdown", "mdx"]) {
+      expect(
+        parseMarkdownToDocument(["```" + fence, "# 제목", "```"].join("\n")).content?.[0],
+      ).toEqual({
+        type: "codeBlock",
+        attrs: { language: "markdown" },
+        content: [{ type: "text", text: "# 제목" }],
+      });
+    }
+
+    for (const fence of ["mmd", "mermaid"]) {
+      expect(
+        parseMarkdownToDocument(["```" + fence, "graph TD", "```"].join("\n")).content?.[0],
+      ).toEqual({
+        type: "codeBlock",
+        attrs: { language: "mermaid" },
+        content: [{ type: "text", text: "graph TD" }],
+      });
+    }
+  });
+
   it("keeps fenced code line highlight metadata", () => {
     expect(
       parseMarkdownToDocument(

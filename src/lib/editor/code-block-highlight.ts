@@ -1,6 +1,7 @@
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
+import { highlightedLineIndexes } from "$lib/highlighter/highlight-lines";
 
 export type EditorCodeTokenKind = "comment" | "string" | "keyword" | "number" | "function";
 
@@ -8,6 +9,21 @@ export type EditorCodeToken = {
   from: number;
   to: number;
   kind: EditorCodeTokenKind;
+};
+
+export type EditorCodeLineDecorationKind = "highlight" | "addition" | "deletion";
+
+export type EditorCodeLineDecoration = {
+  from: number;
+  to: number;
+  kind: EditorCodeLineDecorationKind;
+  empty?: boolean;
+};
+
+type CodeLineDecorationAttrs = {
+  highlightLines?: unknown;
+  additionLines?: unknown;
+  deletionLines?: unknown;
 };
 
 const keywordSets: Partial<Record<DcLanguageId, readonly string[]>> = {
@@ -355,6 +371,35 @@ const keywordSets: Partial<Record<DcLanguageId, readonly string[]>> = {
   json: ["false", "null", "true"],
   yaml: ["false", "null", "off", "on", "true", "yes", "no"],
   toml: ["false", "true"],
+  mermaid: [
+    "activate",
+    "alt",
+    "and",
+    "class",
+    "classDef",
+    "click",
+    "deactivate",
+    "else",
+    "end",
+    "erDiagram",
+    "flowchart",
+    "gantt",
+    "gitGraph",
+    "graph",
+    "journey",
+    "loop",
+    "mindmap",
+    "note",
+    "opt",
+    "participant",
+    "pie",
+    "quadrantChart",
+    "sequenceDiagram",
+    "stateDiagram",
+    "stateDiagram-v2",
+    "subgraph",
+    "timeline",
+  ],
   sql: [
     "add",
     "alter",
@@ -541,6 +586,10 @@ function lineCommentPrefixes(language: DcLanguageId): readonly string[] {
     return ["--"];
   }
 
+  if (language === "mermaid") {
+    return ["%%"];
+  }
+
   if (cFamilyLanguages.has(language)) {
     return ["//"];
   }
@@ -680,6 +729,38 @@ function scanRegexTokens(
   }
 }
 
+function scanMarkdownTokens(
+  line: string,
+  lineOffset: number,
+  protectedRanges: readonly ProtectedRange[],
+  tokens: EditorCodeToken[],
+): void {
+  scanRegexTokens(
+    line,
+    lineOffset,
+    protectedRanges,
+    /^\s{0,3}#{1,6}(?=\s|$)|^\s{0,3}(?:[-*+]|\d+\.)\s|^\s{0,3}>+\s?/g,
+    "keyword",
+    tokens,
+  );
+  scanRegexTokens(
+    line,
+    lineOffset,
+    protectedRanges,
+    /```+[^`]*|~~~+[^~]*/g,
+    "keyword",
+    tokens,
+  );
+  scanRegexTokens(
+    line,
+    lineOffset,
+    protectedRanges,
+    /\[[^\]]+]\([^)]+\)/g,
+    "string",
+    tokens,
+  );
+}
+
 function scanFunctionTokens(
   line: string,
   lineOffset: number,
@@ -722,6 +803,10 @@ export function highlightCodeTokens(code: string, language: unknown): EditorCode
     const protectedRanges: ProtectedRange[] = [];
     scanProtectedTokens(line, offset, normalizedLanguage, tokens, protectedRanges);
 
+    if (normalizedLanguage === "markdown") {
+      scanMarkdownTokens(line, offset, protectedRanges, tokens);
+    }
+
     const keywordRegex = keywordRegexFor(normalizedLanguage);
     if (keywordRegex) {
       scanRegexTokens(line, offset, protectedRanges, keywordRegex, "keyword", tokens);
@@ -745,12 +830,69 @@ export function highlightCodeTokens(code: string, language: unknown): EditorCode
   return cloneTokens(sortedTokens);
 }
 
+export function codeLineDecorations(
+  code: string,
+  attrs: CodeLineDecorationAttrs,
+): EditorCodeLineDecoration[] {
+  const lines = code.split("\n");
+  const highlightIndexes = highlightedLineIndexes(attrs.highlightLines, lines.length);
+  const additionIndexes = highlightedLineIndexes(attrs.additionLines, lines.length);
+  const deletionIndexes = highlightedLineIndexes(attrs.deletionLines, lines.length);
+
+  if (highlightIndexes.size === 0 && additionIndexes.size === 0 && deletionIndexes.size === 0) {
+    return [];
+  }
+
+  const decorations: EditorCodeLineDecoration[] = [];
+  let offset = 0;
+
+  lines.forEach((line, index) => {
+    const kind: EditorCodeLineDecorationKind | undefined = deletionIndexes.has(index)
+      ? "deletion"
+      : additionIndexes.has(index)
+        ? "addition"
+        : highlightIndexes.has(index)
+          ? "highlight"
+          : undefined;
+
+    if (kind) {
+      const lineEnd = offset + line.length;
+      decorations.push(
+        lineEnd > offset
+          ? { from: offset, to: lineEnd, kind }
+          : { from: offset, to: offset, kind, empty: true },
+      );
+    }
+
+    offset += line.length + 1;
+  });
+
+  return decorations;
+}
+
+function codeLineDecorationElement(kind: EditorCodeLineDecorationKind): HTMLElement {
+  const marker = document.createElement("span");
+  marker.className = `dc-code-line dc-code-line-${kind}`;
+  marker.setAttribute("aria-hidden", "true");
+  return marker;
+}
+
 function codeBlockDecorations(state: EditorState): DecorationSet {
   const decorations: Decoration[] = [];
 
   state.doc.descendants((node, pos) => {
     if (node.type.name !== "codeBlock") {
       return;
+    }
+
+    for (const lineDecoration of codeLineDecorations(node.textContent, node.attrs)) {
+      decorations.push(
+        Decoration.widget(
+          pos + 1 + lineDecoration.from,
+          () => codeLineDecorationElement(lineDecoration.kind),
+          { side: -1 },
+        ),
+      );
     }
 
     for (const token of highlightCodeTokens(node.textContent, node.attrs.language)) {

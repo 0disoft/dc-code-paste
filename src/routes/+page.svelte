@@ -30,9 +30,10 @@
         Trash2,
         X,
     } from "lucide-svelte";
-    import { onDestroy, onMount } from "svelte";
+    import { onDestroy, onMount, tick } from "svelte";
     import type { Editor, JSONContent } from "@tiptap/core";
     import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
+    import { NodeSelection, TextSelection } from "@tiptap/pm/state";
     import type { EditorView } from "@tiptap/pm/view";
     import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
     import { defaultProseFontFamily } from "$lib/dc/font-stacks";
@@ -100,6 +101,12 @@
     import { normalizeEditableLinkHref } from "$lib/editor/link";
     import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
     import { parseMarkdownToDocument } from "$lib/editor/markdown-import";
+    import {
+        codeLineRangeContains,
+        codeLineRangeLabel,
+        selectedCodeLineRangeFromOffsets,
+        type CodeLineRange,
+    } from "$lib/editor/code-line-range";
     import {
         normalizeQuoteStyle,
         quoteStyleOptions,
@@ -192,7 +199,7 @@
         type: string;
         pos: number;
         fallback: string;
-        attrName: "label" | "number";
+        attrName: "label" | "number" | "title";
     };
     type TutorialBlockTarget = {
         pos: number;
@@ -204,7 +211,7 @@
     type CodeLineContextMenu = {
         x: number;
         y: number;
-        line: number;
+        range: CodeLineRange;
         pos: number;
     };
     const codeLineMarkers: CodeLineMarker[] = [
@@ -215,6 +222,9 @@
 
     let editorHost = $state<HTMLDivElement>();
     let editor = $state<Editor>();
+    let blockLabelInput = $state<HTMLInputElement>();
+    let codeFilenameInput = $state<HTMLInputElement>();
+    let linkInput = $state<HTMLInputElement>();
     let documentJson = $state<JSONContent>(structuredClone(sampleDocument));
     let language = $state<DcLanguageId>(defaultLanguage);
     let theme = $state<DcThemeId>(defaultTheme);
@@ -933,7 +943,10 @@
             : normalizeBlockLabel(value);
     }
 
-    function editableBlockLabelFallback(nodeName: string) {
+    function editableBlockLabelFallback(
+        nodeName: string,
+        attrs: Record<string, unknown> = {},
+    ) {
         if (nodeName === "heroBlock") {
             return { attrName: "label" as const, fallback: "CODING GUIDE" };
         }
@@ -944,6 +957,13 @@
 
         if (nodeName === "tutorialStep") {
             return { attrName: "number" as const, fallback: "1" };
+        }
+
+        if (nodeName === "comparisonColumn") {
+            return {
+                attrName: "title" as const,
+                fallback: attrs.side === "right" ? "After" : "Before",
+            };
         }
 
         const calloutKind = calloutKindFromNodeName(nodeName);
@@ -959,7 +979,7 @@
         | null {
         for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
             const node = resolvedPos.node(depth);
-            const config = editableBlockLabelFallback(node.type.name);
+            const config = editableBlockLabelFallback(node.type.name, node.attrs);
 
             if (!config) {
                 continue;
@@ -1142,7 +1162,7 @@
 
             const node = current.state.doc.nodeAt(target.pos);
             const fallback = node
-                ? editableBlockLabelFallback(node.type.name)
+                ? editableBlockLabelFallback(node.type.name, node.attrs)
                 : undefined;
 
             if (!node || !fallback) {
@@ -1409,20 +1429,38 @@
         };
     }
 
-    function toggleLineInRange(value: unknown, line: number) {
+    function toggleLinesInRange(value: unknown, range: CodeLineRange) {
         const lines = lineSetFromRange(value);
+        let allLinesActive = true;
 
-        if (lines.has(line)) {
-            lines.delete(line);
-        } else {
-            lines.add(line);
+        for (let line = range.fromLine; line <= range.toLine; line += 1) {
+            if (!lines.has(line)) {
+                allLinesActive = false;
+                break;
+            }
+        }
+
+        for (let line = range.fromLine; line <= range.toLine; line += 1) {
+            if (allLinesActive) {
+                lines.delete(line);
+            } else {
+                lines.add(line);
+            }
         }
 
         return compactLineSet(lines);
     }
 
-    function isLineInRange(value: unknown, line: number) {
-        return lineSetFromRange(value).has(line);
+    function isCodeLineRangeActive(value: unknown, range: CodeLineRange) {
+        const lines = lineSetFromRange(value);
+
+        for (let line = range.fromLine; line <= range.toLine; line += 1) {
+            if (!lines.has(line)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     function codeLineMarkerLabel(marker: CodeLineMarker) {
@@ -1447,6 +1485,66 @@
         return pre instanceof HTMLElement ? pre : undefined;
     }
 
+    function closestEditableBlockLabelElement(
+        target: EventTarget | null,
+    ): HTMLElement | undefined {
+        if (!(target instanceof Element)) {
+            return undefined;
+        }
+
+        const element = target.closest(
+            [
+                ".dc-hero-block",
+                ".dc-summary-box",
+                ".dc-callout",
+                ".dc-tutorial-step",
+                ".dc-comparison-column",
+            ].join(","),
+        );
+
+        return element instanceof HTMLElement ? element : undefined;
+    }
+
+    function closestEditableLinkElement(
+        target: EventTarget | null,
+    ): HTMLElement | undefined {
+        if (!(target instanceof Element)) {
+            return undefined;
+        }
+
+        const element = target.closest(
+            [
+                "a[href]",
+                "a[data-dc-cta-button]",
+                "[data-dc-link-box]",
+                "[data-dc-reference-item]",
+            ].join(","),
+        );
+
+        return element instanceof HTMLElement ? element : undefined;
+    }
+
+    function codeFilenameBarHeight(pre: HTMLElement) {
+        const parsedPaddingTop = Number.parseFloat(getComputedStyle(pre).paddingTop);
+
+        return Number.isFinite(parsedPaddingTop) ? parsedPaddingTop : 0;
+    }
+
+    function isCodeFilenameBarEvent(pre: HTMLElement, event: MouseEvent) {
+        if (!pre.hasAttribute("data-filename")) {
+            return false;
+        }
+
+        const rect = pre.getBoundingClientRect();
+        const headerHeight = codeFilenameBarHeight(pre);
+
+        return (
+            headerHeight > 0 &&
+            event.clientY >= rect.top &&
+            event.clientY <= rect.top + headerHeight
+        );
+    }
+
     function codeBlockAtPosition(view: EditorView, pos: number) {
         const resolved = view.state.doc.resolve(pos);
 
@@ -1464,6 +1562,17 @@
         return undefined;
     }
 
+    function codeBlockFromPre(view: EditorView, pre: HTMLElement) {
+        const rect = pre.getBoundingClientRect();
+        const headerHeight = codeFilenameBarHeight(pre);
+        const position = view.posAtCoords({
+            left: rect.left + Math.min(Math.max(rect.width - 4, 4), 18),
+            top: rect.top + headerHeight + 1,
+        });
+
+        return position ? codeBlockAtPosition(view, position.pos) : undefined;
+    }
+
     function clickedCodeLine(pre: HTMLElement, lineCount: number, event: MouseEvent) {
         const code = pre.querySelector("code") ?? pre;
         const rect = code.getBoundingClientRect();
@@ -1477,6 +1586,309 @@
         const line = Math.floor(Math.max(0, y) / lineHeight) + 1;
 
         return Math.max(1, Math.min(lineCount, line));
+    }
+
+    function selectedCodeLineRange(
+        view: EditorView,
+        codeBlock: { node: ProseMirrorNode; pos: number },
+        clickedLine: number,
+    ): CodeLineRange | undefined {
+        const selection = view.state.selection;
+
+        if (selection.empty) {
+            return undefined;
+        }
+
+        const contentStart = codeBlock.pos + 1;
+        const contentEnd = contentStart + codeBlock.node.content.size;
+
+        if (selection.from < contentStart || selection.to > contentEnd) {
+            return undefined;
+        }
+
+        const range = selectedCodeLineRangeFromOffsets(
+            codeBlock.node.textContent,
+            selection.from - contentStart,
+            selection.to - contentStart,
+        );
+
+        if (!range || !codeLineRangeContains(range, clickedLine)) {
+            return undefined;
+        }
+
+        return range;
+    }
+
+    async function focusCodeFilenameInput() {
+        await tick();
+        codeFilenameInput?.focus();
+        codeFilenameInput?.select();
+    }
+
+    async function focusBlockLabelInput() {
+        await tick();
+        blockLabelInput?.focus();
+        blockLabelInput?.select();
+    }
+
+    async function focusLinkInput() {
+        await tick();
+        linkInput?.focus();
+        linkInput?.select();
+    }
+
+    function isEditableHrefNodeName(nodeName: string) {
+        return (
+            nodeName === "linkBox" ||
+            nodeName === "ctaButton" ||
+            nodeName === "referenceItem"
+        );
+    }
+
+    function hrefFromAttributes(attrs: Record<string, unknown>) {
+        return typeof attrs.href === "string"
+            ? normalizeEditableLinkHref(attrs.href)
+            : undefined;
+    }
+
+    function editableHrefNodeTargetFromResolvedPos(
+        resolvedPos: ResolvedPos,
+    ): { pos: number; href: string } | undefined {
+        for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+            const node = resolvedPos.node(depth);
+
+            if (!isEditableHrefNodeName(node.type.name)) {
+                continue;
+            }
+
+            const href = hrefFromAttributes(node.attrs);
+            return {
+                pos: resolvedPos.before(depth),
+                href: href ?? "",
+            };
+        }
+
+        return undefined;
+    }
+
+    function linkMarkHrefAtPosition(view: EditorView, pos: number) {
+        const linkType = view.state.schema.marks.link;
+
+        if (!linkType) {
+            return undefined;
+        }
+
+        const safePos = Math.max(0, Math.min(view.state.doc.content.size, pos));
+        const resolvedPos = view.state.doc.resolve(safePos);
+        const marks = [
+            ...resolvedPos.marks(),
+            ...(resolvedPos.nodeAfter?.marks ?? []),
+            ...(resolvedPos.nodeBefore?.marks ?? []),
+        ];
+        const linkMark = marks.find((mark) => mark.type === linkType);
+
+        return linkMark ? hrefFromAttributes(linkMark.attrs) : undefined;
+    }
+
+    function editableLinkHrefFromElement(element: HTMLElement) {
+        return (
+            normalizeEditableLinkHref(element.getAttribute("data-href") ?? "") ??
+            normalizeEditableLinkHref(element.getAttribute("href") ?? "")
+        );
+    }
+
+    function editableHrefNodeTargetFromElement(
+        view: EditorView,
+        element: HTMLElement,
+    ): { pos: number; href: string } | undefined {
+        try {
+            const pos = view.posAtDOM(element, 0);
+            const target = editableHrefNodeTargetFromResolvedPos(
+                view.state.doc.resolve(
+                    Math.max(0, Math.min(view.state.doc.content.size, pos + 1)),
+                ),
+            );
+
+            if (target) {
+                return target;
+            }
+        } catch {
+            return undefined;
+        }
+
+        return undefined;
+    }
+
+    function retargetActiveHrefNode(current: Editor, href: string) {
+        let target:
+            | { pos: number; href: string }
+            | undefined;
+
+        if (current.state.selection instanceof NodeSelection) {
+            const selectedNode = current.state.selection.node;
+
+            if (isEditableHrefNodeName(selectedNode.type.name)) {
+                target = {
+                    pos: current.state.selection.from,
+                    href: hrefFromAttributes(selectedNode.attrs) ?? "",
+                };
+            }
+        }
+
+        target ??= editableHrefNodeTargetFromResolvedPos(current.state.selection.$from);
+
+        if (!target) {
+            return false;
+        }
+
+        const node = current.state.doc.nodeAt(target.pos);
+
+        if (!node || !isEditableHrefNodeName(node.type.name)) {
+            return false;
+        }
+
+        current.commands.focus();
+        current.view.dispatch(
+            current.state.tr
+                .setNodeMarkup(target.pos, node.type, { ...node.attrs, href })
+                .scrollIntoView(),
+        );
+
+        return true;
+    }
+
+    function openCodeFilenameEditorFromEvent(view: EditorView, event: MouseEvent) {
+        const pre = closestCodePre(event.target);
+
+        if (!pre || !isCodeFilenameBarEvent(pre, event)) {
+            return false;
+        }
+
+        const codeBlock = codeBlockFromPre(view, pre);
+
+        if (!codeBlock) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeCodeLineContextMenu();
+        activeToolPanel = "code";
+        codeFilename = normalizeCodeFilename(codeBlock.node.attrs.filename);
+
+        view.dispatch(
+            view.state.tr.setSelection(NodeSelection.create(view.state.doc, codeBlock.pos)),
+        );
+        void focusCodeFilenameInput();
+
+        return true;
+    }
+
+    function openEditableLinkFromEvent(view: EditorView, event: MouseEvent) {
+        const element = closestEditableLinkElement(event.target);
+
+        if (!element) {
+            return false;
+        }
+
+        const position = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+        });
+        const nodeTarget =
+            editableHrefNodeTargetFromElement(view, element) ??
+            (position
+                ? editableHrefNodeTargetFromResolvedPos(
+                      view.state.doc.resolve(position.pos),
+                  )
+                : undefined);
+        const markHref = position
+            ? linkMarkHrefAtPosition(view, position.pos)
+            : undefined;
+        const href =
+            nodeTarget?.href ??
+            markHref ??
+            editableLinkHrefFromElement(element);
+
+        if (!href) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeCodeLineContextMenu();
+        isLinkPanelOpen = true;
+        linkError = false;
+        linkDraft = href;
+
+        if (nodeTarget) {
+            view.dispatch(
+                view.state.tr
+                    .setSelection(NodeSelection.create(view.state.doc, nodeTarget.pos))
+                    .scrollIntoView(),
+            );
+        } else if (position) {
+            const safePos = Math.max(0, Math.min(view.state.doc.content.size, position.pos));
+            view.dispatch(
+                view.state.tr
+                    .setSelection(TextSelection.create(view.state.doc, safePos))
+                    .scrollIntoView(),
+            );
+        }
+
+        void focusLinkInput();
+
+        return true;
+    }
+
+    function openBlockLabelEditorFromEvent(view: EditorView, event: MouseEvent) {
+        if (closestCodePre(event.target)) {
+            return false;
+        }
+
+        const element = closestEditableBlockLabelElement(event.target);
+        let target:
+            | (EditableBlockLabelTarget & { label: string })
+            | null = null;
+
+        if (element) {
+            try {
+                const pos = view.posAtDOM(element, 0);
+                target = findEditableBlockLabelTargetFromResolvedPos(
+                    view.state.doc.resolve(
+                        Math.max(0, Math.min(view.state.doc.content.size, pos + 1)),
+                    ),
+                );
+            } catch {
+                target = null;
+            }
+        }
+
+        const position = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
+        });
+
+        if (!target && !position) {
+            return false;
+        }
+
+        target ??= findEditableBlockLabelTargetFromResolvedPos(
+            view.state.doc.resolve(position?.pos ?? 0),
+        );
+
+        if (!target) {
+            return false;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        closeCodeLineContextMenu();
+        activeToolPanel = "blocks";
+        syncBlockLabelTarget(target);
+        void focusBlockLabelInput();
+
+        return true;
     }
 
     function openCodeLineContextMenu(view: EditorView, event: MouseEvent) {
@@ -1504,10 +1916,16 @@
 
         event.preventDefault();
         const lineCount = Math.max(1, codeBlock.node.textContent.split("\n").length);
+        const clickedLine = clickedCodeLine(pre, lineCount, event);
+        const range = selectedCodeLineRange(view, codeBlock, clickedLine) ?? {
+            fromLine: clickedLine,
+            toLine: clickedLine,
+        };
+
         codeLineContextMenu = {
             x: Math.min(event.clientX, Math.max(8, window.innerWidth - 184)),
             y: Math.min(event.clientY, Math.max(8, window.innerHeight - 160)),
-            line: clickedCodeLine(pre, lineCount, event),
+            range,
             pos: codeBlock.pos,
         };
 
@@ -1529,13 +1947,13 @@
             return false;
         }
 
-        return isLineInRange(
+        return isCodeLineRangeActive(
             normalizeCodeLineMarkers({
                 highlightLines: node.attrs.highlightLines,
                 additionLines: node.attrs.additionLines,
                 deletionLines: node.attrs.deletionLines,
             })[marker],
-            codeLineContextMenu.line,
+            codeLineContextMenu.range,
         );
     }
 
@@ -1556,9 +1974,9 @@
                 highlightLines: node.attrs.highlightLines,
                 additionLines: node.attrs.additionLines,
                 deletionLines: node.attrs.deletionLines,
-                [marker]: toggleLineInRange(
+                [marker]: toggleLinesInRange(
                     node.attrs[marker],
-                    codeLineContextMenu.line,
+                    codeLineContextMenu.range,
                 ),
             },
             marker,
@@ -2155,6 +2573,7 @@
         linkError = false;
         linkDraft = href;
         runEditorCommand((current) =>
+            retargetActiveHrefNode(current, href) ||
             current
                 .chain()
                 .focus()
@@ -2168,6 +2587,7 @@
         linkError = false;
         linkDraft = "";
         runEditorCommand((current) =>
+            retargetActiveHrefNode(current, "") ||
             current.chain().focus().extendMarkRange("link").unsetLink().run(),
         );
     }
@@ -2386,9 +2806,21 @@
                         spellcheck: "false",
                     },
                     handleDOMEvents: {
-                        contextmenu: (view, event) =>
+                        contextmenu: (view, event) => {
+                            if (!(event instanceof MouseEvent)) {
+                                return false;
+                            }
+
+                            return (
+                                openEditableLinkFromEvent(view, event) ||
+                                openCodeFilenameEditorFromEvent(view, event) ||
+                                openCodeLineContextMenu(view, event) ||
+                                openBlockLabelEditorFromEvent(view, event)
+                            );
+                        },
+                        dblclick: (view, event) =>
                             event instanceof MouseEvent
-                                ? openCodeLineContextMenu(view, event)
+                                ? openCodeFilenameEditorFromEvent(view, event)
                                 : false,
                     },
                     handleClick: (view, pos) => {
@@ -2727,6 +3159,7 @@
                     <input
                         class:error={linkError}
                         type="url"
+                        bind:this={linkInput}
                         bind:value={linkDraft}
                         aria-label="링크 주소"
                         placeholder="https://example.com"
@@ -2863,6 +3296,7 @@
                 <span><Type size={15} /> 라벨</span>
                 <input
                     type="text"
+                    bind:this={blockLabelInput}
                     bind:value={blockLabelDraft}
                     aria-label="블록 라벨"
                     placeholder={blockLabelPlaceholder()}
@@ -3003,6 +3437,7 @@
                 <input
                     class="code-filename-input"
                     type="text"
+                    bind:this={codeFilenameInput}
                     bind:value={codeFilename}
                     aria-label="코드 파일명"
                     placeholder="main.cpp"
@@ -3420,13 +3855,13 @@
                     class="code-line-context-menu"
                     role="menu"
                     tabindex="-1"
-                    aria-label={`코드 ${codeLineContextMenu.line}번 줄`}
+                    aria-label={`코드 ${codeLineRangeLabel(codeLineContextMenu.range)}`}
                     style={`left:${codeLineContextMenu.x}px;top:${codeLineContextMenu.y}px`}
                     bind:this={codeLineContextMenuElement}
                     onpointerdown={(event) => event.stopPropagation()}
                 >
                     <span class="code-line-context-title"
-                        >{codeLineContextMenu.line}번 줄</span
+                        >{codeLineRangeLabel(codeLineContextMenu.range)}</span
                     >
                     {#each codeLineMarkers as marker}
                         <button
@@ -4416,12 +4851,34 @@
         font-size: 13px;
         font-weight: 800;
         line-height: 1.1;
+        cursor: text;
     }
 
     .editor-surface :global(.article-editor pre code) {
         display: block;
         min-width: max-content;
         font-family: inherit;
+    }
+
+    .editor-surface :global(.article-editor .dc-code-line) {
+        display: inline-block;
+        width: 100%;
+        margin-right: -100%;
+        height: 1.4em;
+        pointer-events: none;
+        vertical-align: top;
+    }
+
+    .editor-surface :global(.article-editor .dc-code-line-highlight) {
+        background: oklch(34.5% 0.105 83.12 / 0.96);
+    }
+
+    .editor-surface :global(.article-editor .dc-code-line-addition) {
+        background: oklch(31.8% 0.115 145.18 / 0.94);
+    }
+
+    .editor-surface :global(.article-editor .dc-code-line-deletion) {
+        background: oklch(32.2% 0.125 24.13 / 0.94);
     }
 
     .editor-surface :global(.article-editor .dc-code-token-keyword) {
@@ -4452,6 +4909,7 @@
         background: oklch(94.93% 0.016 255.07);
         color: oklch(34.86% 0.087 278.64);
         font-family:
+            Pretendard,
             Cascadia Mono,
             D2Coding,
             나눔고딕코딩,

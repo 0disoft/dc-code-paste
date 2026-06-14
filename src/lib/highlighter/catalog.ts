@@ -5,12 +5,20 @@ type SupportedLanguage = {
   readonly shikiLanguage?: string;
 };
 
-type SupportedLanguageGroupId = "native" | "web" | "data" | "diff" | "script" | "general";
+type SupportedLanguageGroupId =
+  | "native"
+  | "web"
+  | "data"
+  | "docs"
+  | "diff"
+  | "script"
+  | "general";
 
 export const supportedLanguageGroupLabels = {
   native: "시스템/네이티브",
   web: "웹/프론트엔드",
   data: "데이터/설정",
+  docs: "문서/다이어그램",
   diff: "변경/패치",
   script: "스크립트",
   general: "일반 언어",
@@ -38,6 +46,8 @@ export const supportedLanguages = [
   { id: "yaml", label: "YAML", group: "data" },
   { id: "toml", label: "TOML", group: "data" },
   { id: "sql", label: "SQL", group: "data" },
+  { id: "markdown", label: "Markdown", group: "docs" },
+  { id: "mermaid", label: "Mermaid", group: "docs" },
   { id: "diff", label: "Diff", group: "diff" },
   { id: "patch", label: "Patch", group: "diff", shikiLanguage: "diff" },
   { id: "bash", label: "Bash", group: "script" },

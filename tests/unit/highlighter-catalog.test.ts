@@ -18,6 +18,16 @@ describe("highlighter catalog", () => {
     ]);
   });
 
+  it("groups documentation and diagram languages together", () => {
+    const docsGroup = supportedLanguageGroups.find((group) => group.id === "docs");
+
+    expect(docsGroup?.label).toBe("문서/다이어그램");
+    expect(docsGroup?.languages.map((language) => language.id)).toEqual([
+      "markdown",
+      "mermaid",
+    ]);
+  });
+
   it("keeps every listed language selectable and grouped", () => {
     const groupedLanguageIds = new Set(
       supportedLanguageGroups.flatMap((group) => group.languages.map((language) => language.id)),

@@ -13,19 +13,26 @@ function paragraph(content: JSONContent[]): JSONContent {
 }
 
 function summaryItem(content: JSONContent[]): JSONContent {
-  return { type: "summaryItem", content };
+  return { type: "summaryItem", content }
 }
 
-function codeBlock(filename: string, highlightLines: string, source: string): JSONContent {
+function codeBlock(
+  language: string,
+  filename: string,
+  highlightLines: string,
+  additionLines: string,
+  deletionLines: string,
+  source: string,
+): JSONContent {
   return {
     type: "codeBlock",
-    attrs: { language: "go", filename, highlightLines },
+    attrs: { language, filename, highlightLines, additionLines, deletionLines },
     content: [{ type: "text", text: source }],
   };
 }
 
 function callout(
-  type: "tipBox" | "warningBox" | "conclusionBox",
+  type: "tipBox" | "warningBox" | "emphasisBox",
   label: string,
   toneColor: string,
   content: JSONContent[],
@@ -34,6 +41,25 @@ function callout(
     type,
     attrs: { label, toneColor },
     content: [paragraph(content)],
+  };
+}
+
+function comparisonColumn(title: string, content: JSONContent[]): JSONContent {
+  return {
+    type: "comparisonColumn",
+    attrs: { title },
+    content,
+  };
+}
+
+function tutorialStep(number: string, title: string, content: JSONContent[]): JSONContent {
+  return {
+    type: "tutorialStep",
+    attrs: { number },
+    content: [
+      { type: "heading", attrs: { level: 1 }, content: [text(title)] },
+      ...content,
+    ],
   };
 }
 
@@ -58,104 +84,155 @@ export const sampleDocument: JSONContent = {
   content: [
     {
       type: "heroBlock",
-      attrs: { label: "GO의 유일한 반복자" },
+      attrs: { label: "DC-CODE-PASTE" },
       content: [
         {
           type: "heading",
           attrs: { level: 1 },
-          content: [text("Go 반복문 정복: for 하나로 모든 루프를 제어한다")],
+          content: [text("디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구")],
         },
         paragraph([
           text(
-            "C 언어 계열의 while, do-while 없이 오직 for만으로 모든 반복 패턴을 구현하는 Go의 간결한 설계를 실전 예제로 익힌다.",
+            "Markdown처럼 글을 작성하고, 버튼 한 번으로 DCInside에 붙여넣을 수 있는 HTML을 만든다.",
           ),
         ]),
       ],
     },
     {
       type: "summaryBox",
-      attrs: { label: "for문 기본기" },
+      attrs: { label: "이 도구로 할 수 있는 것" },
       content: [
         summaryItem([
-          text("Go에는 "),
-          codeText("for"),
-          text(" 키워드 하나만 존재하며, 초기문·조건문·증감문을 모두 생략할 수 있다."),
+          text("Markdown으로 글을 작성하고 에디터에 바로 적용할 수 있다."),
         ]),
         summaryItem([
-          text("조건문만 남기면 "),
-          codeText("while"),
-          text("처럼, 아무것도 쓰지 않으면 무한 루프로 동작한다."),
+          text("코드블록에 파일명, 언어, 강조줄, 추가줄, 삭제줄 표시를 넣을 수 있다."),
         ]),
         summaryItem([
-          codeText("range"),
-          text("를 통해 배열·슬라이스·맵·채널을 인덱스와 값으로 안전하게 순회한다."),
+          text("콜아웃, 비교, 튜토리얼, 링크박스, CTA 버튼 같은 서식 블록을 쓸 수 있다."),
         ]),
         summaryItem([
-          text("사용하지 않는 변수는 "),
-          codeText("_"),
-          text("로 명시적으로 버려야 컴파일 오류를 피할 수 있다."),
+          codeText("디씨 복사"),
+          text(" 버튼으로 DCInside에 그대로 붙여넣을 수 있는 HTML을 만든다."),
+        ]),
+      ],
+    },
+    paragraph([
+      text(
+        "LLM을 써서 글을 빠르게 초안으로 만들 수도 있다. 상단 툴바의 ",
+      ),
+      codeText("LLM 가이드"),
+      text(
+        " 버튼을 누르면 이 도구의 Markdown 문법 설명이 클립보드에 복사된다. 이걸 ChatGPT·Claude·DeepSeek 같은 LLM에 붙여넣고 글 작성을 요청하면 된다.",
+      ),
+    ]),
+    callout("tipBox", "Markdown 붙여넣기 방법", "#16a34a", [
+      text("LLM 결과를 왼쪽 편집기에 직접 붙여넣으면 서식이 깨진다. "),
+      codeText("Markdown"),
+      text(
+        " 버튼으로 입력창을 열고, 거기에 붙여넣은 뒤 ",
+      ),
+      codeText("적용하기"),
+      text("를 눌러야 한다."),
+    ]),
+    {
+      type: "comparisonBlock",
+      content: [
+        comparisonColumn("기존 방식", [
+          paragraph([
+            text("DCInside 에디터에서 색상·폰트·표를 손으로 하나씩 맞춤. 코드는 고정폭 서식으로만 표현 가능."),
+          ]),
+        ]),
+        comparisonColumn("dc-code-paste 사용", [
+          paragraph([
+            text("Markdown 또는 버튼으로 블록 작성 → 미리보기 확인 → 디씨 복사로 바로 붙여넣기."),
+          ]),
+        ]),
+      ],
+    },
+    {
+      type: "tutorialBlock",
+      content: [
+        tutorialStep("01", "LLM 가이드 복사", [
+          paragraph([
+            text("상단 툴바 "),
+            codeText("LLM 가이드"),
+            text(" 버튼을 클릭한다."),
+          ]),
+        ]),
+        tutorialStep("02", "LLM에게 글 요청", [
+          paragraph([
+            text("복사한 가이드를 LLM 채팅창에 붙여넣고, 원하는 글 주제와 함께 작성을 요청한다."),
+          ]),
+        ]),
+        tutorialStep("03", "Markdown 패널에 붙여넣기", [
+          paragraph([
+            text("LLM 결과를 복사한 뒤, "),
+            codeText("Markdown"),
+            text(" 버튼으로 입력창을 열고 붙여넣는다."),
+          ]),
+        ]),
+        tutorialStep("04", "적용 및 미리보기 확인", [
+          paragraph([
+            codeText("적용하기"),
+            text(" 버튼을 누르면 에디터에 내용이 반영되고, 오른쪽 미리보기에서 결과를 확인할 수 있다."),
+          ]),
+        ]),
+        tutorialStep("05", "디씨 복사", [
+          paragraph([
+            text("미리보기가 만족스러우면 "),
+            codeText("디씨 복사"),
+            text(" 버튼을 누르고, DCInside 글쓰기 화면에 붙여넣는다."),
+          ]),
         ]),
       ],
     },
     codeBlock(
-      "basic_for.go",
+      "markdown",
+      "example.md",
+      "3",
       "6",
-      'package main\n\nimport "fmt"\n\nfunc main() {\n    for i := 0; i < 5; i++ {\n        fmt.Println(i)\n    }\n}',
+      "",
+      `# 제목
+
+이 줄은 강조 표시된 줄이다.
+
+본문 텍스트 예시.
+
+이 줄은 추가된 줄 표시다.
+
+:::tip 팁 블록
+팁 내용을 여기에 작성한다.
+:::
+
+:::comparison
+=== Before
+기존 방식 설명
+=== After
+개선된 방식 설명
+:::
+
+:::cta vertical
+[데모 사이트](https://0disoft.github.io/dc-code-paste/)
+[GitHub 저장소](https://github.com/0disoft/dc-code-paste)
+:::`,
     ),
-    codeBlock(
-      "while_style.go",
-      "7",
-      'package main\n\nimport "fmt"\n\nfunc main() {\n    sum := 1\n    for sum < 1000 {\n        sum += sum\n    }\n    fmt.Println(sum)\n}',
-    ),
-    codeBlock(
-      "infinite_loop.go",
-      "4",
-      "package main\n\nfunc main() {\n    for {\n        // 무한 반복이 필요할 때\n    }\n}",
-    ),
-    codeBlock(
-      "range_with_index.go",
-      "6",
-      'package main\n\nimport "fmt"\n\nfunc main() {\n    fruits := []string{"사과", "바나나", "체리"}\n    for idx, name := range fruits {\n        fmt.Printf("%d: %s\\n", idx, name)\n    }\n}',
-    ),
-    callout("tipBox", "조건문으로 변신한 for", "#16a34a", [
-      text("초기문과 증감문을 생략하면 일반적인 "),
-      codeText("while"),
-      text(
-        " 루프와 동일한 형태가 된다. 조건이 거짓이 될 때까지 블록을 반복 실행하므로, 종료 조건을 명확히 설정해야 무한 루프를 방지할 수 있다.",
-      ),
-    ]),
-    callout("warningBox", "range는 값 복사에 주의", "#d97706", [
-      codeText("for range"),
-      text("로 슬라이스를 순회할 때 반환되는 "),
-      codeText("value"),
-      text(
-        "는 요소의 복사본이다. 원본 요소를 직접 수정하려면 인덱스를 사용하거나 포인터 슬라이스를 순회해야 한다.",
-      ),
-    ]),
-    callout("conclusionBox", "for 하나로 충분한 이유", "#a16207", [
-      text("Go는 "),
-      codeText("for"),
-      text("의 생략 가능한 구성 요소와 "),
-      codeText("range"),
-      text(
-        " 키워드만으로 반복 구조를 직교성 있게 표현한다. 문법이 적을수록 코드 리뷰는 빨라지고, 관용구를 익히는 데 걸리는 시간도 짧아진다.",
-      ),
+    callout("warningBox", "줄 번호 범위 주의", "#d97706", [
+      text("강조줄·추가줄·삭제줄 번호는 코드블록 실제 줄 수 안에서 지정해야 한다. 범위를 벗어나면 조용히 무시된다."),
     ]),
     {
       type: "referenceList",
       content: [
-        referenceItem("A Tour of Go - For", "https://go.dev/tour/flowcontrol/1"),
-        referenceItem("Effective Go - For", "https://go.dev/doc/effective_go#for"),
-        referenceItem("Go by Example: For", "https://gobyexample.com/for"),
+        referenceItem("dc-code-paste README", "https://github.com/0disoft/dc-code-paste#readme"),
+        referenceItem("오픈소스 GitHub 저장소", "https://github.com/0disoft/dc-code-paste"),
       ],
     },
     {
       type: "ctaGroup",
       attrs: { layout: "vertical" },
       content: [
-        ctaButton("Go Playground", "https://go.dev/play/"),
-        ctaButton("Tour of Go", "https://go.dev/tour/"),
-        ctaButton("언어 명세 (For문)", "https://go.dev/ref/spec#For_statements"),
+        ctaButton("데모 사이트 열기", "https://0disoft.github.io/dc-code-paste/"),
+        ctaButton("GitHub 저장소", "https://github.com/0disoft/dc-code-paste"),
       ],
     },
   ],

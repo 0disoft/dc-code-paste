@@ -29,6 +29,8 @@ const languageInputs: Record<DcLanguageId, LanguageInput> = {
   yaml: () => import("@shikijs/langs/yaml").then((module) => module.default),
   toml: () => import("@shikijs/langs/toml").then((module) => module.default),
   sql: () => import("@shikijs/langs/sql").then((module) => module.default),
+  markdown: () => import("@shikijs/langs/markdown").then((module) => module.default),
+  mermaid: () => import("@shikijs/langs/mermaid").then((module) => module.default),
   diff: () => import("@shikijs/langs/diff").then((module) => module.default),
   patch: () => import("@shikijs/langs/diff").then((module) => module.default),
   bash: () => import("@shikijs/langs/bash").then((module) => module.default),
