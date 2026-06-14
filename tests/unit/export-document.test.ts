@@ -27,7 +27,22 @@ function textOfTestDocument(node: JSONContent): string {
 }
 
 describe("exportDocumentToDcHtml", () => {
-  it("appends a subtle linked attribution footer to copied DC HTML", async () => {
+  it("returns empty HTML for an empty editor document", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [{ type: "paragraph" }],
+    };
+
+    await expect(exportDocumentToDcHtml(document, exportOptions)).resolves.toBe("");
+    await expect(
+      exportDocumentToDcHtml(document, {
+        ...exportOptions,
+        includeAttribution: true,
+      }),
+    ).resolves.toBe("");
+  });
+
+  it("omits the attribution footer by default for preview HTML", async () => {
     const document: JSONContent = {
       type: "doc",
       content: [
@@ -39,6 +54,27 @@ describe("exportDocumentToDcHtml", () => {
     };
 
     const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain("본문 내용");
+    expect(html).not.toContain("Created with dc-code-paste");
+    expect(html).not.toContain('href="https://0disoft.github.io/dc-code-paste/"');
+  });
+
+  it("appends a subtle linked attribution footer to copied DC HTML", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "본문 내용" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      includeAttribution: true,
+    });
     const footerStart = html.indexOf("Created with dc-code-paste");
 
     expect(footerStart).toBeGreaterThan(html.indexOf("본문 내용"));
@@ -66,6 +102,7 @@ describe("exportDocumentToDcHtml", () => {
     const html = await exportDocumentToDcHtml(document, {
       ...exportOptions,
       documentTheme: "darkEditorial",
+      includeAttribution: true,
     });
 
     expect(html).toContain("Created with dc-code-paste");
@@ -637,6 +674,7 @@ describe("exportDocumentToDcHtml", () => {
       bodyFontSize: "17px",
       codeFontSize: "15px",
       theme: "catppuccin-mocha",
+      includeAttribution: true,
     });
 
     expect(markdown.length).toBeGreaterThan(3_000);

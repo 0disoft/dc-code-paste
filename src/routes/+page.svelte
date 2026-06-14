@@ -267,7 +267,7 @@
     let renderTurn = 0;
 
     const htmlSize = $derived(
-        `${Math.max(1, Math.ceil(html.length / 1024))}KB`,
+        html.length === 0 ? "0KB" : `${Math.ceil(html.length / 1024)}KB`,
     );
     const copyLabel = $derived(copyState === "copied" ? "복사됨" : "디씨 복사");
     const sourceCopyLabel = $derived(
@@ -2246,7 +2246,12 @@
         copyState = "idle";
 
         try {
-            await copyDcHtml(html, editor?.getText() ?? "");
+            const copyHtml = await exportDocumentToDcHtml(documentJson, {
+                ...exportOptions(),
+                includeAttribution: true,
+            });
+
+            await copyDcHtml(copyHtml, editor?.getText() ?? "");
             copyState = "copied";
             window.setTimeout(() => {
                 copyState = "idle";
@@ -3492,8 +3497,6 @@
                 >
                     {#if html}
                         {@html html}
-                    {:else}
-                        <div class="empty">...</div>
                     {/if}
                 </div>
             {:else}
@@ -3711,7 +3714,7 @@
     }
 
     .toolbar .copy-button:disabled {
-        cursor: wait;
+        cursor: not-allowed;
         opacity: 0.72;
     }
 
@@ -4252,7 +4255,7 @@
     }
 
     .source-copy-button:disabled {
-        cursor: wait;
+        cursor: not-allowed;
         opacity: 0.66;
     }
 
@@ -5150,25 +5153,6 @@
 
     .preview-surface :global(pre) {
         max-width: 100%;
-    }
-
-    .empty {
-        color: oklch(51.52% 0.02 87.11);
-        font-family:
-            Cascadia Mono,
-            D2Coding,
-            나눔고딕코딩,
-            Noto Sans Mono CJK,
-            JetBrains Mono,
-            Fira Code,
-            Hack,
-            Source Code Pro,
-            IBM Plex Mono,
-            Roboto Mono,
-            Consolas,
-            Menlo,
-            Monaco,
-            monospace;
     }
 
     .copy-error {

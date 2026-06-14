@@ -148,6 +148,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.locator(".editor-surface")).not.toContainText(
     "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
+  await expect(page.getByText("HTML 0KB")).toBeVisible();
+  await expect(page.locator(".preview-surface")).not.toContainText("...");
+  await expect(page.getByRole("button", { name: /디씨 복사/ })).toHaveCSS("cursor", "not-allowed");
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("예시 템플릿");
     await dialog.accept();
@@ -275,6 +278,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/while_style\.go/);
   await expect(htmlSource).toHaveValue(/infinite_loop\.go/);
   await expect(htmlSource).toHaveValue(/range_with_index\.go/);
+  await expect(htmlSource).not.toHaveValue(/Created with dc-code-paste/);
   await expect(htmlSource).toHaveValue(/line-height:18px;vertical-align:middle/);
   await expect(htmlSource).not.toHaveValue(/<pre/);
   await expect(htmlSource).toHaveValue(/&nbsp;&nbsp;&nbsp;&nbsp;/);

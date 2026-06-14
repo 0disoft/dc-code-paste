@@ -30,6 +30,7 @@ export type DcExportOptions = {
   showLineNumbers: boolean;
   documentTheme?: DcDocumentTheme;
   structure?: DcExportStructure;
+  includeAttribution?: boolean;
 };
 
 export type DcExportStructure = "dcTable";
@@ -384,6 +385,18 @@ function textOf(node: JSONContent): string {
   }
 
   return childrenOf(node).map(textOf).join("");
+}
+
+function hasRenderableDocumentContent(node: JSONContent): boolean {
+  if (typeof node.text === "string" && node.text.trim()) {
+    return true;
+  }
+
+  if (node.type === "horizontalRule") {
+    return true;
+  }
+
+  return childrenOf(node).some(hasRenderableDocumentContent);
 }
 
 function safeSize(value: string, fallback: string): string {
@@ -2619,9 +2632,15 @@ export async function exportDocumentToDcHtml(
   document: JSONContent,
   options: DcExportOptions,
 ): Promise<string> {
+  if (!hasRenderableDocumentContent(document)) {
+    return "";
+  }
+
   const palette = documentPalette(options);
   const body = await renderBlockAsync(document, options, { proseTableSafe: true });
-  const bodyWithAttribution = `${body}${renderAttributionFooter(options)}`;
+  const bodyWithAttribution = options.includeAttribution
+    ? `${body}${renderAttributionFooter(options)}`
+    : body;
   const wrapperStyle = joinStyle({
     display: "block",
     "background-color": palette.articleBackground,
