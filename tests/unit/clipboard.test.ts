@@ -81,4 +81,33 @@ describe("copyPlainText", () => {
       "Clipboard is available only in the browser.",
     );
   });
+
+  it("clears fallback plain text selection even when copy is rejected", async () => {
+    const target = {
+      value: "",
+      setAttribute: vi.fn(),
+      style: {},
+      select: vi.fn(),
+      blur: vi.fn(),
+      remove: vi.fn(),
+    };
+    const removeAllRanges = vi.fn();
+
+    vi.stubGlobal("navigator", {});
+    vi.stubGlobal("window", {
+      getSelection: () => ({ removeAllRanges }),
+    });
+    vi.stubGlobal("document", {
+      createElement: vi.fn(() => target),
+      body: { append: vi.fn() },
+      execCommand: vi.fn(() => false),
+    });
+
+    await expect(copyPlainText("복사")).rejects.toThrow("Copy command was rejected.");
+
+    expect(target.select).toHaveBeenCalledOnce();
+    expect(target.blur).toHaveBeenCalledOnce();
+    expect(removeAllRanges).toHaveBeenCalledOnce();
+    expect(target.remove).toHaveBeenCalledOnce();
+  });
 });

@@ -153,7 +153,7 @@ function normalizeSnapshotName(value: unknown): string | undefined {
   return normalized ? normalized.slice(0, 60) : undefined;
 }
 
-function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefined {
+export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefined {
   if (!isRecord(value)) {
     return undefined;
   }

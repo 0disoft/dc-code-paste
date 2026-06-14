@@ -702,7 +702,7 @@ export function parseMarkdownToDocument(
       const quoteLines: string[] = [];
 
       while (index < lines.length && lines[index]?.trim().startsWith(">")) {
-        quoteLines.push((lines[index] ?? "").trim().replace(/^>\s?/, ""));
+        quoteLines.push((lines[index] ?? "").trim().replace(/^>+\s?/, ""));
         index += 1;
       }
 

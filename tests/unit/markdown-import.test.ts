@@ -335,6 +335,20 @@ describe("markdown import", () => {
     ]);
   });
 
+  it("flattens nested markdown quote markers instead of leaking them into text", () => {
+    expect(
+      parseMarkdownToDocument(["> 바깥 인용", ">> 안쪽 인용"].join("\n")).content?.[0],
+    ).toEqual({
+      type: "blockquote",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "바깥 인용 안쪽 인용" }],
+        },
+      ],
+    });
+  });
+
   it("does not absorb the rest of the document when a custom block is not closed", () => {
     expect(
       parseMarkdownToDocument([":::tip", "닫히지 않은 블록", "", "## 다음 제목"].join("\n"))

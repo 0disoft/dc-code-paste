@@ -87,6 +87,8 @@ export async function copyPlainText(text: string): Promise<void> {
       throw new Error("Copy command was rejected.");
     }
   } finally {
+    target.blur();
+    window.getSelection()?.removeAllRanges();
     target.remove();
   }
 }

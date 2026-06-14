@@ -1,5 +1,9 @@
 import type { JSONContent } from "@tiptap/core";
-import { createDraftSnapshot, parseDraftSnapshot, type DraftPreferences } from "./draft-storage";
+import {
+  createDraftSnapshot,
+  normalizeDraftSnapshot,
+  type DraftPreferences,
+} from "./draft-storage";
 
 export const presetStorageKey = "dc-code-paste:presets:v1";
 export const maxPresetCount = 30;
@@ -45,14 +49,12 @@ function parsePresetRecord(value: unknown): PresetSnapshot | undefined {
     return undefined;
   }
 
-  const draft = parseDraftSnapshot(
-    JSON.stringify({
-      version: 1,
-      updatedAt: value.updatedAt,
-      document: value.document,
-      preferences: value.preferences,
-    }),
-  );
+  const draft = normalizeDraftSnapshot({
+    version: 1,
+    updatedAt: value.updatedAt,
+    document: value.document,
+    preferences: value.preferences,
+  });
 
   if (!draft) {
     return undefined;
