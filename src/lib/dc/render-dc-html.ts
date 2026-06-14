@@ -75,16 +75,11 @@ function renderLineNumber(index: number, foreground: string, width: string): str
   return `<span style="${style}">${index + 1}</span>`;
 }
 
-function lineTextLength(line: readonly DcToken[]): number {
-  return line.reduce((total, token) => total + normalizeTokenContent(token.content).length, 0);
-}
-
 export function renderDcHtml(input: DcRenderInput): string {
   const background = sanitizeColor(input.background, fallbackBackground);
   const foreground = sanitizeColor(input.foreground, fallbackForeground);
   const filename = input.filename?.trim();
   const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
-  const hasLongLines = input.lines.some((line) => lineTextLength(line) > 80);
   const codeFontFamily = safeDcCodeFontFamily();
   const blockStyle = joinStyle({
     "background-color": input.showBackground ? background : undefined,
@@ -93,13 +88,10 @@ export function renderDcHtml(input: DcRenderInput): string {
     "font-size": input.fontSize ?? "14px",
     "line-height": "1.4",
     margin: filename ? 0 : "0 0 16px",
-    "max-width": hasLongLines ? "100%" : undefined,
-    "overflow-x": hasLongLines ? "auto" : undefined,
-    "overflow-y": hasLongLines ? "hidden" : undefined,
+    "max-width": "100%",
     padding: input.showBackground ? "14px 16px" : 0,
-    "white-space": hasLongLines ? "nowrap" : undefined,
     "word-break": "normal",
-    "overflow-wrap": hasLongLines ? "normal" : "anywhere",
+    "overflow-wrap": "anywhere",
   });
 
   const lineNumberWidth = `${Math.min(5, Math.max(2, String(input.lines.length).length))}ch`;
@@ -154,9 +146,8 @@ export function renderDcHtml(input: DcRenderInput): string {
 
   const wrapperStyle = joinStyle({
     margin: "0 0 16px",
-    "max-width": hasLongLines ? "100%" : undefined,
+    "max-width": "100%",
     "border-radius": "7px",
-    overflow: "hidden",
     "background-color": input.showBackground ? background : undefined,
   });
   const headerStyle = joinStyle({

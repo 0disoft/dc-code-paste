@@ -131,7 +131,7 @@ describe("renderDcHtml", () => {
     expect(html).toContain("&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;0;");
   });
 
-  it("keeps long code lines on one horizontal scrollable line", () => {
+  it("wraps long code lines instead of clipping them in DC posts", () => {
     const html = renderDcHtml({
       background: "#111111",
       foreground: "#eeeeee",
@@ -148,12 +148,31 @@ describe("renderDcHtml", () => {
     });
 
     expect(html).toContain("max-width:100%");
-    expect(html).toContain("overflow-x:auto");
-    expect(html).toContain("overflow-y:hidden");
-    expect(html).toContain("white-space:nowrap");
     expect(html).toContain("word-break:normal");
-    expect(html).toContain("overflow-wrap:normal");
-    expect(html).not.toContain("overflow-wrap:anywhere");
+    expect(html).toContain("overflow-wrap:anywhere");
+    expect(html).not.toContain("white-space:nowrap");
+    expect(html).not.toContain("overflow:auto");
+  });
+
+  it("uses the same DC-safe wrapping before a line crosses the old length heuristic", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [
+        [
+          {
+            content: 'fruits := []string{"사과", "바나나", "체리"} dsdfkljksf l;jsd fljsdfl;kj',
+          },
+        ],
+      ],
+    });
+
+    expect(html).toContain("max-width:100%");
+    expect(html).toContain("overflow-wrap:anywhere");
+    expect(html).not.toContain("white-space:nowrap");
+    expect(html).not.toContain("overflow:auto");
   });
 
   it("renders an optional escaped filename header above the code block", () => {
