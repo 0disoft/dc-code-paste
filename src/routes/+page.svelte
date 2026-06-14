@@ -151,8 +151,8 @@
     const previewRenderDebounceMs = 90;
     const draftPersistDebounceMs = 450;
     const documentThemes: { label: string; value: DcDocumentTheme }[] = [
-        { label: "라이트", value: "lightLecture" },
-        { label: "다크", value: "darkEditorial" },
+        { label: "밝은 글", value: "lightLecture" },
+        { label: "어두운 글", value: "darkEditorial" },
     ];
     const editorThemeColorSafety = {
         lightLecture: {
@@ -275,7 +275,7 @@
     );
     const documentThemeLabel = $derived(
         documentThemes.find((item) => item.value === documentTheme)?.label ??
-            "라이트",
+            "밝은 글",
     );
     const presetStateLabel = $derived(
         presetState === "saved"
@@ -477,8 +477,8 @@
     function draftHistorySummary(snapshot: DraftHistorySnapshot) {
         const themeLabel =
             snapshot.preferences.documentTheme === "darkEditorial"
-                ? "다크"
-                : "라이트";
+                ? "어두운 글"
+                : "밝은 글";
         const textLength = countDocumentText(
             snapshot.document,
         ).toLocaleString();
@@ -3092,8 +3092,12 @@
         {#if activeToolPanel === "style"}
             <div id="style-tools" class="tool-group tool-panel tool-group-wide typography-group">
             <label>
-                <span><Paintbrush size={15} /> 문서</span>
-                <select bind:value={documentTheme} aria-label="문서 테마">
+                <span><Paintbrush size={15} /> 글 배경</span>
+                <select
+                    bind:value={documentTheme}
+                    aria-label="복사될 글 배경"
+                    title="DC 야간모드와 별개로 복사될 글의 배경을 고릅니다"
+                >
                     {#each documentThemes as item}
                         <option value={item.value}>{item.label}</option>
                     {/each}
@@ -3219,8 +3223,8 @@
                                             >{preset.preferences
                                                 .documentTheme ===
                                             "darkEditorial"
-                                                ? "다크"
-                                                : "라이트"} · {presetDateLabel(
+                                                ? "어두운 글"
+                                                : "밝은 글"} · {presetDateLabel(
                                                 preset.updatedAt,
                                             )}</small
                                         >
@@ -3440,7 +3444,7 @@
                 </div>
                 <div class="preview-tools">
                     <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>
-                    <span class="status-pill" aria-label="현재 문서 테마"
+                    <span class="status-pill" aria-label="현재 글 배경"
                         >{documentThemeLabel}</span
                     >
                     <div class="mode-switch" aria-label="미리보기 형식">

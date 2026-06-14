@@ -71,6 +71,7 @@ type DocumentPalette = {
   ctaBackground: string;
   ctaBorder: string;
   ctaText: string;
+  attribution: string;
 };
 
 type RenderContext = {
@@ -107,6 +108,7 @@ function documentPalette(options: DcExportOptions): DocumentPalette {
       ctaBackground: "oklch(91.44% 0.064 90.52)",
       ctaBorder: "oklch(96.28% 0.022 90.84)",
       ctaText: "oklch(13.77% 0.018 87.82)",
+      attribution: "#787878",
     };
   }
 
@@ -130,6 +132,7 @@ function documentPalette(options: DcExportOptions): DocumentPalette {
     ctaBackground: "oklch(93.5% 0.044 88.16)",
     ctaBorder: "oklch(70.74% 0.08 82.27)",
     ctaText: "oklch(26.32% 0.03 80.84)",
+    attribution: "#c9c1b5",
   };
 }
 
@@ -223,57 +226,57 @@ const darkCalloutStyles: Record<
 > = {
   tip: {
     label: "TIP",
-    background: "oklch(11.88% 0.018 142.78)",
-    border: "oklch(76.13% 0.153 142.04)",
-    text: "oklch(91.89% 0.026 143.2)",
+    background: "oklch(11.52% 0.012 142.78)",
+    border: "oklch(62.6% 0.082 142.04)",
+    text: "oklch(90.44% 0.018 143.2)",
   },
   warning: {
     label: "주의",
-    background: "oklch(12.26% 0.018 58.76)",
-    border: "oklch(78.46% 0.145 69.41)",
-    text: "oklch(92.96% 0.03 76.33)",
+    background: "oklch(11.9% 0.012 58.76)",
+    border: "oklch(64.8% 0.078 69.41)",
+    text: "oklch(91.32% 0.02 76.33)",
   },
   reference: {
     label: "REF",
-    background: "oklch(11.62% 0.021 245.9)",
-    border: "oklch(72.52% 0.142 232.16)",
-    text: "oklch(91.87% 0.029 233.82)",
+    background: "oklch(11.28% 0.014 245.9)",
+    border: "oklch(60.74% 0.082 232.16)",
+    text: "oklch(90.58% 0.02 233.82)",
   },
   emphasis: {
     label: "POINT",
-    background: "oklch(12.04% 0.022 302.17)",
-    border: "oklch(73.79% 0.151 303.45)",
-    text: "oklch(93.04% 0.029 303.2)",
+    background: "oklch(11.68% 0.015 302.17)",
+    border: "oklch(61.88% 0.086 303.45)",
+    text: "oklch(91.78% 0.02 303.2)",
   },
   success: {
     label: "성공",
-    background: "oklch(11.76% 0.02 154.8)",
-    border: "oklch(76.71% 0.151 154.54)",
-    text: "oklch(92.34% 0.029 154.17)",
+    background: "oklch(11.42% 0.013 154.8)",
+    border: "oklch(62.88% 0.084 154.54)",
+    text: "oklch(91% 0.02 154.17)",
   },
   failure: {
     label: "실패",
-    background: "oklch(12.02% 0.021 24.58)",
-    border: "oklch(75.02% 0.17 24.82)",
-    text: "oklch(93.14% 0.03 24.92)",
+    background: "oklch(11.66% 0.014 24.58)",
+    border: "oklch(62.2% 0.09 24.82)",
+    text: "oklch(91.88% 0.02 24.92)",
   },
   experiment: {
     label: "실험",
-    background: "oklch(11.48% 0.022 264.32)",
-    border: "oklch(73.44% 0.145 264.2)",
-    text: "oklch(92.52% 0.031 264.14)",
+    background: "oklch(11.16% 0.014 264.32)",
+    border: "oklch(61.26% 0.084 264.2)",
+    text: "oklch(91.16% 0.021 264.14)",
   },
   conclusion: {
     label: "결론",
-    background: "oklch(12.18% 0.018 91.22)",
-    border: "oklch(80.18% 0.126 91.43)",
-    text: "oklch(93.56% 0.027 91.42)",
+    background: "oklch(11.84% 0.012 91.22)",
+    border: "oklch(66.4% 0.074 91.43)",
+    text: "oklch(92.08% 0.018 91.42)",
   },
   rebuttal: {
     label: "반박",
-    background: "oklch(12.11% 0.023 330.24)",
-    border: "oklch(75.91% 0.154 330.36)",
-    text: "oklch(93.11% 0.031 330.24)",
+    background: "oklch(11.76% 0.015 330.24)",
+    border: "oklch(62.42% 0.088 330.36)",
+    text: "oklch(91.82% 0.021 330.24)",
   },
 };
 
@@ -482,28 +485,25 @@ function compactInheritedProseStyles(html: string, options: DcExportOptions): st
 function renderAttributionFooter(options: DcExportOptions): string {
   const palette = documentPalette(options);
   const isDarkDocument = normalizeDocumentTheme(options.documentTheme) === "darkEditorial";
-  const mutedColor = isDarkDocument ? "#9a9a9a" : "#d2cbc0";
-  const linkOpacity = isDarkDocument ? 0.42 : 0.22;
+  const linkOpacity = isDarkDocument ? 0.34 : 0.18;
   const tableStyle = joinStyle({
-    width: "100%",
     margin: "20px 0 0",
     "border-collapse": "collapse",
-    "background-color": palette.articleBackground,
   });
   const cellStyle = joinStyle({
     padding: "8px 0 0",
     "text-align": "right",
-    color: mutedColor,
+    color: palette.attribution,
     "font-size": "12px",
     "line-height": 1.4,
   });
   const linkStyle = joinStyle({
-    color: mutedColor,
+    color: palette.attribution,
     opacity: linkOpacity,
     "text-decoration": "none",
   });
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td align="right" style="${cellStyle}"><a href="${attributionHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${attributionText}</a></td></tr></tbody></table>`;
+  return `<table width="100%" style="${tableStyle}"><tbody><tr><td align="right" style="${cellStyle}"><a href="${attributionHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${attributionText}</a></td></tr></tbody></table>`;
 }
 
 function renderDcTableBlock({

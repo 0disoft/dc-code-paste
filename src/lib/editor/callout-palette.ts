@@ -98,11 +98,11 @@ export function createCalloutColorPalette(
   const accent = normalizeCalloutToneColor(value, kind);
 
   if (mode === "dark") {
-    const background = mixHex(accent, "#050505", 0.2);
-    const inlineCodeBackground = mixHex(accent, "#0f172a", 0.62);
+    const background = mixHex(accent, "#050505", 0.14);
+    const inlineCodeBackground = mixHex(accent, "#0f172a", 0.48);
 
     return {
-      border: mixHex(accent, "#ffffff", 0.82),
+      border: mixHex(accent, "#b8b8b8", 0.54),
       background,
       fallbackBackground: background,
       text: readableTextFor(background),

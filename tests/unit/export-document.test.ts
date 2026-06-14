@@ -47,9 +47,30 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain('align="right"');
     expect(html).toContain("text-align:right");
-    expect(html).toContain("color:#d2cbc0");
-    expect(html).toContain("opacity:0.22");
+    expect(html).toContain("color:#c9c1b5");
+    expect(html).toContain("opacity:0.18");
     expect(html.slice(footerStart - 200, footerStart + 120)).not.toContain("font-family:");
+  });
+
+  it("keeps the attribution footer quieter on dark documents", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "다크 문서" }],
+        },
+      ],
+    };
+
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      documentTheme: "darkEditorial",
+    });
+
+    expect(html).toContain("Created with dc-code-paste");
+    expect(html).toContain("color:#787878");
+    expect(html).toContain("opacity:0.34");
   });
 
   it("renders prose, links, callouts, and code blocks as inline-style DC HTML", async () => {

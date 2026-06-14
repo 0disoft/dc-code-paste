@@ -290,8 +290,8 @@ function highlightedLineDecorations(
         border: "oklch(73.05% 0.141 83.41)",
       }
     : {
-        background: "oklch(31.14% 0.076 83.12 / 0.82)",
-        border: "oklch(79.43% 0.129 84.28)",
+        background: "oklch(25.8% 0.042 83.12 / 0.72)",
+        border: "oklch(66.8% 0.082 84.28)",
       };
 
   return lines.map((_, index) =>

@@ -78,7 +78,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 글자 크기")).toHaveValue("15px");
   await expect(page.getByLabel("코드 테마")).toHaveValue("catppuccin-mocha");
   await expect(page.getByLabel("줄번호")).toBeVisible();
-  await expect(page.getByLabel("문서 테마", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("복사될 글 배경", { exact: true })).toHaveCount(0);
   await page
     .locator(".article-editor pre")
     .first()
@@ -181,12 +181,12 @@ test("renders the paste tool", async ({ page }) => {
 
   await expect(page.getByText("글쓰기")).toBeVisible();
   await expect(page.getByLabel("현재 복붙 구조")).toHaveText("DC 테이블");
-  await expect(page.getByLabel("현재 문서 테마")).toHaveText("라이트");
-  if ((await page.getByLabel("문서 테마", { exact: true }).count()) === 0) {
+  await expect(page.getByLabel("현재 글 배경")).toHaveText("밝은 글");
+  if ((await page.getByLabel("복사될 글 배경", { exact: true }).count()) === 0) {
     await page.getByRole("button", { name: "스타일 도구" }).click();
   }
-  await page.getByLabel("문서 테마", { exact: true }).selectOption("darkEditorial");
-  await expect(page.getByLabel("현재 문서 테마")).toHaveText("다크");
+  await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("darkEditorial");
+  await expect(page.getByLabel("현재 글 배경")).toHaveText("어두운 글");
   await expect(page.locator(".preview-surface")).toHaveClass(/preview-surface-dark/);
   const darkEditorCtaColors = await page.locator(".editor-surface").evaluate((surface) => {
     const cta = surface.querySelector<HTMLElement>(".dc-cta-button");
@@ -201,8 +201,8 @@ test("renders the paste tool", async ({ page }) => {
     };
   });
   expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.ctaBackground);
-  await page.getByLabel("문서 테마", { exact: true }).selectOption("lightLecture");
-  await expect(page.getByLabel("현재 문서 테마")).toHaveText("라이트");
+  await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("lightLecture");
+  await expect(page.getByLabel("현재 글 배경")).toHaveText("밝은 글");
   await expect(page.locator(".preview-surface")).not.toHaveClass(/preview-surface-dark/);
   await page.getByRole("button", { name: "저장함" }).click();
   await expect(page.getByRole("button", { name: "저장함" })).toHaveAttribute(
