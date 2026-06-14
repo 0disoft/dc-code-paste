@@ -1,131 +1,86 @@
 # dc-code-paste
 
-디씨인사이드 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정적 웹 도구.
-프로그래밍 강의 글처럼 설명, 팁상자, 참고 링크, 코드블록이 섞인 글을 편집한 뒤
-복사해서 붙여넣는 흐름을 목표로 한다.
+DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정적 웹 도구.
 
-## Stack
+**→ https://0disoft.github.io/dc-code-paste/**
 
-- SvelteKit 2 + Svelte 5
-- Tiptap / ProseMirror
-- Shiki
-- TypeScript with `tsgo`
-- Oxlint + Oxfmt
-- Bun
-- GitHub Pages
+---
 
-## Local Setup
+## 주요 기능
+
+- 글쓰기 에디터 + 실시간 미리보기
+- 코드블록 (파일명, 언어, 라인 하이라이트, 추가/삭제/강조 줄 표시)
+- 콜아웃, 요약, 튜토리얼, 비교, references, CTA 블록
+- Markdown 가져오기 및 적용
+- LLM 가이드 복사 (ChatGPT, Claude, Gemini 등과 연동)
+- 프리셋 저장
+- 초안 히스토리
+- 라이트/다크 테마
+- 브라우저 종료 후에도 localStorage로 자동 복원
+
+---
+
+## 기본 사용 흐름
+
+1. 왼쪽 편집기에서 글을 작성한다.
+2. 오른쪽 미리보기에서 결과를 확인한다.
+3. `디씨 복사` 버튼을 클릭한다.
+4. DCInside 글쓰기 에디터에 붙여넣는다.
+
+> **주의:** 이 도구는 DCInside 에디터에 **리치 텍스트로 붙여넣는** 도구다.
+> HTML 원문을 DCInside HTML 모드에 직접 입력하는 방식과 다르다.
+> 미리보기 패널을 `HTML`로 전환하면 `원문 복사`로 raw HTML 소스도 복사할 수 있지만,
+> 일반적인 사용은 `디씨 복사` → 에디터 붙여넣기다.
+
+---
+
+## LLM으로 글 작성하기
+
+1. `LLM 가이드` 버튼을 클릭해 작성 규칙을 복사한다.
+2. ChatGPT, Claude, Gemini 등에 규칙과 작성할 주제를 함께 전달한다.
+3. LLM이 출력한 Markdown을 복사한다.
+4. dc-code-paste에서 `Markdown` 버튼을 클릭한다.
+5. 입력창에 Markdown을 붙여넣고 `Markdown 적용하기`를 클릭한다.
+6. 편집기와 미리보기에 변환된 글이 표시된다.
+7. 내용을 확인하거나 편집한 뒤 `디씨 복사`로 DCInside에 붙여넣는다.
+
+`:::hero`, `:::summary`, `:::tip`, `:::warning` 같은 블록 태그와 코드블록은
+반드시 `Markdown` 패널을 통해 적용해야 한다.
+LLM 결과를 편집기에 직접 붙여넣는 방식으로는 블록 태그가 해석되지 않는다.
+
+---
+
+## 로컬 실행
 
 ```sh
 bun install
-bun run check
-bun run typecheck:go
-bun run lint
-bun run format:check
-bun run test
-bun run build
+bun run dev
 ```
 
-## GitHub Pages
+---
 
-The app is built with `@sveltejs/adapter-static`.
+## 주요 명령어
 
-`BASE_PATH=/dc-code-paste` is set in `.github/workflows/pages.yml` so the deployed app works at:
-
-```txt
-https://0disoft.github.io/dc-code-paste/
+```sh
+bun run check          # Svelte 타입 검사
+bun run typecheck:go   # tsgo 네이티브 타입 검사
+bun run lint           # Oxlint
+bun run format:check   # Oxfmt
+bun run test           # Vitest 단위 테스트
+bun run test:e2e       # Playwright E2E 테스트
+bun run build          # 정적 빌드
 ```
 
-The repository can stay private while the editor is still being shaped. Enable GitHub Pages after
-the repository is ready to become public.
+---
 
-## Paste Contract
+## DCInside 붙여넣기 주의사항
 
-The app keeps an editor document model internally, then exports inline-style HTML for rich-text
-paste targets:
+릴리스 전 아래 항목을 브라우저에서 직접 확인한다.
 
-- Paste structure: `DC 테이블` uses table wrappers with `bgcolor` fallbacks for stricter DCInside
-  paste surfaces
-- Article canvas: root wrapper with an inline light background, padding, font, and text color so
-  prose stays readable when pasted into DCInside dark mode
-- Prose blocks: paragraph, heading, list, quote, divider
-- Design blocks: `tipBox`, `warningBox`, `referenceBox`, `emphasisBox`, `linkBox`
-- Code blocks: Tiptap `codeBlock` rendered through Shiki on demand
-
-```html
-<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#fbfaf2" style="...">
-  <tbody>
-    <tr>
-      <td style="...">
-        <p style="...">...</p>
-        <table
-          width="100%"
-          cellpadding="0"
-          cellspacing="0"
-          border="0"
-          bgcolor="#e6fbe4"
-          style="..."
-        >
-          <tbody>
-            <tr>
-              <td style="...">...</td>
-            </tr>
-          </tbody>
-        </table>
-      </td>
-    </tr>
-  </tbody>
-</table>
-```
-
-`디씨 복사` writes both `text/html` and `text/plain` for rich paste targets. The preview panel can
-also switch to `HTML` mode, where `원문 복사` copies the exported inline HTML as plain text for
-editors that expect raw HTML source. Exported HTML adds a small centered `Created with
-dc-code-paste` attribution link at the bottom of the article.
-
-Older `calloutBox` documents with a `kind` attribute are still accepted by the exporter, but new
-editor content uses the explicit box node names above.
-
-## Drafts
-
-The editor saves the current draft in browser `localStorage` after the editor is ready:
-
-- Tiptap document JSON
-- Code language and Shiki theme
-- Body, selection, and code font settings
-- Line number setting
-- Paste structure: `DC 테이블`
-
-The draft is restored on the next page load. `초기화` clears the saved draft and returns the editor
-to an empty article; `예시 템플릿` restores the bundled sample article.
-
-## LLM Authoring
-
-`LLM 가이드` copies a prompt that asks an LLM to return Markdown plus dc-code-paste block tags. Paste
-the LLM result into the `Markdown` panel and click `Markdown 적용하기` to turn the tagged text into
-editor blocks and preview HTML.
-
-Supported block tags use `:::` fences:
-
-- `:::hero`
-- `:::summary`
-- `:::tip`, `:::warning`, `:::reference`, `:::emphasis`
-- `:::success`, `:::failure`, `:::experiment`, `:::conclusion`, `:::rebuttal`
-- `:::tutorial`
-- `:::comparison`
-- `:::references`
-- `:::cta`
-
-## Manual DC Paste Check
-
-Before treating a release as ready, check both paste paths in a browser:
-
-1. Start with the default sample article, which already includes a paragraph, heading, tip box,
-   warning box, reference box, link box, quote, lists, divider, and code block.
-2. Click `디씨 복사`, paste into the normal DCInside editor, and confirm the rendered style survives.
-3. Switch the preview panel to `HTML`, click `원문 복사`, paste into DCInside's HTML mode, and confirm
-   the same article renders after leaving HTML mode.
-4. Confirm code colors, box spacing, links, and body font size match the preview closely enough.
-5. Refresh the app after editing text; confirm the draft comes back.
-6. Click `초기화`, refresh, and confirm an empty article comes back instead of the previous draft.
-7. In `DC 테이블`, confirm exported HTML contains `table`, `td`, and `bgcolor`.
+1. 기본 샘플 아티클(단락, 제목, 팁박스, 경고박스, 참조박스, 링크박스, 인용, 목록, 구분선, 코드블록 포함)로 시작한다.
+2. `디씨 복사` → DCInside 일반 에디터에 붙여넣기 → 스타일 유지 확인.
+3. 미리보기 패널을 `HTML`로 전환 → `원문 복사` → DCInside HTML 모드에 붙여넣기 → HTML 모드 해제 후 동일하게 렌더링되는지 확인.
+4. 코드 색상, 박스 여백, 링크, 본문 폰트 크기가 미리보기와 충분히 일치하는지 확인.
+5. 텍스트 편집 후 새로고침 → 초안이 복원되는지 확인.
+6. `초기화` → 새로고침 → 빈 아티클이 오는지 확인.
+7. `DC 테이블` 모드에서 내보낸 HTML에 `table`, `td`, `bgcolor` 속성이 있는지 확인.
