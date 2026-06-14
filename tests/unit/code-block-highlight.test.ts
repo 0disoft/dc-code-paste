@@ -45,6 +45,18 @@ describe("editor code block highlighting", () => {
     expect(tokenTexts(code, "comment", "asm")).toEqual(["; exit"]);
   });
 
+  it("highlights data and query code block tokens", () => {
+    expect(tokenTexts("enabled: true # comment", "keyword", "yaml")).toEqual(["true"]);
+    expect(tokenTexts("enabled: true # comment", "comment", "yaml")).toEqual(["# comment"]);
+    expect(tokenTexts('name = "dc"\nenabled = false', "keyword", "toml")).toEqual(["false"]);
+    expect(tokenTexts("SELECT title FROM posts WHERE id = 1;", "keyword", "sql")).toEqual([
+      "SELECT",
+      "FROM",
+      "WHERE",
+    ]);
+    expect(tokenTexts("select * from posts -- latest", "comment", "sql")).toEqual(["-- latest"]);
+  });
+
   it("uses CSS block comments without treating double slashes as comments", () => {
     const code = [
       "/* color token should stay protected */",

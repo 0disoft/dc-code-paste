@@ -353,6 +353,56 @@ const keywordSets: Partial<Record<DcLanguageId, readonly string[]>> = {
     "while",
   ],
   json: ["false", "null", "true"],
+  yaml: ["false", "null", "off", "on", "true", "yes", "no"],
+  toml: ["false", "true"],
+  sql: [
+    "add",
+    "alter",
+    "and",
+    "as",
+    "asc",
+    "between",
+    "by",
+    "case",
+    "create",
+    "delete",
+    "desc",
+    "distinct",
+    "drop",
+    "else",
+    "end",
+    "exists",
+    "false",
+    "from",
+    "group",
+    "having",
+    "in",
+    "inner",
+    "insert",
+    "into",
+    "is",
+    "join",
+    "left",
+    "like",
+    "limit",
+    "not",
+    "null",
+    "on",
+    "or",
+    "order",
+    "outer",
+    "right",
+    "select",
+    "set",
+    "table",
+    "then",
+    "true",
+    "union",
+    "update",
+    "values",
+    "when",
+    "where",
+  ],
   asm: [
     "add",
     "and",
@@ -416,7 +466,7 @@ const cFamilyLanguages = new Set<DcLanguageId>([
   "mojo",
 ]);
 
-const hashCommentLanguages = new Set<DcLanguageId>(["bash", "python"]);
+const hashCommentLanguages = new Set<DcLanguageId>(["bash", "python", "yaml", "toml"]);
 
 const htmlLikeLanguages = new Set<DcLanguageId>(["html", "svelte", "astro", "tailwind", "unocss"]);
 
@@ -466,7 +516,7 @@ function keywordRegexFor(language: DcLanguageId): RegExp | undefined {
     return undefined;
   }
 
-  return new RegExp(`\\b(${languageKeywords.join("|")})\\b`, "g");
+  return new RegExp(`\\b(${languageKeywords.join("|")})\\b`, language === "sql" ? "gi" : "g");
 }
 
 function keywordSetFor(language: DcLanguageId): ReadonlySet<string> {
@@ -487,7 +537,7 @@ function lineCommentPrefixes(language: DcLanguageId): readonly string[] {
     return ["#"];
   }
 
-  if (language === "haskell") {
+  if (language === "haskell" || language === "sql") {
     return ["--"];
   }
 

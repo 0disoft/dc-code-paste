@@ -47,6 +47,7 @@
         defaultLanguage,
         defaultTheme,
         isSupportedLanguage,
+        supportedLanguageGroups,
         supportedLanguages,
         supportedThemes,
         type DcLanguageId,
@@ -2988,8 +2989,12 @@
                                 .run(),
                         )}
                 >
-                    {#each supportedLanguages as item}
-                        <option value={item.id}>{item.label}</option>
+                    {#each supportedLanguageGroups as group}
+                        <optgroup label={group.label}>
+                            {#each group.languages as item}
+                                <option value={item.id}>{item.label}</option>
+                            {/each}
+                        </optgroup>
                     {/each}
                 </select>
             </label>

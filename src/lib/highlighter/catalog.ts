@@ -1,39 +1,62 @@
 type SupportedLanguage = {
   readonly id: string;
   readonly label: string;
+  readonly group: SupportedLanguageGroupId;
   readonly shikiLanguage?: string;
 };
 
+type SupportedLanguageGroupId = "native" | "web" | "data" | "diff" | "script" | "general";
+
+export const supportedLanguageGroupLabels = {
+  native: "시스템/네이티브",
+  web: "웹/프론트엔드",
+  data: "데이터/설정",
+  diff: "변경/패치",
+  script: "스크립트",
+  general: "일반 언어",
+} as const satisfies Record<SupportedLanguageGroupId, string>;
+
 export const supportedLanguages = [
-  { id: "c", label: "C" },
-  { id: "cpp", label: "C++" },
-  { id: "csharp", label: "C#" },
-  { id: "asm", label: "Assembly" },
-  { id: "javascript", label: "JavaScript" },
-  { id: "typescript", label: "TypeScript" },
-  { id: "jsx", label: "React JSX" },
-  { id: "tsx", label: "React TSX" },
-  { id: "svelte", label: "Svelte" },
-  { id: "astro", label: "Astro" },
-  { id: "html", label: "HTML" },
-  { id: "css", label: "CSS" },
-  { id: "tailwind", label: "Tailwind CSS", shikiLanguage: "html" },
-  { id: "unocss", label: "UnoCSS", shikiLanguage: "html" },
-  { id: "php", label: "PHP" },
-  { id: "json", label: "JSON" },
-  { id: "diff", label: "Diff" },
-  { id: "patch", label: "Patch", shikiLanguage: "diff" },
-  { id: "bash", label: "Bash" },
-  { id: "python", label: "Python" },
-  { id: "java", label: "Java" },
-  { id: "go", label: "Go" },
-  { id: "rust", label: "Rust" },
-  { id: "haskell", label: "Haskell" },
-  { id: "scala", label: "Scala" },
-  { id: "zig", label: "Zig" },
-  { id: "julia", label: "Julia" },
-  { id: "mojo", label: "Mojo" },
+  { id: "c", label: "C", group: "native" },
+  { id: "cpp", label: "C++", group: "native" },
+  { id: "csharp", label: "C#", group: "native" },
+  { id: "asm", label: "Assembly", group: "native" },
+  { id: "rust", label: "Rust", group: "native" },
+  { id: "zig", label: "Zig", group: "native" },
+  { id: "javascript", label: "JavaScript", group: "web" },
+  { id: "typescript", label: "TypeScript", group: "web" },
+  { id: "jsx", label: "React JSX", group: "web" },
+  { id: "tsx", label: "React TSX", group: "web" },
+  { id: "svelte", label: "Svelte", group: "web" },
+  { id: "astro", label: "Astro", group: "web" },
+  { id: "html", label: "HTML", group: "web" },
+  { id: "css", label: "CSS", group: "web" },
+  { id: "tailwind", label: "Tailwind CSS", group: "web", shikiLanguage: "html" },
+  { id: "unocss", label: "UnoCSS", group: "web", shikiLanguage: "html" },
+  { id: "php", label: "PHP", group: "web" },
+  { id: "json", label: "JSON", group: "data" },
+  { id: "yaml", label: "YAML", group: "data" },
+  { id: "toml", label: "TOML", group: "data" },
+  { id: "sql", label: "SQL", group: "data" },
+  { id: "diff", label: "Diff", group: "diff" },
+  { id: "patch", label: "Patch", group: "diff", shikiLanguage: "diff" },
+  { id: "bash", label: "Bash", group: "script" },
+  { id: "python", label: "Python", group: "script" },
+  { id: "java", label: "Java", group: "general" },
+  { id: "go", label: "Go", group: "general" },
+  { id: "haskell", label: "Haskell", group: "general" },
+  { id: "scala", label: "Scala", group: "general" },
+  { id: "julia", label: "Julia", group: "general" },
+  { id: "mojo", label: "Mojo", group: "general" },
 ] as const satisfies readonly SupportedLanguage[];
+
+export const supportedLanguageGroups = Object.entries(supportedLanguageGroupLabels)
+  .map(([id, label]) => ({
+    id: id as SupportedLanguageGroupId,
+    label,
+    languages: supportedLanguages.filter((language) => language.group === id),
+  }))
+  .filter((group) => group.languages.length > 0);
 
 export const supportedThemes = [
   { id: "github-dark", label: "GitHub Dark" },

@@ -26,6 +26,10 @@ const requestedLanguageSamples = [
     token: "i-carbon-send",
   },
   { language: "php", code: "<?php echo strlen('dc');", token: "strlen" },
+  { language: "json", code: '{ "name": "dc", "enabled": true }', token: "enabled" },
+  { language: "yaml", code: "name: dc\nenabled: true", token: "enabled" },
+  { language: "toml", code: 'name = "dc"\nenabled = true', token: "enabled" },
+  { language: "sql", code: "SELECT title FROM posts WHERE id = 1;", token: "SELECT" },
   {
     language: "diff",
     code: "-const oldValue = 1;\n+const newValue = 2;",

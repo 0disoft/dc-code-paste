@@ -178,6 +178,27 @@ describe("markdown import", () => {
     }
   });
 
+  it("normalizes data and query code fence aliases", () => {
+    expect(
+      parseMarkdownToDocument(["```yml", "enabled: true", "```"].join("\n")).content?.[0],
+    ).toEqual({
+      type: "codeBlock",
+      attrs: { language: "yaml" },
+      content: [{ type: "text", text: "enabled: true" }],
+    });
+
+    for (const fence of ["mysql", "postgres", "sqlite"]) {
+      expect(
+        parseMarkdownToDocument(["```" + fence, "select * from posts", "```"].join("\n"))
+          .content?.[0],
+      ).toEqual({
+        type: "codeBlock",
+        attrs: { language: "sql" },
+        content: [{ type: "text", text: "select * from posts" }],
+      });
+    }
+  });
+
   it("keeps fenced code line highlight metadata", () => {
     expect(
       parseMarkdownToDocument(
