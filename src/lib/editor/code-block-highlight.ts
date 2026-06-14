@@ -353,6 +353,50 @@ const keywordSets: Partial<Record<DcLanguageId, readonly string[]>> = {
     "while",
   ],
   json: ["false", "null", "true"],
+  asm: [
+    "add",
+    "and",
+    "bits",
+    "bss",
+    "call",
+    "cmp",
+    "data",
+    "db",
+    "dd",
+    "dec",
+    "dq",
+    "dw",
+    "equ",
+    "extern",
+    "global",
+    "idiv",
+    "imul",
+    "inc",
+    "int",
+    "je",
+    "jg",
+    "jge",
+    "jl",
+    "jle",
+    "jmp",
+    "jne",
+    "lea",
+    "mov",
+    "mul",
+    "nop",
+    "not",
+    "or",
+    "pop",
+    "push",
+    "ret",
+    "section",
+    "shl",
+    "shr",
+    "sub",
+    "syscall",
+    "text",
+    "xor",
+  ],
 };
 
 const cFamilyLanguages = new Set<DcLanguageId>([
@@ -435,6 +479,10 @@ function keywordSetFor(language: DcLanguageId): ReadonlySet<string> {
 }
 
 function lineCommentPrefixes(language: DcLanguageId): readonly string[] {
+  if (language === "asm") {
+    return [";", "#"];
+  }
+
   if (hashCommentLanguages.has(language)) {
     return ["#"];
   }

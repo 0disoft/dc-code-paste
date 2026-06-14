@@ -8,6 +8,7 @@ export const supportedLanguages = [
   { id: "c", label: "C" },
   { id: "cpp", label: "C++" },
   { id: "csharp", label: "C#" },
+  { id: "asm", label: "Assembly" },
   { id: "javascript", label: "JavaScript" },
   { id: "typescript", label: "TypeScript" },
   { id: "jsx", label: "React JSX" },

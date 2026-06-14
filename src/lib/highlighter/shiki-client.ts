@@ -13,6 +13,7 @@ const languageInputs: Record<DcLanguageId, LanguageInput> = {
   c: () => import("@shikijs/langs/c").then((module) => module.default),
   cpp: () => import("@shikijs/langs/cpp").then((module) => module.default),
   csharp: () => import("@shikijs/langs/csharp").then((module) => module.default),
+  asm: () => import("@shikijs/langs/asm").then((module) => module.default),
   javascript: () => import("@shikijs/langs/javascript").then((module) => module.default),
   typescript: () => import("@shikijs/langs/typescript").then((module) => module.default),
   jsx: () => import("@shikijs/langs/jsx").then((module) => module.default),

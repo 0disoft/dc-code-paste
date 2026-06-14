@@ -37,6 +37,7 @@ const requestedLanguageSamples = [
     token: "new",
   },
   { language: "csharp", code: "public class App { static void Main() {} }", token: "class" },
+  { language: "asm", code: "section .text\nglobal _start\n_start:\n    mov eax, 1", token: "mov" },
   { language: "haskell", code: 'main = putStrLn "dc"', token: "putStrLn" },
   { language: "scala", code: 'object Main extends App { println("dc") }', token: "object" },
   { language: "zig", code: "pub fn main() void {}", token: "main" },

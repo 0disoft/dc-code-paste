@@ -166,6 +166,18 @@ describe("markdown import", () => {
     });
   });
 
+  it("normalizes assembly code fence aliases", () => {
+    for (const fence of ["asm", "assembly", "nasm", "yasm"]) {
+      expect(
+        parseMarkdownToDocument(["```" + fence, "mov eax, 1", "```"].join("\n")).content?.[0],
+      ).toEqual({
+        type: "codeBlock",
+        attrs: { language: "asm" },
+        content: [{ type: "text", text: "mov eax, 1" }],
+      });
+    }
+  });
+
   it("keeps fenced code line highlight metadata", () => {
     expect(
       parseMarkdownToDocument(

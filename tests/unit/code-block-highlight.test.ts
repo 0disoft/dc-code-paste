@@ -37,6 +37,14 @@ describe("editor code block highlighting", () => {
     expect(tokenTexts(code, "number", "unknown")).toEqual(["0"]);
   });
 
+  it("highlights common assembly tokens and semicolon comments", () => {
+    const code = ["section .text", "global _start", "_start:", "    mov eax, 1 ; exit"].join("\n");
+
+    expect(tokenTexts(code, "keyword", "asm")).toEqual(["section", "text", "global", "mov"]);
+    expect(tokenTexts(code, "number", "asm")).toEqual(["1"]);
+    expect(tokenTexts(code, "comment", "asm")).toEqual(["; exit"]);
+  });
+
   it("uses CSS block comments without treating double slashes as comments", () => {
     const code = [
       "/* color token should stay protected */",
