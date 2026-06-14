@@ -61,21 +61,11 @@ describe("editor code block highlighting", () => {
   });
 
   it("highlights common markdown and mermaid tokens", () => {
-    const markdown = [
-      "# 제목",
-      "- 항목",
-      "[문서](https://example.com)",
-    ].join("\n");
-    const mermaid = [
-      "graph TD",
-      "  A --> B",
-      "%% comment",
-    ].join("\n");
+    const markdown = ["# 제목", "- 항목", "[문서](https://example.com)"].join("\n");
+    const mermaid = ["graph TD", "  A --> B", "%% comment"].join("\n");
 
     expect(tokenTexts(markdown, "keyword", "markdown")).toEqual(["#", "- "]);
-    expect(tokenTexts(markdown, "string", "markdown")).toEqual([
-      "[문서](https://example.com)",
-    ]);
+    expect(tokenTexts(markdown, "string", "markdown")).toEqual(["[문서](https://example.com)"]);
     expect(tokenTexts(mermaid, "keyword", "mermaid")).toEqual(["graph"]);
     expect(tokenTexts(mermaid, "comment", "mermaid")).toEqual(["%% comment"]);
   });

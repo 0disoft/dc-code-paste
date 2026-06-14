@@ -5,14 +5,7 @@ type SupportedLanguage = {
   readonly shikiLanguage?: string;
 };
 
-type SupportedLanguageGroupId =
-  | "native"
-  | "web"
-  | "data"
-  | "docs"
-  | "diff"
-  | "script"
-  | "general";
+type SupportedLanguageGroupId = "native" | "web" | "data" | "docs" | "diff" | "script" | "general";
 
 export const supportedLanguageGroupLabels = {
   native: "시스템/네이티브",

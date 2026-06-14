@@ -22,10 +22,7 @@ describe("highlighter catalog", () => {
     const docsGroup = supportedLanguageGroups.find((group) => group.id === "docs");
 
     expect(docsGroup?.label).toBe("문서/다이어그램");
-    expect(docsGroup?.languages.map((language) => language.id)).toEqual([
-      "markdown",
-      "mermaid",
-    ]);
+    expect(docsGroup?.languages.map((language) => language.id)).toEqual(["markdown", "mermaid"]);
   });
 
   it("keeps every listed language selectable and grouped", () => {

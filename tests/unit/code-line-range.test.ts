@@ -23,7 +23,12 @@ describe("code line range", () => {
   ].join("\n");
 
   function lineStartOffset(line: number) {
-    return text.split("\n").slice(0, line - 1).join("\n").length + (line > 1 ? 1 : 0);
+    return (
+      text
+        .split("\n")
+        .slice(0, line - 1)
+        .join("\n").length + (line > 1 ? 1 : 0)
+    );
   }
 
   it("maps code offsets to one-based line numbers", () => {
@@ -33,11 +38,7 @@ describe("code line range", () => {
   });
 
   it("creates an inclusive line range from a text selection", () => {
-    const range = selectedCodeLineRangeFromOffsets(
-      text,
-      lineStartOffset(9),
-      lineStartOffset(12),
-    );
+    const range = selectedCodeLineRangeFromOffsets(text, lineStartOffset(9), lineStartOffset(12));
 
     expect(range).toEqual({ fromLine: 9, toLine: 11 });
     expect(range && codeLineRangeLabel(range)).toBe("9-11번 줄");

@@ -39,7 +39,11 @@ function collectNodeTypes(node: JSONContent, found = new Set<string>()): Set<str
   return found;
 }
 
-function collectNodesByType(node: JSONContent, type: string, found: JSONContent[] = []): JSONContent[] {
+function collectNodesByType(
+  node: JSONContent,
+  type: string,
+  found: JSONContent[] = [],
+): JSONContent[] {
   if (node.type === type) {
     found.push(node);
   }
@@ -69,7 +73,9 @@ describe("sampleDocument", () => {
     expect(text).toContain("적용하기를 눌러야 한다");
     expect(text).not.toContain("Go 반복문 정복: for 하나로 모든 루프를 제어한다");
     expect(text).not.toContain("Go에는 for 키워드 하나만 존재하며");
-    expect(text).not.toContain("for range로 슬라이스를 순회할 때 반환되는 value는 요소의 복사본이다.");
+    expect(text).not.toContain(
+      "for range로 슬라이스를 순회할 때 반환되는 value는 요소의 복사본이다.",
+    );
   });
 
   it("highlights the embedded example.md block as Markdown", () => {

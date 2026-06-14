@@ -13,7 +13,7 @@ function paragraph(content: JSONContent[]): JSONContent {
 }
 
 function summaryItem(content: JSONContent[]): JSONContent {
-  return { type: "summaryItem", content }
+  return { type: "summaryItem", content };
 }
 
 function codeBlock(
@@ -56,10 +56,7 @@ function tutorialStep(number: string, title: string, content: JSONContent[]): JS
   return {
     type: "tutorialStep",
     attrs: { number },
-    content: [
-      { type: "heading", attrs: { level: 1 }, content: [text(title)] },
-      ...content,
-    ],
+    content: [{ type: "heading", attrs: { level: 1 }, content: [text(title)] }, ...content],
   };
 }
 
@@ -102,12 +99,8 @@ export const sampleDocument: JSONContent = {
       type: "summaryBox",
       attrs: { label: "이 도구로 할 수 있는 것" },
       content: [
-        summaryItem([
-          text("Markdown으로 글을 작성하고 에디터에 바로 적용할 수 있다."),
-        ]),
-        summaryItem([
-          text("코드블록에 파일명, 언어, 강조줄, 추가줄, 삭제줄 표시를 넣을 수 있다."),
-        ]),
+        summaryItem([text("Markdown으로 글을 작성하고 에디터에 바로 적용할 수 있다.")]),
+        summaryItem([text("코드블록에 파일명, 언어, 강조줄, 추가줄, 삭제줄 표시를 넣을 수 있다.")]),
         summaryItem([
           text("콜아웃, 비교, 튜토리얼, 링크박스, CTA 버튼 같은 서식 블록을 쓸 수 있다."),
         ]),
@@ -118,9 +111,7 @@ export const sampleDocument: JSONContent = {
       ],
     },
     paragraph([
-      text(
-        "LLM을 써서 글을 빠르게 초안으로 만들 수도 있다. 상단 툴바의 ",
-      ),
+      text("LLM을 써서 글을 빠르게 초안으로 만들 수도 있다. 상단 툴바의 "),
       codeText("LLM 가이드"),
       text(
         " 버튼을 누르면 이 도구의 Markdown 문법 설명이 클립보드에 복사된다. 이걸 ChatGPT·Claude·DeepSeek 같은 LLM에 붙여넣고 글 작성을 요청하면 된다.",
@@ -129,9 +120,7 @@ export const sampleDocument: JSONContent = {
     callout("tipBox", "Markdown 붙여넣기 방법", "#16a34a", [
       text("LLM 결과를 왼쪽 편집기에 직접 붙여넣으면 서식이 깨진다. "),
       codeText("Markdown"),
-      text(
-        " 버튼으로 입력창을 열고, 거기에 붙여넣은 뒤 ",
-      ),
+      text(" 버튼으로 입력창을 열고, 거기에 붙여넣은 뒤 "),
       codeText("적용하기"),
       text("를 눌러야 한다."),
     ]),
@@ -140,7 +129,9 @@ export const sampleDocument: JSONContent = {
       content: [
         comparisonColumn("기존 방식", [
           paragraph([
-            text("DCInside 에디터에서 색상·폰트·표를 손으로 하나씩 맞춤. 코드는 고정폭 서식으로만 표현 가능."),
+            text(
+              "DCInside 에디터에서 색상·폰트·표를 손으로 하나씩 맞춤. 코드는 고정폭 서식으로만 표현 가능.",
+            ),
           ]),
         ]),
         comparisonColumn("dc-code-paste 사용", [
@@ -154,11 +145,7 @@ export const sampleDocument: JSONContent = {
       type: "tutorialBlock",
       content: [
         tutorialStep("01", "LLM 가이드 복사", [
-          paragraph([
-            text("상단 툴바 "),
-            codeText("LLM 가이드"),
-            text(" 버튼을 클릭한다."),
-          ]),
+          paragraph([text("상단 툴바 "), codeText("LLM 가이드"), text(" 버튼을 클릭한다.")]),
         ]),
         tutorialStep("02", "LLM에게 글 요청", [
           paragraph([
@@ -175,7 +162,9 @@ export const sampleDocument: JSONContent = {
         tutorialStep("04", "적용 및 미리보기 확인", [
           paragraph([
             codeText("적용하기"),
-            text(" 버튼을 누르면 에디터에 내용이 반영되고, 오른쪽 미리보기에서 결과를 확인할 수 있다."),
+            text(
+              " 버튼을 누르면 에디터에 내용이 반영되고, 오른쪽 미리보기에서 결과를 확인할 수 있다.",
+            ),
           ]),
         ]),
         tutorialStep("05", "디씨 복사", [
@@ -218,7 +207,9 @@ export const sampleDocument: JSONContent = {
 :::`,
     ),
     callout("warningBox", "줄 번호 범위 주의", "#d97706", [
-      text("강조줄·추가줄·삭제줄 번호는 코드블록 실제 줄 수 안에서 지정해야 한다. 범위를 벗어나면 조용히 무시된다."),
+      text(
+        "강조줄·추가줄·삭제줄 번호는 코드블록 실제 줄 수 안에서 지정해야 한다. 범위를 벗어나면 조용히 무시된다.",
+      ),
     ]),
     {
       type: "referenceList",

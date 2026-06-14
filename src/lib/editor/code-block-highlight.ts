@@ -743,22 +743,8 @@ function scanMarkdownTokens(
     "keyword",
     tokens,
   );
-  scanRegexTokens(
-    line,
-    lineOffset,
-    protectedRanges,
-    /```+[^`]*|~~~+[^~]*/g,
-    "keyword",
-    tokens,
-  );
-  scanRegexTokens(
-    line,
-    lineOffset,
-    protectedRanges,
-    /\[[^\]]+]\([^)]+\)/g,
-    "string",
-    tokens,
-  );
+  scanRegexTokens(line, lineOffset, protectedRanges, /```+[^`]*|~~~+[^~]*/g, "keyword", tokens);
+  scanRegexTokens(line, lineOffset, protectedRanges, /\[[^\]]+]\([^)]+\)/g, "string", tokens);
 }
 
 function scanFunctionTokens(

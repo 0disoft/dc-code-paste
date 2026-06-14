@@ -16,7 +16,6 @@ import { normalizeQuoteStyle, type QuoteStyle } from "$lib/editor/quote-style";
 import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
 import {
   defaultProseFontFamily,
-  safeDcCodeFontFamily as safeCodeFontFamily,
   safeDcInlineCodeFontFamily as safeInlineCodeFontFamily,
   safeDcProseFontFamily as safeProseFontFamily,
 } from "./font-stacks";
