@@ -131,6 +131,31 @@ describe("renderDcHtml", () => {
     expect(html).toContain("&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;0;");
   });
 
+  it("keeps long code lines on one horizontal scrollable line", () => {
+    const html = renderDcHtml({
+      background: "#111111",
+      foreground: "#eeeeee",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [
+        [
+          {
+            content:
+              "throw new InvalidArgumentException('성과 이름을 공백으로 구분해야 합니다. 잘못된 입력은 사용자 화면에 그대로 보여주면 안 됩니다.');",
+          },
+        ],
+      ],
+    });
+
+    expect(html).toContain("max-width:100%");
+    expect(html).toContain("overflow-x:auto");
+    expect(html).toContain("overflow-y:hidden");
+    expect(html).toContain("white-space:nowrap");
+    expect(html).toContain("word-break:normal");
+    expect(html).toContain("overflow-wrap:normal");
+    expect(html).not.toContain("overflow-wrap:anywhere");
+  });
+
   it("renders an optional escaped filename header above the code block", () => {
     const html = renderDcHtml({
       background: "#111111",
