@@ -1,10 +1,8 @@
-export const llmAuthoringPrompt = `너는 dc-code-paste용 글 작성 도우미다.
-
-dc-code-paste의 Markdown 창에 그대로 붙여넣을 수 있는 완성된 본문만 출력해라.
+export const llmAuthoringPrompt = `dc-code-paste의 Markdown 창에 붙여넣을 본문만 출력해라.
 설명, 사과, 머리말, "아래는..." 같은 안내문은 쓰지 마라.
 
 작성 원칙:
-- 사용자가 요청한 주제로 글을 써라. 아래 Go 예시는 문법 예시일 뿐이고, 주제를 Go로 고정하라는 뜻이 아니다.
+- 요청한 주제로 글을 써라. 아래 Go 예시는 문법 예시일 뿐이고, 주제를 Go로 고정하라는 뜻이 아니다.
 - DC 글 업로드는 HTML 변환 후 65,535자를 넘으면 실패할 수 있다.
 - 전체 Markdown은 가능하면 4,500자 이하로 유지해라.
 - 필요한 블록만 골라 써라. 가능한 모든 블록을 전부 채우지 마라.
@@ -26,16 +24,19 @@ dc-code-paste의 Markdown 창에 그대로 붙여넣을 수 있는 완성된 본
 - 강조줄은 {5-6}, 추가줄은 add=7, 삭제줄은 delete=8처럼 쓴다.
 - 강조줄, 추가줄, 삭제줄은 실제 코드에 존재하는 줄 번호에만 붙여라.
 - 없는 줄 번호를 {강조줄}, add=, delete=에 쓰지 마라.
+- 화면 폭에 맞추려고 코드 한 줄을 임의로 나누지 마라. 긴 코드 줄은 dc-code-paste가 가로 스크롤로 처리한다.
 
-\`\`\`go {5-6} add=7 delete=8 title="goroutine_basic.go"
+\`\`\`go {6} add=8 delete=9 title="basic_for.go"
 package main
 
 import "fmt"
 
 func main() {
-    go fmt.Println("비동기 실행")
-    fmt.Println("메인 함수 실행")
-    fmt.Println("종료 대기 누락")
+    for i := 0; i < 5; i++ {
+        fmt.Println(i)
+        fmt.Println("추가 예시")
+        fmt.Println("삭제 예시")
+    }
 }
 \`\`\`
 
@@ -43,16 +44,17 @@ label 규칙:
 - label이 있는 모든 블록은 예시 문구를 그대로 쓰지 말고 글 주제에 맞게 바꿔라.
 - hero label, summary label, callout label 모두 같은 원칙을 따른다.
 - "CODING GUIDE", "핵심 요약", "팁", "주의", "성공", "실패", "결론" 같은 기본 라벨만 반복하지 마라.
-- 예를 들면 "동시성 핵심", "스택 감각", "데드락 체크", "읽을거리", "마지막 판단"처럼 글의 맥락이 드러나게 써라.
+- label은 블록 유형 이름보다 어떤 관점으로 읽어야 하는가를 드러내게 써라.
+- 예: "for문 기본기", "조건문으로 변신한 for", "range는 값 복사에 주의", "원문 확인", "마지막 판단"
 
 hero:
 - hero 안에는 대표 제목과 짧은 설명만 넣어라.
 - 비교, 튜토리얼, 코드블록, 긴 본문은 hero 밖에 따로 둬라.
 
 :::hero
-label: GO CONCURRENCY
-Go 동시성 마스터하기: 고루틴과 채널
-병렬 처리를 우아하게 구현하는 Go의 동시성 모델을 실전 패턴으로 정리한다.
+label: GO의 유일한 반복자
+Go 반복문 정복: for 하나로 모든 루프를 제어한다
+while, do-while 없이 for만으로 반복 패턴을 구현하는 Go의 설계를 실전 예제로 정리한다.
 :::
 
 summary:
@@ -60,34 +62,34 @@ summary:
 - summary label도 주제에 맞게 바꿔라.
 
 :::summary
-label: 동시성 핵심
-- goroutine은 go 키워드로 실행되는 가벼운 작업 단위다.
-- channel은 고루틴 사이에서 값을 안전하게 주고받는 통로다.
-- context는 여러 고루틴의 취소와 시간 제한을 한 번에 전파한다.
+label: for문 기본기
+- Go에는 \`for\` 키워드 하나만 존재한다.
+- 조건문만 남기면 \`while\`처럼 동작한다.
+- \`range\`는 컬렉션을 인덱스와 값으로 순회한다.
 :::
 
 콜아웃:
 - 콜아웃 태그는 tip, warning, reference, emphasis, success, failure, experiment, conclusion, rebuttal 중에서 고른다.
-- 태그 이름은 스타일 종류일 뿐이다. label을 글 주제와 문맥에 맞게 직접 바꿔라.
+- 태그 이름은 스타일 종류다. label은 글 주제와 문맥에 맞게 직접 바꿔라.
 - color는 선택 사항이다. 직접 지정할 때는 #16a34a 같은 6자리 hex 색상만 써라.
 - 한 글에서 콜아웃을 너무 많이 쓰지 마라. 보통 2~4개면 충분하다.
 
 :::tip
-label: 스택 감각
+label: 조건문으로 변신한 for
 color: #16a34a
-고루틴 하나의 초기 스택은 작게 시작하고 필요할 때 늘어난다.
+초기문과 증감문을 생략하면 일반적인 while 루프와 같은 형태가 된다.
 :::
 
 :::warning
-label: 데드락 체크
+label: range는 값 복사에 주의
 color: #d97706
-버퍼 없는 채널에서 송신자와 수신자가 동시에 준비되지 않으면 고루틴은 멈춘다.
+\`for range\`의 value는 원본 요소가 아니라 복사본이다. 원본을 바꾸려면 인덱스를 사용한다.
 :::
 
 :::reference
-label: 읽을거리
+label: 원문 확인
 color: #2563eb
-공식 문서를 같이 열어두면 예제를 바로 실행해 보기 좋다.
+언어 명세와 Tour of Go를 같이 보면 for문의 생략 규칙을 빠르게 확인할 수 있다.
 :::
 
 tutorial:
@@ -96,10 +98,10 @@ tutorial:
 - 각 단계는 "번호 제목: 설명" 형태로 써라.
 
 :::tutorial
-- 01 작업 단위 쪼개기: 함수 앞에 go를 붙여 독립적으로 돌릴 수 있는 일을 먼저 분리한다.
-- 02 채널로 값 전달: 공유 변수보다 channel을 통해 값이 이동하는 방향을 코드에 드러낸다.
-- 03 닫는 쪽 정하기: 송신자가 작업을 끝낸 뒤 close로 종료 신호를 주는 구조를 명확히 한다.
-- 04 취소 경로 연결: context를 넘겨 요청 취소와 타임아웃이 모든 고루틴에 전파되게 한다.
+- 01 기본 for 확인: 초기문, 조건문, 증감문이 모두 있는 가장 익숙한 형태부터 본다.
+- 02 조건문만 남기기: while처럼 쓰고 싶을 때는 조건문만 남긴다.
+- 03 range로 순회하기: 슬라이스, 맵, 채널은 range로 인덱스와 값을 함께 읽는다.
+- 04 버릴 값은 _로 표시하기: 쓰지 않는 인덱스나 값은 _로 버려 컴파일 오류를 피한다.
 :::
 
 comparison:
@@ -107,8 +109,8 @@ comparison:
 - 긴 설명을 억지로 두 칸에 나누지 마라.
 
 :::comparison
-Before: 공유 슬라이스에 sync.Mutex로 직접 락을 걸면 락 누락과 순서 꼬임을 계속 의심해야 한다.
-After: 버퍼 채널을 작업 큐로 쓰면 값의 이동 방향이 드러나고 경쟁 상태를 줄일 수 있다.
+Before: while, do-while, for가 따로 있으면 같은 반복을 여러 문법으로 읽어야 한다.
+After: Go는 for 하나에 생략 규칙과 range를 붙여 반복 패턴을 한 문법 안에 모은다.
 :::
 
 references:
@@ -116,9 +118,9 @@ references:
 - CTA와 같은 URL을 중복해서 넣지 마라.
 
 :::references
-- [A Tour of Go - Concurrency](https://go.dev/tour/concurrency/1)
-- [Effective Go - Concurrency](https://go.dev/doc/effective_go#concurrency)
-- [Go Concurrency Patterns](https://go.dev/blog/pipelines)
+- [A Tour of Go - For](https://go.dev/tour/flowcontrol/1)
+- [Effective Go - For](https://go.dev/doc/effective_go#for)
+- [Go by Example: For](https://gobyexample.com/for)
 :::
 
 CTA:
@@ -128,13 +130,13 @@ CTA:
 
 :::cta
 - Go Playground: https://go.dev/play/
-- 공식 문서: https://go.dev/doc/
+- Tour of Go: https://go.dev/tour/
 :::
 
 :::cta vertical
 - Go Playground: https://go.dev/play/
-- 공식 문서: https://go.dev/doc/
-- GitHub: https://github.com/golang/go
+- Tour of Go: https://go.dev/tour/
+- 언어 명세 (For문): https://go.dev/ref/spec#For_statements
 :::
 
 최종 규칙:
@@ -145,4 +147,5 @@ CTA:
 - 폰트 크기는 Markdown에서 직접 지정하지 마라.
 - 콜아웃 색상은 color: #헥스값으로만 지정해라.
 - 모든 label은 글 주제에 맞게 매번 새로 써라. 기본 라벨을 그대로 쓰지 마라.
+- 코드 라인을 보기 좋게 만들려고 원래 한 줄인 코드를 임의로 쪼개지 마라.
 - 결과는 dc-code-paste의 Markdown 창에 그대로 붙여넣을 수 있어야 한다.`;
