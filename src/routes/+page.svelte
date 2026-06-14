@@ -147,8 +147,8 @@
     const previewRenderDebounceMs = 90;
     const draftPersistDebounceMs = 450;
     const documentThemes: { label: string; value: DcDocumentTheme }[] = [
-        { label: "강의 라이트", value: "lightLecture" },
-        { label: "다크 에디토리얼", value: "darkEditorial" },
+        { label: "라이트", value: "lightLecture" },
+        { label: "다크", value: "darkEditorial" },
     ];
     const editorThemeColorSafety = {
         lightLecture: {
@@ -270,7 +270,7 @@
     );
     const documentThemeLabel = $derived(
         documentThemes.find((item) => item.value === documentTheme)?.label ??
-            "강의 라이트",
+            "라이트",
     );
     const presetStateLabel = $derived(
         presetState === "saved"
@@ -2452,16 +2452,6 @@
                 <Save size={17} />
                 <span>저장함</span>
             </button>
-            <a
-                class="tool-link"
-                href="https://github.com/0disoft/dc-code-paste"
-                target="_blank"
-                rel="noreferrer"
-                title="GitHub 저장소"
-                aria-label="GitHub 저장소 새 탭으로 열기"
-            >
-                <Github size={17} />
-            </a>
         </div>
 
         <div class="tool-group inline-group">
@@ -2924,8 +2914,8 @@
                 </select>
             </label>
             <label>
-                <span>크기</span>
-                <select bind:value={codeFontSize} aria-label="코드 크기">
+                <span>코드 글자</span>
+                <select bind:value={codeFontSize} aria-label="코드 글자 크기">
                     {#each codeSizes as item}
                         <option value={item}>{item}</option>
                     {/each}
@@ -2949,18 +2939,18 @@
                 </select>
             </label>
             <label>
-                <span>본문</span>
-                <select bind:value={bodyFontSize} aria-label="기본 크기">
+                <span>전체 글자</span>
+                <select bind:value={bodyFontSize} aria-label="전체 글자 크기">
                     {#each bodySizes as item}
                         <option value={item}>{item}</option>
                     {/each}
                 </select>
             </label>
             <label>
-                <span>크기</span>
+                <span>선택 글자</span>
                 <select
                     bind:value={selectionFontSize}
-                    aria-label="선택 크기"
+                    aria-label="선택 글자 크기"
                     onchange={() => setFontSize(selectionFontSize)}
                 >
                     {#each bodySizes as item}
@@ -3343,6 +3333,17 @@
             원문 복사가 막혔어. HTML 원문을 직접 선택해서 복사해줘.
         </p>
     {/if}
+
+    <a
+        class="floating-github-link"
+        href="https://github.com/0disoft/dc-code-paste"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="GitHub 저장소"
+        aria-label="GitHub 저장소 새 탭으로 열기"
+    >
+        <Github size={21} />
+    </a>
 </main>
 
 <style>
@@ -3358,9 +3359,9 @@
         top: 8px;
         z-index: 20;
         display: grid;
-        gap: 10px;
+        gap: 5px;
         max-height: calc(100vh - 16px);
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         overflow: auto;
         overscroll-behavior: contain;
         scrollbar-gutter: stable;
@@ -3443,7 +3444,6 @@
     }
 
     .toolbar button,
-    .toolbar .tool-link,
     .toolbar label,
     .switch {
         height: 36px;
@@ -3451,8 +3451,7 @@
         white-space: nowrap;
     }
 
-    .toolbar button,
-    .toolbar .tool-link {
+    .toolbar button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -3465,7 +3464,6 @@
         color: var(--text);
         font-weight: 500;
         cursor: pointer;
-        text-decoration: none;
     }
 
     .toolbar :global(svg) {
@@ -3487,6 +3485,37 @@
     .toolbar button:disabled {
         cursor: not-allowed;
         opacity: 0.42;
+    }
+
+    .floating-github-link {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        z-index: 35;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 1px solid color-mix(in oklch, var(--line) 82%, transparent);
+        border-radius: 999px;
+        background: color-mix(in oklch, var(--panel) 92%, transparent);
+        color: var(--muted);
+        box-shadow: 0 16px 34px oklch(0% 0 0 / 0.2);
+        text-decoration: none;
+        backdrop-filter: blur(10px);
+        transition:
+            border-color 0.16s ease,
+            color 0.16s ease,
+            transform 0.16s ease;
+    }
+
+    .floating-github-link:hover,
+    .floating-github-link:focus-visible {
+        border-color: color-mix(in oklch, var(--accent) 68%, var(--line));
+        color: var(--accent);
+        transform: translateY(-1px);
+        outline: none;
     }
 
     .toolbar .copy-button {
@@ -3734,7 +3763,7 @@
     .storage-panel {
         grid-column: 1 / -1;
         display: grid;
-        gap: 10px;
+        gap: 5px;
         margin: 0;
     }
 
@@ -4988,6 +5017,13 @@
 
         .tool-group:last-child {
             padding-bottom: 6px;
+        }
+
+        .floating-github-link {
+            left: 8px;
+            bottom: 8px;
+            width: 42px;
+            height: 42px;
         }
 
         .preset-save,
