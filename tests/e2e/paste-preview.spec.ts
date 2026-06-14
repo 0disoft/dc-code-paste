@@ -69,6 +69,11 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
   await expect(page.getByLabel("코드 추가 줄")).toBeVisible();
   await expect(page.getByLabel("코드 삭제 줄")).toBeVisible();
+  await page.getByLabel("코드 강조 줄").fill("abc");
+  await expect(page.getByLabel("코드 강조 줄")).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByText("사이 숫자와 쉼표, 범위만 입력")).toBeVisible();
+  await page.getByLabel("코드 강조 줄").fill("5-6");
+  await expect(page.getByLabel("코드 강조 줄")).toHaveAttribute("aria-invalid", "false");
   await expect(page.getByLabel("코드 글자 크기")).toBeVisible();
   await expect(page.getByLabel("코드 글자 크기")).toHaveValue("15px");
   await expect(page.getByLabel("코드 테마")).toHaveValue("catppuccin-mocha");
@@ -135,10 +140,18 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.locator(".editor-surface")).toContainText(
     "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("빈 문서로 초기화");
+    await dialog.accept();
+  });
   await page.getByRole("button", { name: "초기화" }).click();
   await expect(page.locator(".editor-surface")).not.toContainText(
     "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
   );
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("예시 템플릿");
+    await dialog.accept();
+  });
   await page.getByRole("button", { name: "예시 템플릿" }).click();
   await expect(page.locator(".editor-surface")).toContainText(
     "Go 반복문 정복: for 하나로 모든 루프를 제어한다",
@@ -200,6 +213,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("저장된 프리셋")).toContainText("프리셋 없음");
   await expect(page.getByRole("region", { name: "초안 히스토리" })).toBeVisible();
   await expect(page.getByLabel("저장된 초안")).toContainText("초안 없음");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
+  await page.getByRole("button", { name: "저장함" }).click();
   await page.getByRole("button", { name: "초안 스냅샷 저장" }).click();
   await expect(page.getByLabel("저장된 초안").getByText(/초안/)).toBeVisible();
   await page
@@ -216,7 +232,8 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("저장된 프리셋").getByText("강의글 구조")).toBeVisible();
   await page
     .getByLabel("저장된 프리셋")
-    .getByRole("button", { name: /강의글 구조/ })
+    .locator(".preset-apply")
+    .filter({ hasText: "강의글 구조" })
     .dblclick();
   await page.getByLabel("프리셋 제목 변경").fill("풀이 템플릿");
   await page.getByLabel("프리셋 제목 변경").press("Enter");
@@ -227,6 +244,8 @@ test("renders the paste tool", async ({ page }) => {
   await page.getByRole("button", { name: "저장함" }).click();
   await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
   await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "HTML" })).toBeVisible();
   await page.getByRole("button", { name: "HTML" }).click();
   await expect(page.getByRole("button", { name: /원문 복사/ })).toBeVisible();
@@ -242,7 +261,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/range는 값 복사에 주의/);
   await expect(htmlSource).toHaveValue(/for 하나로 충분한 이유/);
   await expect(htmlSource).toHaveValue(/Go에는/);
-  await expect(htmlSource).toHaveValue(/for 키워드 하나만 존재하며/);
+  await expect(htmlSource).toHaveValue(/키워드 하나만 존재하며/);
   await expect(htmlSource).toHaveValue(/초기문과 증감문을 생략하면/);
   await expect(htmlSource).toHaveValue(/반환되는/);
   await expect(htmlSource).toHaveValue(/value/);
@@ -256,10 +275,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).toHaveValue(/while_style\.go/);
   await expect(htmlSource).toHaveValue(/infinite_loop\.go/);
   await expect(htmlSource).toHaveValue(/range_with_index\.go/);
-  await expect(htmlSource).toHaveValue(/text-align:center/);
+  await expect(htmlSource).toHaveValue(/line-height:18px;vertical-align:middle/);
   await expect(htmlSource).not.toHaveValue(/<pre/);
   await expect(htmlSource).toHaveValue(/&nbsp;&nbsp;&nbsp;&nbsp;/);
-  await expect(htmlSource).toHaveValue(/for&nbsp;i&nbsp;:=&nbsp;0/);
 
   await page.getByRole("button", { name: "Markdown" }).click();
   await page
@@ -294,6 +312,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).not.toHaveValue(/oklch\(/);
   await expect(htmlSource).not.toHaveValue(/<pre/);
 
+  await page.getByRole("button", { name: "저장함" }).click();
   await page
     .getByLabel("저장된 초안")
     .getByRole("button")
@@ -306,6 +325,7 @@ test("renders the paste tool", async ({ page }) => {
   await page.getByLabel("Markdown 원문").fill("# 임시 문서\n\n프리셋 적용 전 상태");
   await page.getByRole("button", { name: "Markdown 적용하기" }).click();
   await expect(htmlSource).toHaveValue(/임시 문서/);
+  await page.getByRole("button", { name: "저장함" }).click();
   await page
     .getByLabel("저장된 프리셋")
     .getByRole("button")

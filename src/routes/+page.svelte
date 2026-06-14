@@ -28,6 +28,7 @@
         Unlink,
         Redo2,
         Trash2,
+        X,
     } from "lucide-svelte";
     import { onDestroy, onMount } from "svelte";
     import type { Editor, JSONContent } from "@tiptap/core";
@@ -123,7 +124,10 @@
         createDefaultComparisonBlock,
     } from "$lib/editor/comparison-block";
     import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
-    import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+    import {
+        maxHighlightLineNumber,
+        normalizeHighlightLines,
+    } from "$lib/highlighter/highlight-lines";
     import {
         createPresetSnapshot,
         deletePresetSnapshot,
@@ -164,11 +168,11 @@
         { background: string; fallback: string }
     >;
     const swatches = [
-        "oklch(23.39% 0.012 255.51)",
-        "oklch(56.77% 0.154 252.96)",
-        "oklch(50.61% 0.142 146.57)",
-        "oklch(57.8% 0.18 31.88)",
-        "oklch(47.55% 0.145 302.98)",
+        { label: "짙은 회색", color: "oklch(23.39% 0.012 255.51)" },
+        { label: "파랑", color: "oklch(56.77% 0.154 252.96)" },
+        { label: "초록", color: "oklch(50.61% 0.142 146.57)" },
+        { label: "주황", color: "oklch(57.8% 0.18 31.88)" },
+        { label: "보라", color: "oklch(47.55% 0.145 302.98)" },
     ];
     const calloutColorOptions: {
         label: string;
@@ -252,6 +256,7 @@
     let renameDraft = $state("");
     let calloutColorInput = $state<HTMLInputElement>();
     let codeLineContextMenu = $state<CodeLineContextMenu | null>(null);
+    let codeLineContextMenuElement = $state<HTMLDivElement>();
     let editorSignal = $state(0);
     let canPersistDraft = $state(false);
     let lastDraftHistoryFingerprint = "";
@@ -293,6 +298,16 @@
               ? "비어 있음"
               : "대기",
     );
+    const lineRangeHelp = `1-${maxHighlightLineNumber.toLocaleString()} 사이 숫자와 쉼표, 범위만 입력`;
+    const codeLineHighlightsInvalid = $derived(
+        isLineRangeInputInvalid(codeLineHighlights),
+    );
+    const codeAdditionLinesInvalid = $derived(
+        isLineRangeInputInvalid(codeAdditionLines),
+    );
+    const codeDeletionLinesInvalid = $derived(
+        isLineRangeInputInvalid(codeDeletionLines),
+    );
     const llmPromptCopyLabel = $derived(
         llmPromptCopyState === "copied"
             ? "복사됨"
@@ -300,6 +315,14 @@
               ? "복사 실패"
               : "LLM 가이드",
     );
+
+    $effect(() => {
+        if (typeof window !== "undefined" && codeLineContextMenu) {
+            window.requestAnimationFrame(() =>
+                codeLineContextMenuElement?.focus(),
+            );
+        }
+    });
 
     function draftStorage() {
         return typeof window === "undefined" ? undefined : window.localStorage;
@@ -501,6 +524,62 @@
         }
     }
 
+    function isLineRangeInputInvalid(value: string) {
+        const trimmed = value.trim();
+
+        if (!trimmed) {
+            return false;
+        }
+
+        return trimmed.split(",").some((part) => {
+            const match = /^\s*(\d+)(?:\s*-\s*(\d+))?\s*$/.exec(part);
+
+            if (!match) {
+                return true;
+            }
+
+            const start = Number.parseInt(match[1] ?? "", 10);
+            const end = match[2] ? Number.parseInt(match[2], 10) : start;
+
+            return (
+                !Number.isSafeInteger(start) ||
+                !Number.isSafeInteger(end) ||
+                start < 1 ||
+                end < 1 ||
+                start > maxHighlightLineNumber ||
+                end > maxHighlightLineNumber
+            );
+        });
+    }
+
+    function closeTransientPanels() {
+        closeCodeLineContextMenu();
+        cancelRename();
+        isLinkPanelOpen = false;
+        isMarkdownPanelOpen = false;
+        isStoragePanelOpen = false;
+        activeToolPanel = null;
+        markdownImportState = "idle";
+    }
+
+    function toggleMarkdownPanel() {
+        isMarkdownPanelOpen = !isMarkdownPanelOpen;
+        markdownImportState = "idle";
+
+        if (isMarkdownPanelOpen) {
+            isStoragePanelOpen = false;
+        }
+    }
+
+    function toggleStoragePanel() {
+        isStoragePanelOpen = !isStoragePanelOpen;
+
+        if (isStoragePanelOpen) {
+            isMarkdownPanelOpen = false;
+            markdownImportState = "idle";
+        }
+    }
+
     function scheduleCardApply(callback: () => void, event: MouseEvent) {
         if (event.detail > 1) {
             clearPendingCardApply();
@@ -508,10 +587,7 @@
         }
 
         clearPendingCardApply();
-        cardApplyTimer = setTimeout(() => {
-            cardApplyTimer = undefined;
-            callback();
-        }, 260);
+        callback();
     }
 
     function beginPresetRename(preset: PresetSnapshot, event: MouseEvent) {
@@ -584,7 +660,7 @@
             preferences,
         );
 
-        if (fingerprint === lastDraftHistoryFingerprint) {
+        if (options.automatic && fingerprint === lastDraftHistoryFingerprint) {
             return false;
         }
 
@@ -1099,6 +1175,14 @@
     }
 
     function applyCodeBlock() {
+        if (
+            codeLineHighlightsInvalid ||
+            codeAdditionLinesInvalid ||
+            codeDeletionLinesInvalid
+        ) {
+            return;
+        }
+
         const { highlightLines, additionLines, deletionLines } =
             normalizeCodeLineMarkers({
                 highlightLines: codeLineHighlights,
@@ -1167,6 +1251,10 @@
     }
 
     function applyCodeLineHighlights() {
+        if (codeLineHighlightsInvalid) {
+            return;
+        }
+
         const markerAttrs = normalizeCodeLineMarkers(
             {
                 highlightLines: codeLineHighlights,
@@ -1186,6 +1274,10 @@
     }
 
     function applyCodeAdditionLines() {
+        if (codeAdditionLinesInvalid) {
+            return;
+        }
+
         const markerAttrs = normalizeCodeLineMarkers(
             {
                 highlightLines: codeLineHighlights,
@@ -1205,6 +1297,10 @@
     }
 
     function applyCodeDeletionLines() {
+        if (codeDeletionLinesInvalid) {
+            return;
+        }
+
         const markerAttrs = normalizeCodeLineMarkers(
             {
                 highlightLines: codeLineHighlights,
@@ -2106,6 +2202,14 @@
     }
 
     function resetDraft() {
+        if (
+            !window.confirm(
+                "현재 글을 모두 지우고 빈 문서로 초기화할까?",
+            )
+        ) {
+            return;
+        }
+
         const storage = draftStorage();
         if (storage) {
             clearDraftSnapshot(storage);
@@ -2121,6 +2225,14 @@
     }
 
     function applyExampleTemplate() {
+        if (
+            !window.confirm(
+                "현재 글을 예시 템플릿으로 바꿀까?",
+            )
+        ) {
+            return;
+        }
+
         applyDraftPreferences(defaultDraftPreferences());
         replaceEditorDocument(sampleDocument);
         isLinkPanelOpen = false;
@@ -2187,12 +2299,48 @@
         let mountedEditor: Editor | undefined;
         const savedDraft = readDraftSnapshot(window.localStorage);
         const closeFloatingMenus = () => closeCodeLineContextMenu();
+        const closePanelsOnOutsidePointer = (event: PointerEvent) => {
+            const target = event.target;
+
+            if (!(target instanceof Element)) {
+                return;
+            }
+
+            if (
+                target.closest(".toolbar-shell") ||
+                target.closest(".code-line-context-menu") ||
+                target.closest(".markdown-panel") ||
+                target.closest(".storage-panel")
+            ) {
+                return;
+            }
+
+            if (
+                isLinkPanelOpen ||
+                isMarkdownPanelOpen ||
+                isStoragePanelOpen ||
+                activeToolPanel
+            ) {
+                closeTransientPanels();
+            }
+        };
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
-                closeCodeLineContextMenu();
+                if (
+                    codeLineContextMenu ||
+                    isLinkPanelOpen ||
+                    isMarkdownPanelOpen ||
+                    isStoragePanelOpen ||
+                    activeToolPanel ||
+                    renameTarget
+                ) {
+                    event.preventDefault();
+                    closeTransientPanels();
+                }
             }
         };
 
+        window.addEventListener("pointerdown", closePanelsOnOutsidePointer);
         window.addEventListener("resize", closeFloatingMenus);
         window.addEventListener("scroll", closeFloatingMenus, true);
         window.addEventListener("keydown", closeOnEscape);
@@ -2329,6 +2477,7 @@
             window.removeEventListener("resize", closeFloatingMenus);
             window.removeEventListener("scroll", closeFloatingMenus, true);
             window.removeEventListener("keydown", closeOnEscape);
+            window.removeEventListener("pointerdown", closePanelsOnOutsidePointer);
             mountedEditor?.destroy();
         };
     });
@@ -2418,10 +2567,8 @@
                 type="button"
                 title="Markdown"
                 aria-label="Markdown"
-                onclick={() => {
-                    isMarkdownPanelOpen = !isMarkdownPanelOpen;
-                    markdownImportState = "idle";
-                }}
+                aria-expanded={isMarkdownPanelOpen}
+                onclick={toggleMarkdownPanel}
             >
                 <FileText size={17} />
                 <span>Markdown</span>
@@ -2447,7 +2594,7 @@
                 aria-label="저장함"
                 aria-expanded={isStoragePanelOpen}
                 aria-controls="storage-panel"
-                onclick={() => (isStoragePanelOpen = !isStoragePanelOpen)}
+                onclick={toggleStoragePanel}
             >
                 <Save size={17} />
                 <span>저장함</span>
@@ -2570,7 +2717,7 @@
         {#if isLinkPanelOpen}
             <div class="tool-group link-tool">
                 <label>
-                    <span><Link2 size={15} /> URL</span>
+                    <span><Link2 size={15} /> 링크</span>
                     <input
                         class:error={linkError}
                         type="url"
@@ -2861,9 +3008,12 @@
                 <span><Highlighter size={15} /> 강조줄</span>
                 <input
                     class="line-highlight-input"
+                    class:error={codeLineHighlightsInvalid}
                     type="text"
                     bind:value={codeLineHighlights}
                     aria-label="코드 강조 줄"
+                    aria-invalid={codeLineHighlightsInvalid}
+                    aria-describedby={codeLineHighlightsInvalid ? "code-line-range-help" : undefined}
                     placeholder="2,4-6"
                     onblur={applyCodeLineHighlights}
                     onkeydown={(event) => {
@@ -2877,9 +3027,12 @@
                 <span>추가줄</span>
                 <input
                     class="line-highlight-input"
+                    class:error={codeAdditionLinesInvalid}
                     type="text"
                     bind:value={codeAdditionLines}
                     aria-label="코드 추가 줄"
+                    aria-invalid={codeAdditionLinesInvalid}
+                    aria-describedby={codeAdditionLinesInvalid ? "code-line-range-help" : undefined}
                     placeholder="2,4-6"
                     onblur={applyCodeAdditionLines}
                     onkeydown={(event) => {
@@ -2893,9 +3046,12 @@
                 <span>삭제줄</span>
                 <input
                     class="line-highlight-input"
+                    class:error={codeDeletionLinesInvalid}
                     type="text"
                     bind:value={codeDeletionLines}
                     aria-label="코드 삭제 줄"
+                    aria-invalid={codeDeletionLinesInvalid}
+                    aria-describedby={codeDeletionLinesInvalid ? "code-line-range-help" : undefined}
                     placeholder="2,4-6"
                     onblur={applyCodeDeletionLines}
                     onkeydown={(event) => {
@@ -2905,6 +3061,11 @@
                     }}
                 />
             </label>
+            {#if codeLineHighlightsInvalid || codeAdditionLinesInvalid || codeDeletionLinesInvalid}
+                <span id="code-line-range-help" class="line-range-hint"
+                    >{lineRangeHelp}</span
+                >
+            {/if}
             <label>
                 <span><Paintbrush size={15} /> 테마</span>
                 <select bind:value={theme} aria-label="코드 테마">
@@ -2959,14 +3120,14 @@
                 </select>
             </label>
             <div class="swatches" aria-label="글자색">
-                {#each swatches as color}
+                {#each swatches as swatch}
                     <button
                         class="swatch"
                         type="button"
-                        title="글자색"
-                        aria-label="글자색"
-                        style={`--swatch:${color}`}
-                        onclick={() => setTextColor(color)}
+                        title={`${swatch.label} 글자색`}
+                        aria-label={`${swatch.label} 글자색`}
+                        style={`--swatch:${swatch.color}`}
+                        onclick={() => setTextColor(swatch.color)}
                     ></button>
                 {/each}
             </div>
@@ -2976,6 +3137,15 @@
 
     {#if isStoragePanelOpen}
         <div id="storage-panel" class="storage-panel">
+            <button
+                class="panel-close-button storage-panel-close"
+                type="button"
+                title="저장함 닫기"
+                aria-label="닫기"
+                onclick={() => (isStoragePanelOpen = false)}
+            >
+                <X size={16} />
+            </button>
             <section class="preset-panel" aria-label="프리셋">
                 <div class="preset-save">
                     <label>
@@ -3197,6 +3367,15 @@
                     <Trash2 size={15} />
                     <span>비우기</span>
                 </button>
+                <button
+                    class="markdown-clear-button"
+                    type="button"
+                    aria-label="Markdown 닫기"
+                    onclick={() => (isMarkdownPanelOpen = false)}
+                >
+                    <X size={15} />
+                    <span>닫기</span>
+                </button>
                 <span
                     class:error={markdownImportState === "error"}
                     class="markdown-status">{markdownImportStateLabel}</span
@@ -3229,6 +3408,7 @@
                     tabindex="-1"
                     aria-label={`코드 ${codeLineContextMenu.line}번 줄`}
                     style={`left:${codeLineContextMenu.x}px;top:${codeLineContextMenu.y}px`}
+                    bind:this={codeLineContextMenuElement}
                     onpointerdown={(event) => event.stopPropagation()}
                 >
                     <span class="code-line-context-title"
@@ -3590,6 +3770,11 @@
         outline: none;
     }
 
+    input[type="text"].error {
+        border-color: var(--danger);
+        background: color-mix(in oklch, var(--danger) 12%, var(--panel-2));
+    }
+
     input[type="text"]:disabled {
         cursor: not-allowed;
         opacity: 0.5;
@@ -3641,6 +3826,12 @@
     .code-filename-input,
     .line-highlight-input {
         width: 170px;
+    }
+
+    .line-range-hint {
+        color: var(--danger);
+        font-size: 12px;
+        font-weight: 500;
     }
 
     .link-tool {
@@ -3724,7 +3915,8 @@
     }
 
     .markdown-import-button,
-    .markdown-clear-button {
+    .markdown-clear-button,
+    .panel-close-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -3762,9 +3954,27 @@
 
     .storage-panel {
         grid-column: 1 / -1;
+        position: relative;
         display: grid;
         gap: 5px;
         margin: 0;
+        padding-right: 38px;
+    }
+
+    .storage-panel-close {
+        position: absolute;
+        top: 9px;
+        right: 9px;
+        z-index: 1;
+        width: 32px;
+        min-width: 32px;
+        height: 32px;
+        padding: 0;
+        color: var(--muted);
+    }
+
+    .storage-panel-close:hover {
+        color: var(--danger);
     }
 
     .preset-panel,
