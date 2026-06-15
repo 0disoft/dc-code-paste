@@ -1,5 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import type { DcDocumentTheme, DcExportStructure } from "$lib/dc/export-document";
+import { containsMarkdownInlineToken, parseMarkdownInline } from "$lib/editor/markdown-inline";
+import { parseMarkdownToDocument, sanitizeCodeHighlightLines } from "$lib/editor/markdown-import";
 import {
   isSupportedLanguage,
   isSupportedTheme,
@@ -153,6 +155,198 @@ function normalizeSnapshotName(value: unknown): string | undefined {
   return normalized ? normalized.slice(0, 60) : undefined;
 }
 
+function textContent(node: JSONContent): string {
+  if (typeof node.text === "string") {
+    return node.text;
+  }
+
+  return Array.isArray(node.content) ? node.content.map(textContent).join("") : "";
+}
+
+function plainUnmarkedTextContent(node: JSONContent): string | undefined {
+  if (!Array.isArray(node.content) || node.content.length === 0) {
+    return undefined;
+  }
+
+  const parts: string[] = [];
+
+  for (const child of node.content) {
+    if (child.type !== "text" || typeof child.text !== "string" || child.marks?.length) {
+      return undefined;
+    }
+
+    parts.push(child.text);
+  }
+
+  return parts.join("");
+}
+
+function restoreInlineMarkdownContentNode(
+  node: JSONContent,
+  parentType?: string,
+): JSONContent | undefined {
+  const shouldRestore =
+    node.type === "summaryItem" ||
+    (node.type === "paragraph" &&
+      (parentType === "comparisonColumn" || parentType === "tutorialStep"));
+
+  if (!shouldRestore) {
+    return undefined;
+  }
+
+  const text = plainUnmarkedTextContent(node);
+  if (!text || !containsMarkdownInlineToken(text)) {
+    return undefined;
+  }
+
+  return {
+    ...node,
+    content: parseMarkdownInline(text),
+  };
+}
+
+function restoreTutorialTitleOnlyStep(node: JSONContent): JSONContent | undefined {
+  if (node.type !== "tutorialStep" || node.content?.length) {
+    return undefined;
+  }
+
+  const title = typeof node.attrs?.title === "string" ? node.attrs.title.trim() : "";
+  if (!title) {
+    return undefined;
+  }
+
+  const { title: _title, ...attrs } = node.attrs ?? {};
+
+  return {
+    ...node,
+    attrs,
+    content: [
+      {
+        type: "paragraph",
+        content: parseMarkdownInline(title),
+      },
+    ],
+  };
+}
+
+function markdownTableRow(cells: readonly string[]): string {
+  return `| ${cells.join(" | ")} |`;
+}
+
+function collapsedMarkdownTableRows(text: string): string[] {
+  const cells = text
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+  const separatorStart = cells.findIndex((cell) => /^:?-{3,}:?$/.test(cell));
+
+  if (separatorStart < 1) {
+    return [];
+  }
+
+  let columnCount = 0;
+  while (
+    separatorStart + columnCount < cells.length &&
+    /^:?-{3,}:?$/.test(cells[separatorStart + columnCount] ?? "")
+  ) {
+    columnCount += 1;
+  }
+
+  if (columnCount < 2 || separatorStart < columnCount) {
+    return [];
+  }
+
+  const header = cells.slice(separatorStart - columnCount, separatorStart);
+  const rows = [
+    markdownTableRow(header),
+    markdownTableRow(cells.slice(separatorStart, separatorStart + columnCount)),
+  ];
+  let index = separatorStart + columnCount;
+
+  while (index + columnCount <= cells.length) {
+    rows.push(markdownTableRow(cells.slice(index, index + columnCount)));
+    index += columnCount;
+  }
+
+  return rows.length >= 3 ? rows : [];
+}
+
+function restoreCollapsedMarkdownTableParagraph(node: JSONContent): JSONContent | undefined {
+  if (node.type !== "paragraph") {
+    return undefined;
+  }
+
+  const text = textContent(node).replace(/\s+/g, " ").trim();
+  const rows = collapsedMarkdownTableRows(text);
+
+  const separator = rows[1]?.replace(/\s+/g, "") ?? "";
+  if (rows.length < 3 || !/^\|:?-{3,}:?(?:\|:?-{3,}:?)+\|$/.test(separator)) {
+    return undefined;
+  }
+
+  const table = parseMarkdownToDocument(rows.join("\n")).content?.[0];
+
+  return table?.type === "dcDataTable" ? table : undefined;
+}
+
+function restoreDecorativeCodeHighlightLines(node: JSONContent): JSONContent | undefined {
+  if (node.type !== "codeBlock" || typeof node.attrs?.highlightLines !== "string") {
+    return undefined;
+  }
+
+  const normalized = sanitizeCodeHighlightLines(
+    node.attrs.highlightLines,
+    textContent(node).split("\n"),
+  );
+
+  if (normalized === node.attrs.highlightLines) {
+    return undefined;
+  }
+
+  const attrs = { ...node.attrs };
+  if (normalized) {
+    attrs.highlightLines = normalized;
+  } else {
+    delete attrs.highlightLines;
+  }
+
+  return {
+    ...node,
+    attrs,
+  };
+}
+
+function normalizeDraftDocumentNodes(node: JSONContent, parentType?: string): JSONContent {
+  const restoredTable = restoreCollapsedMarkdownTableParagraph(node);
+  if (restoredTable) {
+    return restoredTable;
+  }
+
+  const restoredTutorialStep = restoreTutorialTitleOnlyStep(node);
+  if (restoredTutorialStep) {
+    return restoredTutorialStep;
+  }
+
+  const restoredInline = restoreInlineMarkdownContentNode(node, parentType);
+  if (restoredInline) {
+    return restoredInline;
+  }
+
+  const restoredCodeHighlights = restoreDecorativeCodeHighlightLines(node);
+  if (restoredCodeHighlights) {
+    return restoredCodeHighlights;
+  }
+
+  if (!Array.isArray(node.content)) {
+    return node;
+  }
+
+  return {
+    ...node,
+    content: node.content.map((child) => normalizeDraftDocumentNodes(child, node.type)),
+  };
+}
+
 export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefined {
   if (!isRecord(value)) {
     return undefined;
@@ -175,7 +369,7 @@ export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefine
   return {
     version: 1,
     updatedAt: value.updatedAt,
-    document: value.document,
+    document: normalizeDraftDocumentNodes(value.document),
     preferences,
   };
 }

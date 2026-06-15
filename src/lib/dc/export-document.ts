@@ -909,6 +909,60 @@ async function renderListItemBody(
   return body || "&nbsp;";
 }
 
+function renderDataTable(node: JSONContent, options: DcExportOptions): string {
+  const palette = documentPalette(options);
+  const isDarkEditorial = normalizeDocumentTheme(options.documentTheme) === "darkEditorial";
+  const tableBorder = isDarkEditorial ? "#3a3a3a" : "#d8d2c4";
+  const headerBackground = isDarkEditorial ? "#242424" : "#f3eadb";
+  const cellBackground = isDarkEditorial ? dcDarkPageBackground : dcLightPageBackground;
+  const tableStyle = joinStyle({
+    width: "100%",
+    margin: "0 0 16px",
+    "border-collapse": "collapse",
+    "table-layout": "fixed",
+    color: palette.text,
+    "font-family": safeProseFontFamily(options.bodyFontFamily),
+    "font-size": safeBodyFontSize(options),
+    "line-height": 1.62,
+  });
+  const rows = childrenOf(node)
+    .map((row) => {
+      const cells = childrenOf(row)
+        .map((cell) => {
+          const isHeader = cell.attrs?.header === true;
+          const tag = isHeader ? "th" : "td";
+          const cellStyle = joinStyle({
+            padding: isHeader ? "8px 10px" : "9px 10px",
+            border: `1px solid ${tableBorder}`,
+            "background-color": isHeader ? headerBackground : cellBackground,
+            color: isHeader ? palette.heading : undefined,
+            "font-weight": isHeader ? 700 : undefined,
+            "text-align": "left",
+            "vertical-align": "top",
+            "word-break": "keep-all",
+            "overflow-wrap": "break-word",
+          });
+          const body = renderInlineChildren(cell, options, {
+            text: isHeader ? palette.heading : palette.text,
+            background: isHeader ? headerBackground : cellBackground,
+            inlineCodeBackground: palette.inlineCodeBackground,
+            inlineCodeText: palette.inlineCodeText,
+          });
+
+          return `<${tag} style="${cellStyle}">${body || "&nbsp;"}</${tag}>`;
+        })
+        .join("");
+
+      return cells ? `<tr>${cells}</tr>` : "";
+    })
+    .filter(Boolean)
+    .join("");
+
+  return rows
+    ? `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`
+    : "";
+}
+
 async function renderCallout(
   node: JSONContent,
   options: DcExportOptions,
@@ -2207,12 +2261,12 @@ function comparisonBlockPalette(options: DcExportOptions) {
   };
 }
 
-function tutorialStepTitle(node: JSONContent, index: number): string {
+function tutorialStepTitle(node: JSONContent): string {
   if (typeof node.attrs?.title === "string" && node.attrs.title.trim()) {
     return node.attrs.title.trim();
   }
 
-  return `단계 ${index + 1}`;
+  return "";
 }
 
 function tutorialStepNumber(node: JSONContent, index: number): string {
@@ -2304,7 +2358,7 @@ async function renderTutorialBlockModern(
   const cards = await Promise.all(
     steps.map(async (step, index) => {
       const number = tutorialStepNumber(step, index);
-      const title = escapeHtml(tutorialStepTitle(step, index));
+      const title = escapeHtml(tutorialStepTitle(step));
       const body = await renderTutorialStepBody(
         step,
         options,
@@ -2312,8 +2366,9 @@ async function renderTutorialBlockModern(
         palette.cardBackground,
       );
       const bodyHtml = body ? `<div style="${bodyStyle}">${body}</div>` : "";
+      const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "";
 
-      return `<section style="${cardStyle}"><div style="${headStyle}"><span style="${numberCellStyle}"><span style="${numberStyle}">${number}</span></span><strong style="${titleStyle}">${title}</strong></div>${bodyHtml}</section>`;
+      return `<section style="${cardStyle}"><div style="${headStyle}"><span style="${numberCellStyle}"><span style="${numberStyle}">${number}</span></span>${titleHtml}</div>${bodyHtml}</section>`;
     }),
   );
 
@@ -2369,7 +2424,7 @@ async function renderTutorialBlockTable(
   const cards = await Promise.all(
     steps.map(async (step, index) => {
       const number = tutorialStepNumber(step, index);
-      const title = escapeHtml(tutorialStepTitle(step, index));
+      const title = escapeHtml(tutorialStepTitle(step));
       const body = await renderTutorialStepBody(
         step,
         options,
@@ -2388,8 +2443,9 @@ async function renderTutorialBlockTable(
       const bodyRow = body
         ? `<tr><td style="${bodySpacerCellStyle}">&nbsp;</td><td style="${bodyCellStyle}">${body}</td></tr>`
         : "";
+      const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "&nbsp;";
 
-      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.cardFallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}">${badge}</td><td style="${headCellStyle}"><strong style="${titleStyle}">${title}</strong></td></tr>${bodyRow}</tbody></table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.cardFallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}">${badge}</td><td style="${headCellStyle}">${titleHtml}</td></tr>${bodyRow}</tbody></table>`;
     }),
   );
 
@@ -2617,6 +2673,8 @@ async function renderBlockAsync(
       return renderTutorialBlock(node, options);
     case "comparisonBlock":
       return renderComparisonBlock(node, options);
+    case "dcDataTable":
+      return renderDataTable(node, options);
     case "codeBlock":
       return renderCodeBlock(node, options);
     case "blockquote":

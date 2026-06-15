@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import { parseMarkdownInline } from "$lib/editor/markdown-inline";
 
 const defaultTutorialSteps = [
   {
@@ -50,20 +51,41 @@ export function createTutorialStep(
   body?: string,
   number?: string | number,
 ): JSONContent {
+  const trimmedTitle = title.trim();
   const trimmedBody = body?.trim();
   const normalizedNumber = normalizeTutorialStepNumber(number);
 
   return {
     type: "tutorialStep",
     attrs: {
-      title,
+      title: trimmedTitle,
       ...(normalizedNumber ? { number: normalizedNumber } : {}),
     },
     content: trimmedBody
       ? [
           {
             type: "paragraph",
-            content: [{ type: "text", text: trimmedBody }],
+            content: parseMarkdownInline(trimmedBody),
+          },
+        ]
+      : [],
+  };
+}
+
+export function createTutorialBodyStep(text: string, number?: string | number): JSONContent {
+  const trimmedText = text.trim();
+  const normalizedNumber = normalizeTutorialStepNumber(number);
+
+  return {
+    type: "tutorialStep",
+    attrs: {
+      ...(normalizedNumber ? { number: normalizedNumber } : {}),
+    },
+    content: trimmedText
+      ? [
+          {
+            type: "paragraph",
+            content: parseMarkdownInline(trimmedText),
           },
         ]
       : [],
@@ -114,7 +136,9 @@ export function createTutorialBlockFromText(text: string): JSONContent | undefin
     .filter((line) => line.text.length > 0)
     .map((line, index) => {
       const step = splitTutorialLine(line.text);
-      return createTutorialStep(step.title, step.body, line.number ?? index + 1);
+      return step.body
+        ? createTutorialStep(step.title, step.body, line.number ?? index + 1)
+        : createTutorialBodyStep(step.title, line.number ?? index + 1);
     });
 
   return steps.length > 0

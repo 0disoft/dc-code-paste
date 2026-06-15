@@ -100,6 +100,18 @@
     } from "$lib/editor/reference-list";
     import { normalizeEditableLinkHref } from "$lib/editor/link";
     import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
+    import {
+        autocompleteLlmModelOptions,
+        defaultLlmProviderId,
+        llmModelAutocompleteLimit,
+        llmProviders,
+        openRouterTopWeeklyModelLimit,
+        providerDefinition,
+        requestLlmMarkdown,
+        requestOpenRouterModels,
+        type OpenRouterModelOption,
+        type LlmProviderId,
+    } from "$lib/editor/llm-generation";
     import { parseMarkdownToDocument } from "$lib/editor/markdown-import";
     import {
         codeLineRangeContains,
@@ -253,6 +265,22 @@
     let markdownDraft = $state("");
     let markdownImportState = $state<"idle" | "imported" | "error">("idle");
     let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
+    let isLlmPanelOpen = $state(false);
+    let llmProvider = $state<LlmProviderId>(defaultLlmProviderId);
+    let llmApiKey = $state("");
+    let llmModel = $state("");
+    let llmUserPrompt = $state("");
+    let openRouterModels = $state<OpenRouterModelOption[]>([]);
+    let isOpenRouterTopWeeklyOnly = $state(true);
+    let isLlmModelAutocompleteOpen = $state(false);
+    let openRouterModelState = $state<
+        "idle" | "loading" | "loaded" | "fallback" | "error"
+    >("idle");
+    let openRouterModelError = $state("");
+    let llmGenerationState = $state<
+        "idle" | "loading" | "ready" | "error"
+    >("idle");
+    let llmGenerationError = $state("");
     let isStoragePanelOpen = $state(false);
     let activeToolPanel = $state<ToolPanelId | null>(null);
     let blockLabelDraft = $state("");
@@ -276,11 +304,12 @@
     let previewRenderTimer: ReturnType<typeof setTimeout> | undefined;
     let draftPersistTimer: ReturnType<typeof setTimeout> | undefined;
     let renderTurn = 0;
+    let openRouterModelLoadTurn = 0;
 
     const htmlSize = $derived(
         html.length === 0 ? "0KB" : `${Math.ceil(html.length / 1024)}KB`,
     );
-    const copyLabel = $derived(copyState === "copied" ? "복사됨" : "디씨 복사");
+    const copyLabel = $derived(copyState === "copied" ? "복사됨" : "복사");
     const sourceCopyLabel = $derived(
         sourceCopyState === "copied" ? "복사됨" : "원문 복사",
     );
@@ -324,7 +353,70 @@
             ? "복사됨"
             : llmPromptCopyState === "error"
               ? "복사 실패"
-              : "LLM 가이드",
+              : "가이드",
+    );
+    const activeLlmProvider = $derived(providerDefinition(llmProvider));
+    const llmModelOptions = $derived(
+        llmProvider === "openrouter" && openRouterModels.length > 0
+            ? openRouterModels
+            : activeLlmProvider.models.map((model) => ({
+                  id: model,
+                  name: model,
+              })),
+    );
+    const shouldShowInitialLlmModels = $derived(
+        llmModel.trim().length === 0 &&
+            llmModelOptions.length > 0 &&
+            (llmProvider !== "openrouter" ||
+                (isOpenRouterTopWeeklyOnly && openRouterModels.length > 0)),
+    );
+    const activeLlmModelAutocompleteOptions = $derived(
+        autocompleteLlmModelOptions(llmModelOptions, llmModel, {
+            limit: llmProvider === "openrouter" && shouldShowInitialLlmModels
+                ? openRouterTopWeeklyModelLimit
+                : llmModelAutocompleteLimit,
+            showInitialOptions: shouldShowInitialLlmModels,
+        }),
+    );
+    const shouldShowLlmModelAutocomplete = $derived(
+        isLlmModelAutocompleteOpen && activeLlmModelAutocompleteOptions.length > 0,
+    );
+    const llmGenerationStateLabel = $derived(
+        llmGenerationState === "loading"
+            ? "생성 중"
+            : llmGenerationState === "ready"
+              ? "Markdown에 넣음"
+              : llmGenerationState === "error"
+                ? llmGenerationError || "요청 실패"
+                : "대기",
+    );
+    const isLlmGenerateDisabled = $derived(
+        llmGenerationState === "loading" ||
+            !llmApiKey.trim() ||
+            !llmModel.trim() ||
+            !llmUserPrompt.trim(),
+    );
+    const openRouterModelStateLabel = $derived(
+        llmProvider !== "openrouter"
+            ? ""
+            : openRouterModelState === "loading"
+              ? "모델 불러오는 중"
+              : openRouterModelState === "loaded"
+                ? isOpenRouterTopWeeklyOnly
+                  ? `주간 인기 ${openRouterModels.length.toLocaleString()}개`
+                  : `${openRouterModels.length.toLocaleString()}개 불러옴`
+                : openRouterModelState === "fallback"
+                  ? `공개 목록 ${openRouterModels.length.toLocaleString()}개`
+                  : openRouterModelState === "error"
+                    ? openRouterModelError || "모델 불러오기 실패"
+                    : isOpenRouterTopWeeklyOnly
+                      ? "주간 인기 대기"
+                      : "모델 목록 대기",
+    );
+    const openCodeGoModelStateLabel = $derived(
+        llmProvider === "opencode-go"
+            ? `${activeLlmProvider.models.length.toLocaleString()}개 준비됨`
+            : "",
     );
 
     $effect(() => {
@@ -568,9 +660,12 @@
         cancelRename();
         isLinkPanelOpen = false;
         isMarkdownPanelOpen = false;
+        isLlmPanelOpen = false;
         isStoragePanelOpen = false;
         activeToolPanel = null;
         markdownImportState = "idle";
+        llmGenerationError = "";
+        llmGenerationState = "idle";
     }
 
     function toggleMarkdownPanel() {
@@ -578,6 +673,7 @@
         markdownImportState = "idle";
 
         if (isMarkdownPanelOpen) {
+            isLlmPanelOpen = false;
             isStoragePanelOpen = false;
         }
     }
@@ -587,8 +683,132 @@
 
         if (isStoragePanelOpen) {
             isMarkdownPanelOpen = false;
+            isLlmPanelOpen = false;
             markdownImportState = "idle";
         }
+    }
+
+    function toggleLlmPanel() {
+        isLlmPanelOpen = !isLlmPanelOpen;
+        llmGenerationError = "";
+
+        if (isLlmPanelOpen) {
+            isMarkdownPanelOpen = false;
+            isStoragePanelOpen = false;
+            markdownImportState = "idle";
+            if (
+                llmProvider === "openrouter" &&
+                openRouterModelState === "idle"
+            ) {
+                void refreshOpenRouterModels();
+            }
+        } else if (llmGenerationState !== "loading") {
+            llmGenerationState = "idle";
+        }
+    }
+
+    function selectLlmProvider(value: string) {
+        const nextProvider = llmProviders.some((provider) => provider.id === value)
+            ? (value as LlmProviderId)
+            : defaultLlmProviderId;
+
+        llmProvider = nextProvider;
+        llmModel = "";
+        llmGenerationState = "idle";
+        llmGenerationError = "";
+        isLlmModelAutocompleteOpen = true;
+
+        if (nextProvider === "openrouter") {
+            void refreshOpenRouterModels();
+        }
+    }
+
+    function updateLlmModel(value: string) {
+        llmModel = value;
+        llmGenerationState = "idle";
+        isLlmModelAutocompleteOpen = true;
+    }
+
+    function selectLlmModel(value: string) {
+        llmModel = value;
+        llmGenerationState = "idle";
+        isLlmModelAutocompleteOpen = false;
+    }
+
+    function closeLlmModelAutocompleteSoon() {
+        window.setTimeout(() => {
+            isLlmModelAutocompleteOpen = false;
+        }, 120);
+    }
+
+    async function refreshOpenRouterModels() {
+        if (llmProvider !== "openrouter") {
+            return;
+        }
+
+        const turn = ++openRouterModelLoadTurn;
+        const useTopWeeklyLimit = isOpenRouterTopWeeklyOnly;
+
+        openRouterModelState = "loading";
+        openRouterModelError = "";
+
+        try {
+            const models = await requestOpenRouterModels(llmApiKey, {
+                limit: useTopWeeklyLimit ? openRouterTopWeeklyModelLimit : undefined,
+            });
+            applyOpenRouterModels(models, "loaded", turn);
+        } catch (error) {
+            if (!llmApiKey.trim()) {
+                applyOpenRouterModelError(error, turn);
+                return;
+            }
+
+            try {
+                const models = await requestOpenRouterModels("", {
+                    limit: useTopWeeklyLimit ? openRouterTopWeeklyModelLimit : undefined,
+                });
+                applyOpenRouterModels(models, "fallback", turn);
+            } catch (fallbackError) {
+                applyOpenRouterModelError(fallbackError, turn);
+            }
+        }
+    }
+
+    function setOpenRouterTopWeeklyOnly(value: boolean) {
+        isOpenRouterTopWeeklyOnly = value;
+        openRouterModelError = "";
+
+        if (llmProvider === "openrouter") {
+            void refreshOpenRouterModels();
+        }
+    }
+
+    function applyOpenRouterModels(
+        models: OpenRouterModelOption[],
+        state: "loaded" | "fallback",
+        turn: number,
+    ) {
+        if (turn !== openRouterModelLoadTurn) {
+            return;
+        }
+
+        openRouterModels = models;
+        openRouterModelState = models.length > 0 ? state : "error";
+        openRouterModelError = models.length > 0 ? "" : "사용 가능한 모델 없음";
+
+        isLlmModelAutocompleteOpen = true;
+    }
+
+    function applyOpenRouterModelError(error: unknown, turn: number) {
+        if (turn !== openRouterModelLoadTurn) {
+            return;
+        }
+
+        openRouterModelState = "error";
+        openRouterModelError =
+            error instanceof Error
+                ? error.message
+                : "OpenRouter 모델 목록을 불러오지 못했습니다.";
     }
 
     function scheduleCardApply(callback: () => void, event: MouseEvent) {
@@ -762,6 +982,7 @@
 
         const nextDocument = parseMarkdownToDocument(markdownDraft, {
             defaultLanguage: language,
+            sanitizeCodeHighlightLines: true,
         });
         const importedLanguage = firstCodeBlockLanguage(nextDocument);
 
@@ -1492,12 +1713,23 @@
             return undefined;
         }
 
+        const tutorialLabel = target.closest(
+            ".dc-tutorial-head, .dc-tutorial-number, .dc-tutorial-title",
+        );
+        if (tutorialLabel) {
+            const tutorialStep = tutorialLabel.closest(".dc-tutorial-step");
+            return tutorialStep instanceof HTMLElement ? tutorialStep : undefined;
+        }
+
+        if (target.closest(".dc-tutorial-body")) {
+            return undefined;
+        }
+
         const element = target.closest(
             [
                 ".dc-hero-block",
                 ".dc-summary-box",
                 ".dc-callout",
-                ".dc-tutorial-step",
                 ".dc-comparison-column",
             ].join(","),
         );
@@ -2710,6 +2942,44 @@
         }
     }
 
+    async function generateMarkdownWithLlm() {
+        if (isLlmGenerateDisabled) {
+            return;
+        }
+
+        llmGenerationState = "loading";
+        llmGenerationError = "";
+
+        try {
+            const markdown = await requestLlmMarkdown({
+                provider: llmProvider,
+                apiKey: llmApiKey,
+                model: llmModel,
+                userPrompt: llmUserPrompt,
+                authoringPrompt: llmAuthoringPrompt,
+                siteUrl: "https://0disoft.github.io/dc-code-paste/",
+                appTitle: "dc-code-paste",
+            });
+
+            markdownDraft = markdown;
+            markdownImportState = "idle";
+            isLlmPanelOpen = false;
+            isMarkdownPanelOpen = true;
+            isStoragePanelOpen = false;
+            llmGenerationState = "ready";
+        } catch (error) {
+            llmGenerationError =
+                llmProvider === "opencode-go" && error instanceof TypeError
+                    ? "OpenCode Go 직접 호출이 브라우저에서 막혔습니다."
+                    : error instanceof TypeError
+                      ? "브라우저 직접 호출이 막혔습니다."
+                      : error instanceof Error
+                        ? error.message
+                        : "브라우저 직접 호출이 막혔거나 응답을 읽지 못했습니다.";
+            llmGenerationState = "error";
+        }
+    }
+
     function toggleToolPanel(panel: ToolPanelId) {
         activeToolPanel = activeToolPanel === panel ? null : panel;
     }
@@ -2736,6 +3006,7 @@
                 target.closest(".toolbar-shell") ||
                 target.closest(".code-line-context-menu") ||
                 target.closest(".markdown-panel") ||
+                target.closest(".llm-panel") ||
                 target.closest(".storage-panel")
             ) {
                 return;
@@ -2744,6 +3015,7 @@
             if (
                 isLinkPanelOpen ||
                 isMarkdownPanelOpen ||
+                isLlmPanelOpen ||
                 isStoragePanelOpen ||
                 activeToolPanel
             ) {
@@ -2756,6 +3028,7 @@
                     codeLineContextMenu ||
                     isLinkPanelOpen ||
                     isMarkdownPanelOpen ||
+                    isLlmPanelOpen ||
                     isStoragePanelOpen ||
                     activeToolPanel ||
                     renameTarget
@@ -2981,7 +3254,7 @@
                 onclick={applyExampleTemplate}
             >
                 <LayoutTemplate size={17} />
-                <span>예시 템플릿</span>
+                <span>예시</span>
             </button>
             <button
                 class="copy-button"
@@ -3009,7 +3282,7 @@
                 onclick={toggleMarkdownPanel}
             >
                 <FileText size={17} />
-                <span>Markdown</span>
+                <span>MD</span>
             </button>
             <button
                 class:active={llmPromptCopyState === "copied"}
@@ -3024,6 +3297,22 @@
                     <Sparkles size={17} />
                 {/if}
                 <span>{llmPromptCopyLabel}</span>
+            </button>
+            <button
+                class:active={isLlmPanelOpen || llmGenerationState === "loading"}
+                type="button"
+                title="AI 작성"
+                aria-label="AI 작성"
+                aria-expanded={isLlmPanelOpen}
+                aria-controls="llm-panel"
+                onclick={toggleLlmPanel}
+            >
+                {#if llmGenerationState === "loading"}
+                    <span class="spin-icon"><Loader2 size={17} /></span>
+                {:else}
+                    <Sparkles size={17} />
+                {/if}
+                <span>AI</span>
             </button>
             <button
                 class:active={isStoragePanelOpen}
@@ -3785,7 +4074,193 @@
             </section>
         </div>
     {/if}
-    </div>
+
+    {#if isLlmPanelOpen}
+        <section id="llm-panel" class="llm-panel" aria-label="AI 글 작성">
+            <div class="llm-grid">
+                <label class="llm-field">
+                    <span>제공자</span>
+                    <select
+                        value={llmProvider}
+                        onchange={(event) =>
+                            selectLlmProvider(event.currentTarget.value)}
+                    >
+                        {#each llmProviders as provider}
+                            <option value={provider.id}>{provider.label}</option>
+                        {/each}
+                    </select>
+                </label>
+                <div class="llm-field">
+                    <label for="llm-model-input">모델</label>
+                    <div class="llm-model-row">
+                        <div class="llm-model-combobox">
+                            <input
+                                id="llm-model-input"
+                                type="text"
+                                name="dc-code-paste-model-query"
+                                bind:value={llmModel}
+                                autocomplete="off"
+                                autocapitalize="off"
+                                spellcheck="false"
+                                data-form-type="other"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-haspopup="listbox"
+                                aria-expanded={shouldShowLlmModelAutocomplete}
+                                aria-controls="llm-model-suggestions"
+                                placeholder="모델 ID 직접 입력"
+                                onfocus={() => (isLlmModelAutocompleteOpen = true)}
+                                onblur={closeLlmModelAutocompleteSoon}
+                                oninput={(event) =>
+                                    updateLlmModel(event.currentTarget.value)}
+                            />
+                            {#if shouldShowLlmModelAutocomplete}
+                                <div
+                                    id="llm-model-suggestions"
+                                    class="llm-model-suggestions"
+                                    role="listbox"
+                                    aria-label="모델 추천"
+                                >
+                                    {#each activeLlmModelAutocompleteOptions as model}
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            aria-selected={model.id === llmModel}
+                                            onmousedown={(event) =>
+                                                event.preventDefault()}
+                                            onclick={() => selectLlmModel(model.id)}
+                                        >
+                                            <span>{model.id}</span>
+                                            {#if model.name !== model.id}
+                                                <small>{model.name}</small>
+                                            {/if}
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </div>
+                        {#if llmProvider === "openrouter"}
+                            <label
+                                class="llm-model-filter"
+                                title="지난주 사용량 기준 상위 80개만 표시"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={isOpenRouterTopWeeklyOnly}
+                                    onchange={(event) =>
+                                        setOpenRouterTopWeeklyOnly(
+                                            event.currentTarget.checked,
+                                        )}
+                                />
+                                <span>주간 인기 80</span>
+                            </label>
+                            <button
+                                class="llm-model-refresh"
+                                type="button"
+                                title="모델 목록 새로고침"
+                                aria-label="모델 목록 새로고침"
+                                disabled={openRouterModelState === "loading"}
+                                onclick={refreshOpenRouterModels}
+                            >
+                                {#if openRouterModelState === "loading"}
+                                    <span class="spin-icon"
+                                        ><Loader2 size={14} /></span
+                                    >
+                                {:else}
+                                    <RotateCcw size={14} />
+                                {/if}
+                            </button>
+                        {/if}
+                    </div>
+                </div>
+                <label class="llm-field">
+                    <span>API 키</span>
+                    <input
+                        class="llm-secret-input"
+                        type="text"
+                        name="dc-code-paste-api-token"
+                        bind:value={llmApiKey}
+                        autocomplete="off"
+                        autocapitalize="off"
+                        inputmode="text"
+                        spellcheck="false"
+                        data-form-type="other"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        placeholder={activeLlmProvider.apiKeyPlaceholder}
+                        oninput={() => (llmGenerationState = "idle")}
+                        onchange={() => {
+                            llmGenerationState = "idle";
+                            if (llmProvider === "openrouter") {
+                                void refreshOpenRouterModels();
+                            }
+                        }}
+                    />
+                </label>
+            </div>
+            <label class="llm-field llm-prompt-field">
+                <span>요청</span>
+                <textarea
+                    class="llm-prompt-input"
+                    bind:value={llmUserPrompt}
+                    placeholder="예: 스마트폰 배터리를 오래 쓰는 현실적인 방법을 정리해줘"
+                    oninput={() => (llmGenerationState = "idle")}
+                ></textarea>
+            </label>
+            <div class="llm-actions">
+                <button
+                    class="markdown-import-button"
+                    type="button"
+                    aria-label="AI 글 생성하기"
+                    aria-busy={llmGenerationState === "loading"}
+                    disabled={isLlmGenerateDisabled}
+                    onclick={generateMarkdownWithLlm}
+                >
+                    {#if llmGenerationState === "loading"}
+                        <span class="spin-icon"><Loader2 size={16} /></span>
+                        <span>생성 중</span>
+                    {:else}
+                        <Sparkles size={16} />
+                        <span>생성하기</span>
+                    {/if}
+                </button>
+                <button
+                    class="markdown-clear-button"
+                    type="button"
+                    aria-label="AI 작성 닫기"
+                    onclick={() => (isLlmPanelOpen = false)}
+                >
+                    <X size={15} />
+                    <span>닫기</span>
+                </button>
+                <span
+                    class:error={llmGenerationState === "error"}
+                    class="markdown-status llm-status"
+                    title={llmGenerationState === "error"
+                        ? llmGenerationError
+                        : ""}>{llmGenerationStateLabel}</span
+                >
+                {#if llmProvider === "openrouter"}
+                    <span
+                        class:error={openRouterModelState === "error"}
+                        class="markdown-status llm-status"
+                        title={openRouterModelState === "error"
+                            ? openRouterModelError
+                            : ""}>{openRouterModelStateLabel}</span
+                    >
+                {/if}
+                {#if llmProvider === "opencode-go"}
+                    <span
+                        class="markdown-status llm-status"
+                        title="">{openCodeGoModelStateLabel}</span
+                    >
+                {/if}
+                <span class="llm-note">키는 저장하지 않음</span>
+            </div>
+        </section>
+    {/if}
 
     {#if isMarkdownPanelOpen}
         <section class="markdown-panel" aria-label="Markdown import">
@@ -3832,6 +4307,7 @@
             </div>
         </section>
     {/if}
+    </div>
 
     <section class="workbench">
         <div class="editor-panel">
@@ -4311,7 +4787,8 @@
         background: var(--swatch);
     }
 
-    .markdown-panel {
+    .markdown-panel,
+    .llm-panel {
         display: grid;
         gap: 10px;
         margin-bottom: 12px;
@@ -4319,6 +4796,11 @@
         border: 1px solid var(--line);
         border-radius: 8px;
         background: color-mix(in oklch, var(--panel) 88%, transparent);
+    }
+
+    .toolbar-shell .markdown-panel,
+    .toolbar-shell .llm-panel {
+        margin-bottom: 0;
     }
 
     .markdown-input {
@@ -4354,7 +4836,182 @@
         border-color: var(--accent);
     }
 
-    .markdown-actions {
+    .llm-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .llm-field {
+        display: grid;
+        align-items: stretch;
+        gap: 5px;
+        min-width: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .llm-field > label,
+    .llm-field > span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .llm-field input,
+    .llm-field select,
+    .llm-prompt-input {
+        width: 100%;
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        font: inherit;
+        outline: none;
+    }
+
+    .llm-field input,
+    .llm-field select {
+        height: 36px;
+        padding: 0 11px;
+    }
+
+    .llm-secret-input {
+        -webkit-text-security: disc;
+    }
+
+    .llm-model-row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        min-width: 0;
+    }
+
+    .llm-model-combobox {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .llm-model-suggestions {
+        position: absolute;
+        z-index: 30;
+        top: calc(100% + 5px);
+        right: 0;
+        left: 0;
+        display: grid;
+        max-height: 250px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        background: var(--panel);
+        box-shadow: 0 16px 34px color-mix(in oklch, black 36%, transparent);
+        padding: 4px;
+    }
+
+    .llm-model-suggestions button {
+        display: grid;
+        gap: 2px;
+        width: 100%;
+        min-height: 36px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--text);
+        padding: 6px 8px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .llm-model-suggestions button:hover,
+    .llm-model-suggestions button:focus-visible,
+    .llm-model-suggestions button[aria-selected="true"] {
+        background: color-mix(in oklch, var(--accent) 14%, transparent);
+        outline: none;
+    }
+
+    .llm-model-suggestions span,
+    .llm-model-suggestions small {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .llm-model-suggestions small {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .llm-model-filter {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        gap: 6px;
+        min-height: 36px;
+        padding: 0 9px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        color: var(--muted);
+        font-size: 13px;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .llm-model-filter input {
+        width: 14px;
+        min-width: 14px;
+        height: 14px;
+        padding: 0;
+        margin: 0;
+        accent-color: var(--accent);
+    }
+
+    .llm-model-refresh {
+        display: inline-flex;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel-2);
+        color: var(--text);
+        cursor: pointer;
+    }
+
+    .llm-model-refresh:disabled {
+        cursor: wait;
+        opacity: 0.62;
+    }
+
+    .llm-prompt-field {
+        display: grid;
+    }
+
+    .llm-prompt-input {
+        min-height: 112px;
+        resize: vertical;
+        padding: 10px 11px;
+        line-height: 1.55;
+    }
+
+    .llm-field input:focus,
+    .llm-field select:focus,
+    .llm-prompt-input:focus {
+        border-color: var(--accent);
+    }
+
+    .markdown-actions,
+    .llm-actions {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -4388,10 +5045,29 @@
         color: var(--danger);
     }
 
+    .markdown-import-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+    }
+
     .markdown-status {
         color: var(--muted);
         font-size: 12px;
         font-weight: 850;
+        white-space: nowrap;
+    }
+
+    .llm-status {
+        min-width: 0;
+        max-width: min(520px, 100%);
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .llm-note {
+        color: color-mix(in oklch, var(--muted) 76%, transparent);
+        font-size: 12px;
+        font-weight: 500;
         white-space: nowrap;
     }
 
@@ -4870,7 +5546,7 @@
     }
 
     .editor-surface :global(.article-editor .dc-code-line-highlight) {
-        background: oklch(34.5% 0.105 83.12 / 0.96);
+        background: oklch(38.8% 0.126 91.8 / 0.9);
     }
 
     .editor-surface :global(.article-editor .dc-code-line-addition) {
@@ -5432,6 +6108,46 @@
         color: oklch(92.34% 0.029 154.17);
     }
 
+    .editor-surface :global(.dc-data-table) {
+        width: 100%;
+        margin: 0 0 16px;
+        border-collapse: collapse;
+        table-layout: fixed;
+        color: oklch(23.39% 0.012 255.51);
+        font-size: var(--editor-body-font-size, 17px);
+        line-height: 1.62;
+    }
+
+    .editor-surface :global(.dc-data-table-cell) {
+        border: 1px solid oklch(84.71% 0.018 83.76);
+        padding: 8px 10px;
+        background: oklch(99.2% 0.006 91.5);
+        text-align: left;
+        vertical-align: top;
+        overflow-wrap: break-word;
+    }
+
+    .editor-surface :global(th.dc-data-table-cell) {
+        background: oklch(95.64% 0.026 83.11);
+        color: oklch(24.19% 0.019 255.77);
+        font-weight: 700;
+    }
+
+    .editor-surface-dark :global(.dc-data-table) {
+        color: #e8e8e8;
+    }
+
+    .editor-surface-dark :global(.dc-data-table-cell) {
+        border-color: #3a3a3a;
+        background: #151515;
+        color: #e8e8e8;
+    }
+
+    .editor-surface-dark :global(th.dc-data-table-cell) {
+        background: #242424;
+        color: #f4f4f4;
+    }
+
     .editor-surface :global(.dc-callout) {
         margin: 0 0 16px;
         padding: 12px 14px;
@@ -5694,6 +6410,18 @@
 
         .preset-list,
         .draft-history-list {
+            flex-basis: 100%;
+        }
+
+        .llm-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .llm-model-row {
+            flex-wrap: wrap;
+        }
+
+        .llm-model-combobox {
             flex-basis: 100%;
         }
 

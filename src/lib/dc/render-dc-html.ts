@@ -118,8 +118,6 @@ export function renderDcHtml(input: DcRenderInput): string {
       const neutralLineStyle = joinStyle({
         margin: input.showBackground ? "0 -16px" : undefined,
         padding: input.showBackground ? "0 16px" : undefined,
-        "min-height": "1.4em",
-        "box-sizing": "border-box",
       });
 
       return `<div style="${neutralLineStyle}">${content}</div>`;

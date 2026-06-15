@@ -148,6 +148,77 @@ describe("markdown import", () => {
     });
   });
 
+  it("turns GitHub-flavored markdown tables into data table nodes", () => {
+    expect(
+      parseMarkdownToDocument(
+        [
+          "| 설정 항목 | 추천값 | 효과 |",
+          "| --- | --- | --- |",
+          "| 화면 밝기 | 자동 밝기 또는 40% 이하 | 최대 20% 절약 |",
+          "| 배터리 절약 모드 | **항상 켜기** | 백그라운드 소모 감소 |",
+        ].join("\n"),
+      ).content?.[0],
+    ).toEqual({
+      type: "dcDataTable",
+      content: [
+        {
+          type: "dcDataTableRow",
+          content: [
+            {
+              type: "dcDataTableCell",
+              attrs: { header: true },
+              content: [{ type: "text", text: "설정 항목" }],
+            },
+            {
+              type: "dcDataTableCell",
+              attrs: { header: true },
+              content: [{ type: "text", text: "추천값" }],
+            },
+            {
+              type: "dcDataTableCell",
+              attrs: { header: true },
+              content: [{ type: "text", text: "효과" }],
+            },
+          ],
+        },
+        {
+          type: "dcDataTableRow",
+          content: [
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "화면 밝기" }],
+            },
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "자동 밝기 또는 40% 이하" }],
+            },
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "최대 20% 절약" }],
+            },
+          ],
+        },
+        {
+          type: "dcDataTableRow",
+          content: [
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "배터리 절약 모드" }],
+            },
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "항상 켜기", marks: [{ type: "bold" }] }],
+            },
+            {
+              type: "dcDataTableCell",
+              content: [{ type: "text", text: "백그라운드 소모 감소" }],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("keeps diff and patch code fences as diff-style code blocks", () => {
     expect(
       parseMarkdownToDocument(["```patch", "-old", "+new", "```"].join("\n")).content?.[0],
@@ -230,6 +301,77 @@ describe("markdown import", () => {
       type: "codeBlock",
       attrs: { language: "typescript", highlightLines: "2,4-5" },
       content: [{ type: "text", text: "const a = 1;\nconst b = 2;\nconst c = 3;" }],
+    });
+  });
+
+  it("can drop decorative blank and closing lines from fenced code highlights", () => {
+    expect(
+      parseMarkdownToDocument(
+        [
+          '```cpp {6-7,11} title="cpp_vector.cpp"',
+          "#include <vector>",
+          "#include <iostream>",
+          "",
+          "int main() {",
+          "    std::vector<int> v;",
+          "    v.push_back(10);",
+          "    v.push_back(20);",
+          "",
+          "    int* p = new int(5);",
+          "    delete p;",
+          "",
+          "    std::cout << v[0] << std::endl;",
+          "    return 0;",
+          "}",
+          "```",
+        ].join("\n"),
+        { sanitizeCodeHighlightLines: true },
+      ).content?.[0],
+    ).toEqual({
+      type: "codeBlock",
+      attrs: { language: "cpp", highlightLines: "6-7", filename: "cpp_vector.cpp" },
+      content: [
+        {
+          type: "text",
+          text: [
+            "#include <vector>",
+            "#include <iostream>",
+            "",
+            "int main() {",
+            "    std::vector<int> v;",
+            "    v.push_back(10);",
+            "    v.push_back(20);",
+            "",
+            "    int* p = new int(5);",
+            "    delete p;",
+            "",
+            "    std::cout << v[0] << std::endl;",
+            "    return 0;",
+            "}",
+          ].join("\n"),
+        },
+      ],
+    });
+
+    expect(
+      parseMarkdownToDocument(
+        [
+          '```rust {4-5,9} title="rust_vec.rs"',
+          "fn main() {",
+          "    let mut v = Vec::new();",
+          "    v.push(10);",
+          "    v.push(20);",
+          "    // Box는 scope를 벗어나면 자동 해제",
+          "    let p = Box::new(5);",
+          "",
+          '    println!("{}", v[0]);',
+          "}",
+          "```",
+        ].join("\n"),
+        { sanitizeCodeHighlightLines: true },
+      ).content?.[0],
+    ).toMatchObject({
+      attrs: { language: "rust", highlightLines: "4-5", filename: "rust_vec.rs" },
     });
   });
 

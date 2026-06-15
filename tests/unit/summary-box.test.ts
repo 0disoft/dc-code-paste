@@ -4,7 +4,7 @@ import { createSummaryBoxFromText } from "../../src/lib/editor/summary-box";
 describe("createSummaryBoxFromText", () => {
   it("turns selected bullet-like lines into summary items", () => {
     const document = createSummaryBoxFromText(
-      ["- 입력 크기를 먼저 본다.", "2. flush가 반복되는지 확인한다.", "자료 흐름을 줄인다."].join(
+      ["- 입력 크기를 먼저 본다.", "2. `flush`가 반복되는지 확인한다.", "자료 흐름을 줄인다."].join(
         "\n",
       ),
     );
@@ -19,7 +19,10 @@ describe("createSummaryBoxFromText", () => {
         },
         {
           type: "summaryItem",
-          content: [{ type: "text", text: "flush가 반복되는지 확인한다." }],
+          content: [
+            { type: "text", text: "flush", marks: [{ type: "code" }] },
+            { type: "text", text: "가 반복되는지 확인한다." },
+          ],
         },
         {
           type: "summaryItem",

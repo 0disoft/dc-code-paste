@@ -291,12 +291,12 @@ function highlightedLineDecorations(
   const light = isLightTheme(theme);
   const palette = light
     ? {
-        background: "oklch(95.4% 0.072 84.61 / 0.82)",
-        border: "oklch(73.05% 0.141 83.41)",
+        background: "oklch(96.4% 0.092 91.8 / 0.86)",
+        border: "oklch(75.6% 0.162 91.4)",
       }
     : {
-        background: "oklch(25.8% 0.042 83.12 / 0.72)",
-        border: "oklch(66.8% 0.082 84.28)",
+        background: "oklch(30.8% 0.076 91.8 / 0.82)",
+        border: "oklch(78.2% 0.142 91.2)",
       };
 
   return lines.map((_, index) =>

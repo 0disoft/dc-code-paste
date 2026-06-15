@@ -52,6 +52,14 @@ describe("llmAuthoringPrompt", () => {
     expect(llmAuthoringPrompt).toContain("CTA는 사용자가 실제로 누를 행동 버튼");
     expect(llmAuthoringPrompt).toContain("CTA와 같은 URL을 중복해서 넣지 마라");
     expect(llmAuthoringPrompt).toContain("없는 줄 번호를 {강조줄}, add=, delete=에 쓰지 마라");
+    expect(llmAuthoringPrompt).toContain("코드블록 시작 줄 바로 다음 줄을 1번으로 세어라");
+    expect(llmAuthoringPrompt).toContain("빈 줄도 실제 줄 번호에 포함된다");
+    expect(llmAuthoringPrompt).toContain("줄을 추가하거나 제거하면 강조 범위를 다시 계산해라");
+    expect(llmAuthoringPrompt).toContain("빈 줄, 맨 끝의 닫는 괄호만 있는 줄");
+    expect(llmAuthoringPrompt).toContain("{6-7,9-10}처럼 필요한 줄만 콤마로 나눠라");
+    expect(llmAuthoringPrompt).toContain("확신이 없으면 {}, add=, delete=를 쓰지 마라");
+    expect(llmAuthoringPrompt).toContain('```julia {7-9} title="parametric_dispatch.jl"');
+    expect(llmAuthoringPrompt).toContain('speak(::Animal) = "Unknown sound"');
     expect(llmAuthoringPrompt).toContain("Markdown 창에 그대로 붙여넣을 수 있어야 한다");
   });
 });

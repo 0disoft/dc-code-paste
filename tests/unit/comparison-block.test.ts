@@ -4,7 +4,7 @@ import { createComparisonBlockFromText } from "../../src/lib/editor/comparison-b
 describe("createComparisonBlockFromText", () => {
   it("turns labelled selected lines into a two-column comparison block", () => {
     const document = createComparisonBlockFromText(
-      ["장점: 빠른 입력은 코드가 단순하다.", "단점: 섞어 쓰면 출력 순서가 꼬일 수 있다."].join(
+      ["장점: 빠른 입력은 `코드`가 단순하다.", "단점: 섞어 쓰면 출력 순서가 꼬일 수 있다."].join(
         "\n",
       ),
     );
@@ -18,7 +18,11 @@ describe("createComparisonBlockFromText", () => {
           content: [
             {
               type: "paragraph",
-              content: [{ type: "text", text: "빠른 입력은 코드가 단순하다." }],
+              content: [
+                { type: "text", text: "빠른 입력은 " },
+                { type: "text", text: "코드", marks: [{ type: "code" }] },
+                { type: "text", text: "가 단순하다." },
+              ],
             },
           ],
         },

@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import { parseMarkdownInline } from "$lib/editor/markdown-inline";
 
 export const defaultSummaryBoxLabel = "동시성 핵심";
 
@@ -34,7 +35,7 @@ export function createSummaryBoxFromText(text: string): JSONContent | undefined 
     .filter((line) => line.length > 0)
     .map((line) => ({
       type: "summaryItem",
-      content: [{ type: "text", text: line }],
+      content: parseMarkdownInline(line),
     }));
 
   return items.length > 0

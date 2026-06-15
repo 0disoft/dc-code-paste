@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import { parseMarkdownInline } from "$lib/editor/markdown-inline";
 
 type ComparisonSide = "left" | "right";
 
@@ -46,7 +47,7 @@ function createComparisonColumn(side: ComparisonSide, input: ComparisonColumnInp
     attrs: { side, title: input.title },
     content: input.lines.map((line) => ({
       type: "paragraph",
-      content: [{ type: "text", text: line }],
+      content: parseMarkdownInline(line),
     })),
   };
 }

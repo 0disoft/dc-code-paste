@@ -13,21 +13,23 @@ import { normalizeEditableLinkHref } from "$lib/editor/link";
 import { createReferenceListFromText } from "$lib/editor/reference-list";
 import { createSummaryBoxFromText } from "$lib/editor/summary-box";
 import { createTutorialBlockFromText } from "$lib/editor/tutorial-block";
+import { compactContent, parseMarkdownInline, textNode } from "$lib/editor/markdown-inline";
 import { defaultLanguage, isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
-import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
-
-type InlineMark = {
-  type: string;
-  attrs?: Record<string, unknown>;
-};
+import { highlightedLineIndexes, normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 
 type ParsedListItem = {
   text: string;
 };
 
+type ParsedMarkdownTable = {
+  node: JSONContent;
+  nextIndex: number;
+};
+
 type MarkdownImportOptions = {
   defaultLanguage?: DcLanguageId;
+  sanitizeCodeHighlightLines?: boolean;
 };
 
 type CustomBlockMetadata = {
@@ -50,18 +52,7 @@ const linkBoxLabelPattern = /^(?:linkbox|link box|링크박스|link|링크)$/i;
 const customBlockStartPattern = /^:::\s*([a-zA-Z가-힣_-]+)(?:\s+(.+))?\s*$/;
 const customBlockEndPattern = /^:::\s*$/;
 
-function textNode(text: string, marks?: InlineMark[]): JSONContent | undefined {
-  if (!text) {
-    return undefined;
-  }
-
-  return marks && marks.length > 0 ? { type: "text", text, marks } : { type: "text", text };
-}
-
-function compactContent(content: Array<JSONContent | undefined>): JSONContent[] | undefined {
-  const nextContent = content.filter((item): item is JSONContent => Boolean(item));
-  return nextContent.length > 0 ? nextContent : undefined;
-}
+export { parseMarkdownInline } from "$lib/editor/markdown-inline";
 
 function normalizeLanguage(value: string | undefined, fallback: DcLanguageId): DcLanguageId {
   const normalized = value?.trim().toLowerCase();
@@ -134,6 +125,45 @@ function parseFenceLineRange(value: string | undefined, names: string[]): string
   return assigned ? normalizeHighlightLines(assigned[1]) : "";
 }
 
+function isDecorativeCodeHighlightLine(line: string): boolean {
+  const trimmed = line.trim();
+
+  return !trimmed || /^(?:[})\];,]+|end)$/i.test(trimmed);
+}
+
+function compactCodeLineNumbers(lineNumbers: readonly number[]): string {
+  if (lineNumbers.length === 0) {
+    return "";
+  }
+
+  const ranges: string[] = [];
+  let start = lineNumbers[0] ?? 0;
+  let previous = start;
+
+  for (const line of lineNumbers.slice(1)) {
+    if (line === previous + 1) {
+      previous = line;
+      continue;
+    }
+
+    ranges.push(start === previous ? String(start) : `${start}-${previous}`);
+    start = line;
+    previous = line;
+  }
+
+  ranges.push(start === previous ? String(start) : `${start}-${previous}`);
+  return ranges.join(",");
+}
+
+export function sanitizeCodeHighlightLines(value: string, codeLines: readonly string[]): string {
+  const lineNumbers = [...highlightedLineIndexes(value, codeLines.length)]
+    .map((index) => index + 1)
+    .filter((lineNumber) => !isDecorativeCodeHighlightLine(codeLines[lineNumber - 1] ?? ""))
+    .sort((left, right) => left - right);
+
+  return compactCodeLineNumbers(lineNumbers);
+}
+
 function parseFenceFilename(value: string | undefined): string {
   if (!value) {
     return "";
@@ -162,74 +192,90 @@ function parseFenceFilename(value: string | undefined): string {
   return /^[\w@./\\ -]+\.[\w-]+$/.test(bare) ? normalizeCodeFilename(bare) : "";
 }
 
-function splitInlineToken(value: string) {
-  const codeMatch = /^`([^`]+)`$/.exec(value);
-  if (codeMatch) {
-    return { kind: "code" as const, text: codeMatch[1] ?? "" };
-  }
-
-  const linkMatch = /^\[([^\]]+)]\(([^)]+)\)$/.exec(value);
-  if (linkMatch) {
-    return { kind: "link" as const, text: linkMatch[1] ?? "", href: linkMatch[2] ?? "" };
-  }
-
-  const boldMatch = /^(?:\*\*|__)(.+)(?:\*\*|__)$/.exec(value);
-  if (boldMatch) {
-    return { kind: "bold" as const, text: boldMatch[1] ?? "" };
-  }
-
-  const italicMatch = /^(?:\*|_)(.+)(?:\*|_)$/.exec(value);
-  if (italicMatch) {
-    return { kind: "italic" as const, text: italicMatch[1] ?? "" };
-  }
-
-  return { kind: "text" as const, text: value };
-}
-
-export function parseMarkdownInline(value: string): JSONContent[] | undefined {
-  const tokenPattern = /`[^`]+`|\[[^\]]+]\([^)]+\)|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_/g;
-  const content: Array<JSONContent | undefined> = [];
-  let cursor = 0;
-
-  for (const match of value.matchAll(tokenPattern)) {
-    const matchText = match[0];
-    const index = match.index ?? 0;
-
-    content.push(textNode(value.slice(cursor, index)));
-
-    const token = splitInlineToken(matchText);
-    if (token.kind === "code") {
-      content.push(textNode(token.text, [{ type: "code" }]));
-    } else if (token.kind === "link") {
-      const href = normalizeEditableLinkHref(token.href);
-      content.push(
-        href
-          ? textNode(token.text || href, [
-              {
-                type: "link",
-                attrs: { href, target: "_blank", rel: "noopener noreferrer" },
-              },
-            ])
-          : textNode(matchText),
-      );
-    } else if (token.kind === "bold") {
-      content.push(textNode(token.text, [{ type: "bold" }]));
-    } else if (token.kind === "italic") {
-      content.push(textNode(token.text, [{ type: "italic" }]));
-    } else {
-      content.push(textNode(token.text));
-    }
-
-    cursor = index + matchText.length;
-  }
-
-  content.push(textNode(value.slice(cursor)));
-
-  return compactContent(content);
-}
-
 function paragraphNode(text: string): JSONContent {
   return { type: "paragraph", content: parseMarkdownInline(text.trim()) };
+}
+
+function splitMarkdownTableCells(line: string): string[] {
+  const trimmed = line.trim();
+  const withoutOuterPipes = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+
+  return withoutOuterPipes.split("|").map((cell) => cell.trim());
+}
+
+function isMarkdownTableLine(line: string): boolean {
+  const trimmed = line.trim();
+
+  return trimmed.includes("|") && splitMarkdownTableCells(trimmed).length >= 2;
+}
+
+function isMarkdownTableSeparatorLine(line: string): boolean {
+  if (!isMarkdownTableLine(line)) {
+    return false;
+  }
+
+  return splitMarkdownTableCells(line).every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function normalizeMarkdownTableRowCells(cells: string[], width: number): string[] {
+  return Array.from({ length: width }, (_, index) => cells[index]?.trim() ?? "");
+}
+
+function dataTableCellNode(text: string, header: boolean): JSONContent {
+  return {
+    type: "dcDataTableCell",
+    ...(header ? { attrs: { header: true } } : {}),
+    content: parseMarkdownInline(text),
+  };
+}
+
+function dataTableRowNode(cells: string[], header: boolean): JSONContent {
+  return {
+    type: "dcDataTableRow",
+    content: cells.map((cell) => dataTableCellNode(cell, header)),
+  };
+}
+
+function parseMarkdownTable(lines: string[], start: number): ParsedMarkdownTable | undefined {
+  const headerLine = lines[start] ?? "";
+  const separatorLine = lines[start + 1] ?? "";
+
+  if (!isMarkdownTableLine(headerLine) || !isMarkdownTableSeparatorLine(separatorLine)) {
+    return undefined;
+  }
+
+  const headerCells = splitMarkdownTableCells(headerLine);
+  const columnCount = headerCells.length;
+  const rows: JSONContent[] = [
+    dataTableRowNode(normalizeMarkdownTableRowCells(headerCells, columnCount), true),
+  ];
+  let index = start + 2;
+
+  while (index < lines.length && isMarkdownTableLine(lines[index] ?? "")) {
+    const rowLine = lines[index] ?? "";
+
+    if (isMarkdownTableSeparatorLine(rowLine)) {
+      break;
+    }
+
+    rows.push(
+      dataTableRowNode(
+        normalizeMarkdownTableRowCells(splitMarkdownTableCells(rowLine), columnCount),
+        false,
+      ),
+    );
+    index += 1;
+  }
+
+  return rows.length > 1
+    ? {
+        node: {
+          type: "dcDataTable",
+          content: rows,
+        },
+        nextIndex: index,
+      }
+    : undefined;
 }
 
 function linkBoxNode(label: string, href: string): JSONContent | undefined {
@@ -521,6 +567,7 @@ function isBlockStarter(line: string): boolean {
     headingPattern.test(trimmed) ||
     horizontalRulePattern.test(trimmed) ||
     Boolean(customBlockStart(trimmed)) ||
+    isMarkdownTableLine(trimmed) ||
     unorderedListPattern.test(trimmed) ||
     orderedListPattern.test(trimmed) ||
     Boolean(standaloneLinkBoxNode(trimmed)) ||
@@ -572,7 +619,7 @@ export function parseMarkdownToDocument(
     if (fence) {
       const codeLines: string[] = [];
       const language = normalizeLanguage(fence[1], fallbackLanguage);
-      const highlightLines = parseFenceHighlightLines(fence[2]);
+      const parsedHighlightLines = parseFenceHighlightLines(fence[2]);
       const additionLines = parseFenceLineRange(fence[2], [
         "add",
         "adds",
@@ -603,6 +650,9 @@ export function parseMarkdownToDocument(
         index += 1;
       }
 
+      const highlightLines = options.sanitizeCodeHighlightLines
+        ? sanitizeCodeHighlightLines(parsedHighlightLines, codeLines)
+        : parsedHighlightLines;
       const attrs: Record<string, string> = { language };
       if (highlightLines) {
         attrs.highlightLines = highlightLines;
@@ -648,6 +698,13 @@ export function parseMarkdownToDocument(
     if (horizontalRulePattern.test(trimmed)) {
       content.push({ type: "horizontalRule" });
       index += 1;
+      continue;
+    }
+
+    const table = parseMarkdownTable(lines, index);
+    if (table) {
+      content.push(table.node);
+      index = table.nextIndex;
       continue;
     }
 

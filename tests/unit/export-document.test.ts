@@ -61,6 +61,26 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toContain('href="https://0disoft.github.io/dc-code-paste/"');
   });
 
+  it("exports markdown-authored data tables as paste-safe tables", async () => {
+    const document = parseMarkdownToDocument(
+      [
+        "| 설정 항목 | 추천값 | 효과 |",
+        "| --- | --- | --- |",
+        "| 화면 밝기 | 자동 밝기 또는 40% 이하 | 최대 20% 절약 |",
+        "| 배터리 절약 모드 | 항상 켜기 | 백그라운드 소모 감소 |",
+      ].join("\n"),
+    );
+
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain('<table width="100%"');
+    expect(html).toContain("<th ");
+    expect(html).toContain("<td ");
+    expect(html).toContain("설정 항목");
+    expect(html).toContain("자동 밝기 또는 40% 이하");
+    expect(html).toContain("백그라운드 소모 감소");
+  });
+
   it("appends a subtle linked attribution footer to copied DC HTML", async () => {
     const document: JSONContent = {
       type: "doc",

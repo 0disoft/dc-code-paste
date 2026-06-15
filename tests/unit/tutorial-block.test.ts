@@ -16,8 +16,13 @@ describe("createTutorialBlockFromText", () => {
       content: [
         {
           type: "tutorialStep",
-          attrs: { title: "문제 파악", number: "01" },
-          content: [],
+          attrs: { number: "01" },
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "문제 파악" }],
+            },
+          ],
         },
         {
           type: "tutorialStep",
@@ -55,7 +60,31 @@ describe("createTutorialBlockFromText", () => {
     expect(document?.content?.map((step) => step.attrs)).toEqual([
       { title: "추가 검증", number: "04" },
       { title: "병목 재측정", number: "05" },
-      { title: "제출 전 확인", number: "006" },
+      { number: "006" },
     ]);
+  });
+
+  it("keeps title-only tutorial lines editable and parses inline code", () => {
+    const document = createTutorialBlockFromText(
+      "02 `fcstValue`를 `string`으로 보존하는 `RawItem` 슬라이스로 언마샬한다.",
+    );
+
+    expect(document?.content?.[0]).toEqual({
+      type: "tutorialStep",
+      attrs: { number: "02" },
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "fcstValue", marks: [{ type: "code" }] },
+            { type: "text", text: "를 " },
+            { type: "text", text: "string", marks: [{ type: "code" }] },
+            { type: "text", text: "으로 보존하는 " },
+            { type: "text", text: "RawItem", marks: [{ type: "code" }] },
+            { type: "text", text: " 슬라이스로 언마샬한다." },
+          ],
+        },
+      ],
+    });
   });
 });

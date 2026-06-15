@@ -270,8 +270,8 @@ export const TutorialStep = Node.create({
   addAttributes() {
     return {
       title: {
-        default: "단계",
-        parseHTML: (element) => element.getAttribute("data-title") ?? "단계",
+        default: "",
+        parseHTML: (element) => element.getAttribute("data-title") ?? "",
         renderHTML: (attributes) => {
           const title = typeof attributes.title === "string" ? attributes.title.trim() : "";
           return title ? { "data-title": title } : {};
@@ -301,7 +301,7 @@ export const TutorialStep = Node.create({
 
   renderHTML({ HTMLAttributes }) {
     const title =
-      typeof HTMLAttributes["data-title"] === "string" ? HTMLAttributes["data-title"] : "단계";
+      typeof HTMLAttributes["data-title"] === "string" ? HTMLAttributes["data-title"].trim() : "";
     const number = normalizeTutorialStepNumber(HTMLAttributes["data-number"]);
     const numberAttributes = number
       ? { class: "dc-tutorial-number", "data-number": number }
@@ -317,7 +317,7 @@ export const TutorialStep = Node.create({
         "div",
         { class: "dc-tutorial-head" },
         ["span", numberAttributes],
-        ["strong", { class: "dc-tutorial-title" }, title],
+        ...(title ? [["strong", { class: "dc-tutorial-title" }, title]] : []),
       ],
       ["div", { class: "dc-tutorial-body" }, 0],
     ];
@@ -416,6 +416,83 @@ export const ComparisonBlock = Node.create({
   },
 });
 
+export const DcDataTableCell = Node.create({
+  name: "dcDataTableCell",
+  content: "inline*",
+  defining: true,
+
+  addAttributes() {
+    return {
+      header: {
+        default: false,
+        parseHTML: (element) =>
+          element.tagName.toLowerCase() === "th" || element.getAttribute("data-header") === "true",
+        renderHTML: (attributes) => (attributes.header ? { "data-header": "true" } : {}),
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "th[data-dc-table-cell]" }, { tag: "td[data-dc-table-cell]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    const tag = HTMLAttributes["data-header"] === "true" ? "th" : "td";
+
+    return [
+      tag,
+      mergeAttributes(HTMLAttributes, {
+        "data-dc-table-cell": "",
+        class: "dc-data-table-cell",
+      }),
+      0,
+    ];
+  },
+});
+
+export const DcDataTableRow = Node.create({
+  name: "dcDataTableRow",
+  content: "dcDataTableCell+",
+  defining: true,
+
+  parseHTML() {
+    return [{ tag: "tr[data-dc-table-row]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "tr",
+      mergeAttributes(HTMLAttributes, {
+        "data-dc-table-row": "",
+        class: "dc-data-table-row",
+      }),
+      0,
+    ];
+  },
+});
+
+export const DcDataTable = Node.create({
+  name: "dcDataTable",
+  group: "block",
+  content: "dcDataTableRow+",
+  defining: true,
+
+  parseHTML() {
+    return [{ tag: "table[data-dc-data-table]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      "table",
+      mergeAttributes(HTMLAttributes, {
+        "data-dc-data-table": "",
+        class: "dc-data-table",
+      }),
+      ["tbody", 0],
+    ];
+  },
+});
+
 export const editorialExtensions = [
   SectionHeading,
   CtaButton,
@@ -429,4 +506,7 @@ export const editorialExtensions = [
   TutorialBlock,
   ComparisonColumn,
   ComparisonBlock,
+  DcDataTableCell,
+  DcDataTableRow,
+  DcDataTable,
 ];
