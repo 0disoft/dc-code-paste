@@ -48,19 +48,19 @@ DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정
 
 ### 지원 제공자
 
-| 제공자 | 비고 |
-|--------|------|
-| OpenRouter | API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공. |
-| OpenCode Go | minimax, kimi, glm, deepseek, qwen, mimo, hy3 계열 모델 내장 |
-| OpenAI | Responses API 사용 |
-| Claude (Anthropic) | |
-| Gemini | |
-| DeepSeek | |
-| Mistral | |
-| Groq | |
-| Cerebras | |
-| xAI | |
-| Perplexity | |
+| 제공자             | 비고                                                              |
+| ------------------ | ----------------------------------------------------------------- |
+| OpenRouter         | API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공. |
+| OpenCode Go        | minimax, kimi, glm, deepseek, qwen, mimo, hy3 계열 모델 내장      |
+| OpenAI             | Responses API 사용                                                |
+| Claude (Anthropic) |                                                                   |
+| Gemini             |                                                                   |
+| DeepSeek           |                                                                   |
+| Mistral            |                                                                   |
+| Groq               |                                                                   |
+| Cerebras           |                                                                   |
+| xAI                |                                                                   |
+| Perplexity         |                                                                   |
 
 OpenRouter를 사용하면 API 키 하나로 여러 모델을 전환할 수 있어 편리하다.
 
