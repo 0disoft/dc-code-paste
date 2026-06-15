@@ -10,6 +10,8 @@ import {
 import { parseMarkdownToDocument } from "../../src/lib/editor/markdown-import";
 
 const expectedDefaultDcProseFontFamily = safeDcProseFontFamily(defaultProseFontFamily);
+const expectedDefaultDcProseLabelFontFamily =
+  expectedDefaultDcProseFontFamily.split(",")[0] ?? "Pretendard";
 
 const exportOptions = {
   theme: "github-dark",
@@ -976,7 +978,11 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("메모 &lt;중요&gt;");
     expect(html).toContain("cin/cout 설정을 앞에 둔다.");
     expect(html).toMatch(
-      /<span style="display:block;margin:0 0 6px;color:#[0-9a-f]{6};font-size:12px;font-weight:700;letter-spacing:0">메모 &lt;중요&gt;<\/span>/,
+      new RegExp(
+        `<span style="display:block;margin:0 0 6px;color:#[0-9a-f]{6};font:700 12px ${escapeRegExp(
+          expectedDefaultDcProseLabelFontFamily,
+        )};letter-spacing:0">메모 &lt;중요&gt;</span>`,
+      ),
     );
     expect(html).not.toContain(">TIP</span>");
     expect(html).not.toContain(">핵심 요약</td>");

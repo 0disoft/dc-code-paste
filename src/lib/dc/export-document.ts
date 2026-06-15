@@ -408,6 +408,11 @@ function safeBodyFontSize(options: DcExportOptions): string {
   return safeSize(options.bodyFontSize, defaultBodyFontSize);
 }
 
+function proseLabelFont(options: DcExportOptions, lineHeight?: number): string {
+  const family = safeProseFontFamily(options.bodyFontFamily).split(",")[0] ?? "Pretendard";
+  return lineHeight ? `700 12px/${lineHeight} ${family}` : `700 12px ${family}`;
+}
+
 function safeCodeFontSize(options: DcExportOptions): string {
   return safeSize(options.codeFontSize, defaultCodeFontSize);
 }
@@ -1002,9 +1007,7 @@ async function renderCallout(
     display: "block",
     margin: "0 0 6px",
     color: palette.text,
-    "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": "12px",
-    "font-weight": 700,
+    font: proseLabelFont(options),
     "letter-spacing": "0",
   });
   const body = await Promise.all(
