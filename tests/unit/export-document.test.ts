@@ -79,6 +79,20 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("설정 항목");
     expect(html).toContain("자동 밝기 또는 40% 이하");
     expect(html).toContain("백그라운드 소모 감소");
+    expect(html).toMatch(
+      new RegExp(
+        `<th style="padding:8px 10px;border:1px solid #[0-9a-f]{6};background-color:#[0-9a-f]{6};color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:17px;font-weight:700;line-height:1\\.62;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:break-word">설정 항목</th>`,
+      ),
+    );
+    expect(html).toMatch(
+      new RegExp(
+        `<td style="padding:9px 10px;border:1px solid #[0-9a-f]{6};background-color:#[0-9a-f]{6};font-family:${escapeRegExp(
+          expectedDefaultDcProseFontFamily,
+        )};font-size:17px;line-height:1\\.62;text-align:left;vertical-align:top;word-break:keep-all;overflow-wrap:break-word">자동 밝기 또는 40% 이하</td>`,
+      ),
+    );
   });
 
   it("keeps prose font styles after markdown-authored data tables", async () => {
@@ -94,7 +108,7 @@ describe("exportDocumentToDcHtml", () => {
     );
 
     const html = await exportDocumentToDcHtml(document, exportOptions);
-    const afterTableHtml = html.slice(Math.max(0, html.indexOf("map") - 240));
+    const afterTableHtml = html.slice(Math.max(0, html.indexOf("map") - 300));
 
     expect(afterTableHtml).toContain(
       `font-family:${expectedDefaultDcProseFontFamily};font-size:17px`,
@@ -290,7 +304,7 @@ describe("exportDocumentToDcHtml", () => {
       new RegExp(
         `<code style="background-color:#[0-9a-f]{6};color:#[0-9a-f]{6};font-family:${escapeRegExp(
           safeDcInlineCodeFontFamily(),
-        )};font-size:0\\.92em;padding:1px 4px;border-radius:4px">LLM 가이드</code>`,
+        )};font-size:\\.92em;font-weight:700;padding:1px 4px;border-radius:4px">LLM 가이드</code>`,
       ),
     );
     expect(html).toContain("TIP");

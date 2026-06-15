@@ -5600,6 +5600,7 @@
             Menlo,
             Monaco,
             monospace;
+        font-weight: 700;
         padding: 1px 4px;
     }
 
