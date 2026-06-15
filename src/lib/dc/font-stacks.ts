@@ -132,6 +132,7 @@ function hasAnySignal(fonts: readonly string[], signals: ReadonlySet<string>): b
 function appendFallbackFonts(
   primaryFonts: readonly string[],
   fallbackFonts: readonly string[],
+  separator = ", ",
 ): string {
   const seen = new Set<string>();
   const stack: string[] = [];
@@ -158,7 +159,7 @@ function appendFallbackFonts(
     stack.push(font);
   }
 
-  return stack.join(", ");
+  return stack.join(separator);
 }
 
 function fallbackFontsFor(
@@ -181,7 +182,7 @@ function compactProseFallbackFonts(primaryFonts: readonly string[]): readonly st
     return ["Batang", "serif"];
   }
 
-  return ["Malgun Gothic", "맑은 고딕", "sans-serif"];
+  return ["sans-serif"];
 }
 
 export function buildFontStack(
@@ -212,15 +213,19 @@ export function safeDcProseFontFamily(value = ""): string {
   const primaryFonts = parseFontFamily(value);
   const selectedFonts = primaryFonts.length > 0 ? primaryFonts : ["Malgun Gothic"];
 
-  return appendFallbackFonts(selectedFonts.slice(0, 1), compactProseFallbackFonts(selectedFonts));
+  return appendFallbackFonts(
+    selectedFonts.slice(0, 1),
+    compactProseFallbackFonts(selectedFonts),
+    ",",
+  );
 }
 
 export function safeDcCodeFontFamily(): string {
-  return appendFallbackFonts([], ["Cascadia Mono", "Pretendard", "D2Coding", "monospace"]);
+  return appendFallbackFonts([], ["Cascadia Mono", "D2Coding", "monospace"], ",");
 }
 
 export function safeDcInlineCodeFontFamily(): string {
-  return appendFallbackFonts([], ["Pretendard", "Cascadia Mono", "D2Coding", "monospace"]);
+  return appendFallbackFonts([], ["Pretendard", "monospace"], ",");
 }
 
 export const defaultProseFontFamily = safeProseFontFamily();

@@ -81,6 +81,29 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("백그라운드 소모 감소");
   });
 
+  it("keeps prose font styles after markdown-authored data tables", async () => {
+    const document = parseMarkdownToDocument(
+      [
+        "| 함수 | 예시 | 결과 |",
+        "| --- | --- | --- |",
+        "| gcd | `gcd(24, 60)` | 12 |",
+        "| lcm | `lcm(8, 10)` | 40 |",
+        "",
+        "`map` 노드 조작도 이제 재할당 없이 가능하다.",
+      ].join("\n"),
+    );
+
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+    const afterTableHtml = html.slice(Math.max(0, html.indexOf("map") - 240));
+
+    expect(afterTableHtml).toContain(
+      `font-family:${expectedDefaultDcProseFontFamily};font-size:17px`,
+    );
+    expect(afterTableHtml).toMatch(
+      /<td style="padding:0;color:#[0-9a-f]{6};font-family:[^"]+;font-size:17px;line-height:1\.72">/,
+    );
+  });
+
   it("appends a subtle linked attribution footer to copied DC HTML", async () => {
     const document: JSONContent = {
       type: "doc",
@@ -289,10 +312,10 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("&bull;</span></td><td");
     expect(html).toContain(">1.</span></td><td");
     expect(html).toMatch(
-      /<span style="color:#[0-9a-f]{6};font-size:17px;font-weight:400;line-height:1\.7">첫 번째 체크<\/span>/,
+      /<td style="padding:0 0 7px;color:#[0-9a-f]{6};font-family:[^"]+;font-size:17px;line-height:1\.7;vertical-align:top"><span style="color:#[0-9a-f]{6};line-height:1\.7">첫 번째 체크<\/span><\/td>/,
     );
     expect(html).toMatch(
-      /<span style="color:#[0-9a-f]{6};font-size:17px;font-weight:400;line-height:1\.7">순서 있는 체크<\/span>/,
+      /<td style="padding:0 0 7px;color:#[0-9a-f]{6};font-family:[^"]+;font-size:17px;line-height:1\.7;vertical-align:top"><span style="color:#[0-9a-f]{6};line-height:1\.7">순서 있는 체크<\/span><\/td>/,
     );
     expect(html).toContain("<hr");
     expect(html).toContain("const");
@@ -438,16 +461,12 @@ describe("exportDocumentToDcHtml", () => {
       `<span style="font-family:${safeDcProseFontFamily("Georgia, Times New Roman, serif")};font-size:18px">선택 스타일</span>`,
     );
     expect(html).toContain(`font-family:${expectedDefaultDcProseFontFamily}`);
-    expect(
-      html.match(new RegExp(`font-family:${escapeRegExp(expectedDefaultDcProseFontFamily)}`, "g"))
-        ?.length ?? 0,
-    ).toBeLessThanOrEqual(2);
     expect(html).toContain("font-size:17px");
     expect(html).toContain(`<td style="padding:18px;background-color:`);
     expect(html).toContain(`font-family:${expectedDefaultDcProseFontFamily};font-size:17px`);
     expect(html).toMatch(
       new RegExp(
-        `<table width="100%"[^>]*style="width:100%;margin:0 0 14px;border-collapse:collapse"><tbody><tr><td style="padding:0;color:#[0-9a-f]{6};font-size:17px;line-height:1\\.72">`,
+        `<table width="100%"[^>]*style="width:100%;margin:0 0 14px;border-collapse:collapse"><tbody><tr><td style="padding:0;color:#[0-9a-f]{6};font-family:${escapeRegExp(expectedDefaultDcProseFontFamily)};font-size:17px;line-height:1\\.72">`,
       ),
     );
   });
@@ -715,7 +734,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(
       html.match(new RegExp(`font-family:${escapeRegExp(expectedDefaultDcProseFontFamily)}`, "g"))
         ?.length ?? 0,
-    ).toBeLessThanOrEqual(2);
+    ).toBeLessThan(50);
     expect(html).toMatch(
       /<strong style="color:#[0-9a-f]{6};font-size:20px;font-weight:700;line-height:1\.35">동시성의 기본 철학<\/strong>/,
     );

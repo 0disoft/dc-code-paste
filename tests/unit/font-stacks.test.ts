@@ -113,13 +113,11 @@ describe("font stacks", () => {
   });
 
   it("keeps DC export font stacks compact enough for inline HTML", () => {
-    expect(safeDcProseFontFamily(safeProseFontFamily("Inter"))).toBe(
-      "Inter, Malgun Gothic, 맑은 고딕, sans-serif",
-    );
-    expect(safeDcProseFontFamily()).toBe("Malgun Gothic, 맑은 고딕, sans-serif");
-    expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe("Georgia, Batang, serif");
-    expect(safeDcCodeFontFamily()).toBe("Cascadia Mono, Pretendard, D2Coding, monospace");
-    expect(safeDcInlineCodeFontFamily()).toBe("Pretendard, Cascadia Mono, D2Coding, monospace");
+    expect(safeDcProseFontFamily(safeProseFontFamily("Inter"))).toBe("Inter,sans-serif");
+    expect(safeDcProseFontFamily()).toBe("Malgun Gothic,sans-serif");
+    expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe("Georgia,Batang,serif");
+    expect(safeDcCodeFontFamily()).toBe("Cascadia Mono,D2Coding,monospace");
+    expect(safeDcInlineCodeFontFamily()).toBe("Pretendard,monospace");
   });
 
   it("strips unsafe font-family punctuation before export", () => {
@@ -130,8 +128,6 @@ describe("font stacks", () => {
     expect(stack).not.toContain(";");
     expect(stack).not.toContain(":");
 
-    expect(safeDcProseFontFamily('Pretendard";color:red')).toBe(
-      "Pretendardcolorred, Malgun Gothic, 맑은 고딕, sans-serif",
-    );
+    expect(safeDcProseFontFamily('Pretendard";color:red')).toBe("Pretendardcolorred,sans-serif");
   });
 });

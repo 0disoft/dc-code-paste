@@ -458,7 +458,7 @@ function removeStyleDeclaration(style: string, property: string, value: string):
     .join(";");
 }
 
-function canCompactInheritedFontSize(tagName: string): boolean {
+function canCompactInheritedProseStyle(tagName: string): boolean {
   return tagName === "table" || tagName === "div" || tagName === "section";
 }
 
@@ -473,19 +473,24 @@ function compactInheritedProseStyles(html: string, options: DcExportOptions): st
     (_match, tagName: string, beforeStyle: string, rawStyle: string) => {
       let style = rawStyle;
       const normalizedTagName = tagName.toLowerCase();
+      const preservesCellStyle = normalizedTagName === "td" || normalizedTagName === "th";
+      const isCompactableWrapper = canCompactInheritedProseStyle(normalizedTagName);
 
       if (styleHasDeclaration(style, "font-family", inheritedFontFamily)) {
-        if (keptInheritedFontFamilyCount >= 2) {
+        if (!preservesCellStyle && keptInheritedFontFamilyCount >= 2) {
           style = removeStyleDeclaration(style, "font-family", inheritedFontFamily);
-        } else {
+        } else if (
+          keptInheritedFontFamilyCount < 2 &&
+          (preservesCellStyle || isCompactableWrapper)
+        ) {
           keptInheritedFontFamilyCount += 1;
         }
       }
 
       if (styleHasDeclaration(style, "font-size", inheritedFontSize)) {
-        if (keptInheritedFontSizeCount >= 2) {
+        if (!preservesCellStyle && keptInheritedFontSizeCount >= 2) {
           style = removeStyleDeclaration(style, "font-size", inheritedFontSize);
-        } else if (canCompactInheritedFontSize(normalizedTagName)) {
+        } else if (keptInheritedFontSizeCount < 2 && (preservesCellStyle || isCompactableWrapper)) {
           keptInheritedFontSizeCount += 1;
         }
       }
@@ -521,6 +526,7 @@ function renderAttributionFooter(options: DcExportOptions): string {
 
 function renderDcTableBlock({
   body,
+  options,
   backgroundColor,
   fallbackBackground,
   borderColor,
@@ -530,6 +536,7 @@ function renderDcTableBlock({
   padding = "12px 14px",
 }: {
   body: string;
+  options: DcExportOptions;
   backgroundColor: string;
   fallbackBackground: string;
   borderColor?: string;
@@ -551,6 +558,7 @@ function renderDcTableBlock({
   const cellStyle = joinStyle({
     padding,
     "background-color": backgroundColor,
+    "font-size": safeBodyFontSize(options),
   });
 
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
@@ -825,7 +833,6 @@ async function renderList(
       color: palette.text,
       "font-family": proseFontFamily,
       "font-size": bodyFontSize,
-      "font-weight": 400,
       "line-height": 1.7,
       "text-align": ordered ? "right" : "center",
       "vertical-align": "top",
@@ -835,7 +842,6 @@ async function renderList(
       color: palette.text,
       "font-family": proseFontFamily,
       "font-size": bodyFontSize,
-      "font-weight": 400,
       "line-height": 1.7,
       "white-space": "nowrap",
     });
@@ -844,7 +850,6 @@ async function renderList(
       color: palette.text,
       "font-family": proseFontFamily,
       "font-size": bodyFontSize,
-      "font-weight": 400,
       "line-height": 1.7,
       "vertical-align": "top",
     });
@@ -852,7 +857,6 @@ async function renderList(
       color: palette.text,
       "font-family": proseFontFamily,
       "font-size": bodyFontSize,
-      "font-weight": 400,
       "line-height": 1.7,
     });
     const rows = await Promise.all(
@@ -1007,6 +1011,7 @@ async function renderCallout(
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body: content,
+      options,
       backgroundColor: palette.background,
       fallbackBackground: calloutFallbackBackground(kind, options, node),
       borderColor: palette.border,
@@ -1094,6 +1099,7 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body: content,
+      options,
       backgroundColor: boxBackground,
       fallbackBackground: isDarkEditorial ? "#0b0b0b" : dcTableFallbackColors.referenceBackground,
       border: `1px solid ${boxBorder}`,
@@ -1159,6 +1165,7 @@ async function renderBlockquote(node: JSONContent, options: DcExportOptions): Pr
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body: content,
+      options,
       backgroundColor: quoteBackground(quoteStyle, palette),
       fallbackBackground: quoteFallbackBackground(options),
       border: quoteStyle === "pull" ? undefined : quoteTableBorder(quoteStyle, palette),
@@ -1361,6 +1368,7 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
   if (isDcTableStructure(options)) {
     return renderDcTableBlock({
       body,
+      options,
       backgroundColor: palette.articleBackground,
       fallbackBackground: palette.fallbackBackground,
       borderColor: palette.sectionAccent,
