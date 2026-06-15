@@ -12,7 +12,8 @@ DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정
 - 코드블록 (파일명, 언어, 라인 하이라이트, 추가/삭제/강조 줄 표시)
 - 콜아웃, 요약, 튜토리얼, 비교, references, CTA 블록
 - Markdown 가져오기 및 적용
-- LLM 가이드 복사 (ChatGPT, Claude, Gemini 등과 연동)
+- **AI 글 작성** — API 키와 모델을 설정하면 요청 한 번으로 Markdown 초안을 생성하고 에디터에 바로 적용
+- LLM 가이드 복사 (외부 LLM 연동용)
 - 프리셋 저장
 - 초안 히스토리
 - 라이트/다크 테마
@@ -34,18 +35,51 @@ DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정
 
 ---
 
-## LLM으로 글 작성하기
+## AI로 글 작성하기
 
-1. `LLM 가이드` 버튼을 클릭해 작성 규칙을 복사한다.
-2. ChatGPT, Claude, Gemini 등에 규칙과 작성할 주제를 함께 전달한다.
+상단 툴바의 `AI` 버튼을 클릭하면 AI 작성 패널이 열린다.
+
+1. **제공자**를 선택한다.
+2. **모델**을 입력하거나 자동완성 목록에서 선택한다.
+3. **API 키**를 입력한다. 키는 브라우저에 저장되지 않는다.
+4. **요청**에 원하는 글 주제나 지시를 입력한다.
+5. `생성하기`를 클릭하면 LLM이 Markdown을 생성하고, 완료되면 Markdown 패널에 자동으로 넣어준다.
+6. Markdown 패널에서 `적용하기`를 클릭하면 에디터에 반영된다.
+
+### 지원 제공자
+
+| 제공자 | 비고 |
+|--------|------|
+| OpenRouter | API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공. |
+| OpenCode Go | minimax, kimi, glm, deepseek, qwen, mimo, hy3 계열 모델 내장 |
+| OpenAI | Responses API 사용 |
+| Claude (Anthropic) | |
+| Gemini | |
+| DeepSeek | |
+| Mistral | |
+| Groq | |
+| Cerebras | |
+| xAI | |
+| Perplexity | |
+
+OpenRouter를 사용하면 API 키 하나로 여러 모델을 전환할 수 있어 편리하다.
+
+---
+
+## LLM 가이드 복사로 외부 LLM 연동하기
+
+앱 내 AI 기능 대신 ChatGPT, Claude, Gemini 웹 등 외부 LLM을 직접 사용하려면:
+
+1. `가이드` 버튼을 클릭해 작성 규칙을 복사한다.
+2. 원하는 LLM에 규칙과 작성할 주제를 함께 전달한다.
 3. LLM이 출력한 Markdown을 복사한다.
-4. dc-code-paste에서 `Markdown` 버튼을 클릭한다.
-5. 입력창에 Markdown을 붙여넣고 `Markdown 적용하기`를 클릭한다.
+4. dc-code-paste에서 `MD` 버튼을 클릭한다.
+5. 입력창에 Markdown을 붙여넣고 `적용하기`를 클릭한다.
 6. 편집기와 미리보기에 변환된 글이 표시된다.
 7. 내용을 확인하거나 편집한 뒤 `디씨 복사`로 DCInside에 붙여넣는다.
 
 `:::hero`, `:::summary`, `:::tip`, `:::warning` 같은 블록 태그와 코드블록은
-반드시 `Markdown` 패널을 통해 적용해야 한다.
+반드시 `MD` 패널을 통해 적용해야 한다.
 LLM 결과를 편집기에 직접 붙여넣는 방식으로는 블록 태그가 해석되지 않는다.
 
 ---
