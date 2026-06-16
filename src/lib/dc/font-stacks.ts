@@ -93,9 +93,9 @@ export const codeFallbackFonts = [
 ] as const;
 
 export const inlineCodeFallbackFonts = [
+  "D2Coding",
   "Pretendard",
   "Cascadia Mono",
-  "D2Coding",
   "나눔고딕코딩",
   "Noto Sans Mono CJK",
   "JetBrains Mono",
@@ -225,7 +225,7 @@ export function safeDcCodeFontFamily(): string {
 }
 
 export function safeDcInlineCodeFontFamily(): string {
-  return appendFallbackFonts([], ["Pretendard", "monospace"], ",");
+  return appendFallbackFonts([], ["D2Coding", "monospace"], ",");
 }
 
 export const defaultProseFontFamily = safeProseFontFamily();

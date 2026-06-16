@@ -9,7 +9,6 @@
         Github,
         Heading1,
         Highlighter,
-        History,
         Italic,
         LayoutTemplate,
         Link2,
@@ -39,6 +38,7 @@
     import { defaultProseFontFamily } from "$lib/dc/font-stacks";
     import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
     import {
+        defaultDcExportStructure,
         exportDocumentToDcHtml,
         type DcDocumentTheme,
         type DcExportOptions,
@@ -98,6 +98,7 @@
         createDefaultReferenceList,
         createReferenceListFromText,
     } from "$lib/editor/reference-list";
+    import StoragePanel from "$lib/components/StoragePanel.svelte";
     import { normalizeEditableLinkHref } from "$lib/editor/link";
     import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
     import {
@@ -442,7 +443,7 @@
             codeFontSize: defaultCodeFontSize,
             showLineNumbers: false,
             documentTheme: "lightLecture",
-            structure: "dcTable",
+            structure: defaultDcExportStructure,
         };
     }
 
@@ -457,7 +458,7 @@
             codeFontSize,
             showLineNumbers,
             documentTheme,
-            structure: "dcTable",
+            structure: defaultDcExportStructure,
         };
     }
 
@@ -599,11 +600,6 @@
 
     function isRenaming(kind: RenameTarget["kind"], id: string) {
         return renameTarget?.kind === kind && renameTarget.id === id;
-    }
-
-    function focusRenameInput(node: HTMLInputElement) {
-        node.focus();
-        node.select();
     }
 
     function clearPendingCardApply() {
@@ -843,22 +839,6 @@
         renameDraft = "";
     }
 
-    function handleRenameKeydown(
-        event: KeyboardEvent,
-        save: () => void,
-    ) {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            save();
-            return;
-        }
-
-        if (event.key === "Escape") {
-            event.preventDefault();
-            cancelRename();
-        }
-    }
-
     function refreshPresetSnapshots() {
         const storage = draftStorage();
         presets = storage ? readPresetSnapshots(storage) : [];
@@ -1081,7 +1061,7 @@
             codeFontSize,
             showLineNumbers,
             documentTheme,
-            structure: "dcTable",
+            structure: defaultDcExportStructure,
         };
     }
 
@@ -3874,205 +3854,39 @@
     </section>
 
     {#if isStoragePanelOpen}
-        <div id="storage-panel" class="storage-panel">
-            <button
-                class="panel-close-button storage-panel-close"
-                type="button"
-                title="저장함 닫기"
-                aria-label="닫기"
-                onclick={() => (isStoragePanelOpen = false)}
-            >
-                <X size={16} />
-            </button>
-            <section class="preset-panel" aria-label="프리셋">
-                <div class="preset-save">
-                    <label>
-                        <span><Save size={15} /> 프리셋</span>
-                        <input
-                            type="text"
-                            bind:value={presetName}
-                            aria-label="프리셋 이름"
-                            maxlength="60"
-                            placeholder="강의글 구조"
-                            oninput={() => (presetState = "idle")}
-                            onkeydown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    saveCurrentPreset();
-                                }
-                            }}
-                        />
-                    </label>
-                    <button
-                        class="preset-save-button"
-                        type="button"
-                        aria-label="프리셋 저장"
-                        onclick={saveCurrentPreset}
-                    >
-                        <Save size={16} />
-                        <span>저장</span>
-                    </button>
-                    <span
-                        class:error={presetState === "error"}
-                        class="preset-count">{presetStateLabel}</span
-                    >
-                </div>
-
-                <div class="preset-list" aria-label="저장된 프리셋">
-                    {#if presets.length === 0}
-                        <span class="preset-empty">프리셋 없음</span>
-                    {:else}
-                        {#each presets as preset (preset.id)}
-                            <div class="preset-item">
-                                {#if isRenaming("preset", preset.id)}
-                                    <input
-                                        class="preset-rename-input"
-                                        type="text"
-                                        bind:value={renameDraft}
-                                        maxlength="60"
-                                        aria-label="프리셋 제목 변경"
-                                        use:focusRenameInput
-                                        onblur={() =>
-                                            savePresetRename(preset.id)}
-                                        onkeydown={(event) =>
-                                            handleRenameKeydown(event, () =>
-                                                savePresetRename(preset.id),
-                                            )}
-                                    />
-                                {:else}
-                                    <button
-                                        type="button"
-                                        class="preset-apply"
-                                        title="더블클릭해서 제목 변경"
-                                        onclick={(event) =>
-                                            scheduleCardApply(
-                                                () => applyPreset(preset),
-                                                event,
-                                            )}
-                                        ondblclick={(event) =>
-                                            beginPresetRename(preset, event)}
-                                    >
-                                        <span>{preset.name}</span>
-                                        <small
-                                            >{preset.preferences
-                                                .documentTheme ===
-                                            "darkEditorial"
-                                                ? "어두운 글"
-                                                : "밝은 글"} · {presetDateLabel(
-                                                preset.updatedAt,
-                                            )}</small
-                                        >
-                                    </button>
-                                {/if}
-                                <button
-                                    type="button"
-                                    class="preset-delete"
-                                    aria-label={`${preset.name} 삭제`}
-                                    title="삭제"
-                                    onclick={() => deletePreset(preset.id)}
-                                >
-                                    <Trash2 size={15} />
-                                </button>
-                            </div>
-                        {/each}
-                    {/if}
-                </div>
-            </section>
-
-            <section class="draft-history-panel" aria-label="초안 히스토리">
-                <div class="draft-history-save">
-                    <div class="draft-history-title">
-                        <History size={15} />
-                        <span>초안 히스토리</span>
-                    </div>
-                    <button
-                        class="draft-history-save-button"
-                        type="button"
-                        aria-label="초안 스냅샷 저장"
-                        onclick={() =>
-                            saveDraftHistorySnapshot({ automatic: false })}
-                    >
-                        <Save size={16} />
-                        <span>스냅샷</span>
-                    </button>
-                    <span
-                        class:error={draftHistoryState === "error"}
-                        class="draft-history-count"
-                        aria-label="초안 히스토리 개수"
-                        >{draftHistoryStateLabel}</span
-                    >
-                </div>
-
-                <div class="draft-history-list" aria-label="저장된 초안">
-                    {#if draftHistory.length === 0}
-                        <span class="draft-history-empty">초안 없음</span>
-                    {:else}
-                        {#each draftHistory as snapshot (snapshot.id)}
-                            <div class="draft-history-item">
-                                {#if isRenaming("draft", snapshot.id)}
-                                    <input
-                                        class="preset-rename-input"
-                                        type="text"
-                                        bind:value={renameDraft}
-                                        maxlength="60"
-                                        aria-label="초안 제목 변경"
-                                        use:focusRenameInput
-                                        onblur={() =>
-                                            saveDraftHistoryRename(
-                                                snapshot.id,
-                                            )}
-                                        onkeydown={(event) =>
-                                            handleRenameKeydown(event, () =>
-                                                saveDraftHistoryRename(
-                                                    snapshot.id,
-                                                ),
-                                            )}
-                                    />
-                                {:else}
-                                    <button
-                                        type="button"
-                                        class="draft-history-apply"
-                                        title="더블클릭해서 제목 변경"
-                                        onclick={(event) =>
-                                            scheduleCardApply(
-                                                () =>
-                                                    restoreDraftHistorySnapshot(
-                                                        snapshot,
-                                                    ),
-                                                event,
-                                            )}
-                                        ondblclick={(event) =>
-                                            beginDraftHistoryRename(
-                                                snapshot,
-                                                event,
-                                            )}
-                                    >
-                                        <span>{draftHistoryName(snapshot)}</span>
-                                        <small
-                                            >{draftHistorySummary(
-                                                snapshot,
-                                            )}</small
-                                        >
-                                    </button>
-                                {/if}
-                                <button
-                                    type="button"
-                                    class="draft-history-delete"
-                                    aria-label={`${draftHistoryName(
-                                        snapshot,
-                                    )} 삭제`}
-                                    title="삭제"
-                                    onclick={() =>
-                                        deleteDraftHistory(snapshot.id)}
-                                >
-                                    <Trash2 size={15} />
-                                </button>
-                            </div>
-                        {/each}
-                    {/if}
-                </div>
-            </section>
-        </div>
+        <StoragePanel
+            bind:presetName
+            bind:renameDraft
+            {presetState}
+            {presetStateLabel}
+            {presets}
+            {draftHistory}
+            {draftHistoryState}
+            {draftHistoryStateLabel}
+            {renameTarget}
+            onClose={() => (isStoragePanelOpen = false)}
+            onPresetNameInput={() => (presetState = "idle")}
+            onSavePreset={saveCurrentPreset}
+            onApplyPreset={(preset, event) =>
+                scheduleCardApply(() => applyPreset(preset), event)}
+            onBeginPresetRename={beginPresetRename}
+            onSavePresetRename={savePresetRename}
+            onDeletePreset={deletePreset}
+            onSaveDraftHistory={() =>
+                saveDraftHistorySnapshot({ automatic: false })}
+            onRestoreDraftHistory={(snapshot, event) =>
+                scheduleCardApply(
+                    () => restoreDraftHistorySnapshot(snapshot),
+                    event,
+                )}
+            onBeginDraftHistoryRename={beginDraftHistoryRename}
+            onSaveDraftHistoryRename={saveDraftHistoryRename}
+            onDeleteDraftHistory={deleteDraftHistory}
+            onCancelRename={cancelRename}
+            {presetDateLabel}
+            {draftHistoryName}
+            {draftHistorySummary}
+        />
     {/if}
 
     {#if isLlmPanelOpen}
@@ -4179,7 +3993,7 @@
                     <span>API 키</span>
                     <input
                         class="llm-secret-input"
-                        type="text"
+                        type="password"
                         name="dc-code-paste-api-token"
                         bind:value={llmApiKey}
                         autocomplete="off"
@@ -5019,8 +4833,7 @@
     }
 
     .markdown-import-button,
-    .markdown-clear-button,
-    .panel-close-button {
+    .markdown-clear-button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -5072,194 +4885,6 @@
     }
 
     .markdown-status.error {
-        color: var(--danger);
-    }
-
-    .storage-panel {
-        grid-column: 1 / -1;
-        position: relative;
-        display: grid;
-        gap: 5px;
-        margin: 0;
-        padding-right: 38px;
-    }
-
-    .storage-panel-close {
-        position: absolute;
-        top: 9px;
-        right: 9px;
-        z-index: 1;
-        width: 32px;
-        min-width: 32px;
-        height: 32px;
-        padding: 0;
-        color: var(--muted);
-    }
-
-    .storage-panel-close:hover {
-        color: var(--danger);
-    }
-
-    .preset-panel,
-    .draft-history-panel {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        align-items: center;
-        margin: 0;
-        padding: 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: color-mix(in oklch, var(--panel) 88%, transparent);
-    }
-
-    .preset-save,
-    .draft-history-save {
-        display: flex;
-        flex: 0 1 auto;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-    }
-
-    .draft-history-title {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 850;
-        white-space: nowrap;
-    }
-
-    .preset-save-button,
-    .draft-history-save-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        height: 34px;
-        border: 1px solid color-mix(in oklch, var(--accent) 66%, var(--line));
-        border-radius: 7px;
-        background: color-mix(in oklch, var(--accent) 18%, var(--panel-2));
-        color: var(--accent);
-        font-weight: 850;
-        cursor: pointer;
-        white-space: nowrap;
-    }
-
-    .preset-count,
-    .draft-history-count {
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 850;
-        white-space: nowrap;
-    }
-
-    .preset-count.error,
-    .draft-history-count.error {
-        color: var(--danger);
-    }
-
-    .preset-list,
-    .draft-history-list {
-        display: flex;
-        flex: 1 1 360px;
-        gap: 8px;
-        min-width: 0;
-        overflow-x: auto;
-        padding-bottom: 1px;
-        scrollbar-gutter: stable;
-    }
-
-    .preset-empty,
-    .draft-history-empty {
-        display: inline-flex;
-        align-items: center;
-        min-height: 34px;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 800;
-    }
-
-    .preset-item,
-    .draft-history-item {
-        display: inline-flex;
-        align-items: stretch;
-        flex: 0 0 auto;
-        max-width: 250px;
-        overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        background: var(--panel-2);
-    }
-
-    .preset-apply,
-    .draft-history-apply {
-        display: grid;
-        gap: 2px;
-        min-width: 150px;
-        max-width: 210px;
-        border: 0;
-        border-right: 1px solid var(--line);
-        background: transparent;
-        color: var(--text);
-        padding: 7px 10px;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .preset-rename-input {
-        min-width: 150px;
-        max-width: 210px;
-        border: 0;
-        border-right: 1px solid var(--line);
-        outline: 2px solid var(--accent);
-        outline-offset: -2px;
-        background: color-mix(in oklch, var(--panel) 88%, var(--accent) 12%);
-        color: var(--text);
-        padding: 7px 10px;
-        font-size: 13px;
-        font-weight: 900;
-    }
-
-    .preset-apply span,
-    .preset-apply small,
-    .draft-history-apply span,
-    .draft-history-apply small {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .preset-apply span,
-    .draft-history-apply span {
-        font-size: 13px;
-        font-weight: 900;
-    }
-
-    .preset-apply small,
-    .draft-history-apply small {
-        color: var(--muted);
-        font-size: 11px;
-        font-weight: 750;
-    }
-
-    .preset-delete,
-    .draft-history-delete {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 34px;
-        border: 0;
-        background: transparent;
-        color: var(--muted);
-        cursor: pointer;
-    }
-
-    .preset-delete:hover,
-    .draft-history-delete:hover {
         color: var(--danger);
     }
 
@@ -5585,9 +5210,9 @@
         background: oklch(94.93% 0.016 255.07);
         color: oklch(34.86% 0.087 278.64);
         font-family:
+            D2Coding,
             Pretendard,
             Cascadia Mono,
-            D2Coding,
             나눔고딕코딩,
             Noto Sans Mono CJK,
             JetBrains Mono,
@@ -6402,16 +6027,6 @@
             bottom: 8px;
             width: 42px;
             height: 42px;
-        }
-
-        .preset-save,
-        .draft-history-save {
-            width: 100%;
-        }
-
-        .preset-list,
-        .draft-history-list {
-            flex-basis: 100%;
         }
 
         .llm-grid {

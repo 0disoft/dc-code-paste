@@ -1,5 +1,9 @@
 import type { JSONContent } from "@tiptap/core";
-import type { DcDocumentTheme, DcExportStructure } from "$lib/dc/export-document";
+import {
+  normalizeDcExportStructure,
+  type DcDocumentTheme,
+  type DcExportStructure,
+} from "$lib/dc/export-document";
 import { containsMarkdownInlineToken, parseMarkdownInline } from "$lib/editor/markdown-inline";
 import { parseMarkdownToDocument, sanitizeCodeHighlightLines } from "$lib/editor/markdown-import";
 import {
@@ -89,14 +93,6 @@ function isJsonContent(value: unknown, depth = 0): value is JSONContent {
   return typeof value.type === "string" || typeof value.text === "string";
 }
 
-function normalizeExportStructure(value: unknown): DcExportStructure | undefined {
-  if (value === "dcTable" || value === "modern") {
-    return "dcTable";
-  }
-
-  return undefined;
-}
-
 function isDocumentTheme(value: unknown): value is DcDocumentTheme {
   return value === "lightLecture" || value === "darkEditorial";
 }
@@ -106,7 +102,7 @@ function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined
     return undefined;
   }
 
-  const structure = normalizeExportStructure(value.structure);
+  const structure = normalizeDcExportStructure(value.structure);
 
   if (
     typeof value.language !== "string" ||

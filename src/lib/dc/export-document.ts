@@ -36,6 +36,8 @@ export type DcExportOptions = {
 export type DcExportStructure = "dcTable";
 export type DcDocumentTheme = "lightLecture" | "darkEditorial";
 
+export const defaultDcExportStructure: DcExportStructure = "dcTable";
+
 const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
 const linkColor = "oklch(56.77% 0.154 252.96)";
 const articleBackground = "oklch(98.38% 0.01 97.33)";
@@ -85,6 +87,14 @@ type RenderContext = {
 
 function normalizeDocumentTheme(value: DcDocumentTheme | undefined): DcDocumentTheme {
   return value === "darkEditorial" ? "darkEditorial" : "lightLecture";
+}
+
+export function normalizeDcExportStructure(value: unknown): DcExportStructure | undefined {
+  if (value === defaultDcExportStructure || value === "modern") {
+    return defaultDcExportStructure;
+  }
+
+  return undefined;
 }
 
 function documentPalette(options: DcExportOptions): DocumentPalette {
@@ -423,8 +433,11 @@ function safeHeadingLevel(value: unknown): 1 | 2 | 3 | 4 | 5 | 6 {
     : 2;
 }
 
-function isDcTableStructure(_options: DcExportOptions): boolean {
-  return true;
+function isDcTableStructure(options: DcExportOptions): boolean {
+  return (
+    (normalizeDcExportStructure(options.structure) ?? defaultDcExportStructure) ===
+    defaultDcExportStructure
+  );
 }
 
 function parseStyleDeclaration(part: string): { property: string; value: string } | undefined {

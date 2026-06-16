@@ -102,13 +102,13 @@ describe("font stacks", () => {
     expect(buildFontStack(["ui-monospace", "Consolas"], "code")).toBe(stack);
   });
 
-  it("uses prose-first fallbacks for inline code", () => {
+  it("uses D2Coding before prose fallbacks for inline code", () => {
     const stack = safeInlineCodeFontFamily();
     const fonts = stack.split(", ");
 
     expect(stack).toBe(inlineCodeFallbackFonts.join(", "));
-    expect(fonts.slice(0, 3)).toEqual(["Pretendard", "Cascadia Mono", "D2Coding"]);
-    expect(fonts.indexOf("Pretendard")).toBeLessThan(fonts.indexOf("Cascadia Mono"));
+    expect(fonts.slice(0, 3)).toEqual(["D2Coding", "Pretendard", "Cascadia Mono"]);
+    expect(fonts.indexOf("D2Coding")).toBeLessThan(fonts.indexOf("Pretendard"));
     expect(fonts).toContain("monospace");
   });
 
@@ -117,7 +117,7 @@ describe("font stacks", () => {
     expect(safeDcProseFontFamily()).toBe("Malgun Gothic,sans-serif");
     expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe("Georgia,Batang,serif");
     expect(safeDcCodeFontFamily()).toBe("Cascadia Mono,D2Coding,monospace");
-    expect(safeDcInlineCodeFontFamily()).toBe("Pretendard,monospace");
+    expect(safeDcInlineCodeFontFamily()).toBe("D2Coding,monospace");
   });
 
   it("strips unsafe font-family punctuation before export", () => {

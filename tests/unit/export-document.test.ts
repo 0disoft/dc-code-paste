@@ -1,6 +1,10 @@
 import type { JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
-import { exportDocumentToDcHtml } from "../../src/lib/dc/export-document";
+import {
+  defaultDcExportStructure,
+  exportDocumentToDcHtml,
+  normalizeDcExportStructure,
+} from "../../src/lib/dc/export-document";
 import {
   defaultProseFontFamily,
   safeDcCodeFontFamily,
@@ -30,6 +34,12 @@ function textOfTestDocument(node: JSONContent): string {
 }
 
 describe("exportDocumentToDcHtml", () => {
+  it("normalizes the export structure contract and legacy structure values", () => {
+    expect(normalizeDcExportStructure(defaultDcExportStructure)).toBe("dcTable");
+    expect(normalizeDcExportStructure("modern")).toBe("dcTable");
+    expect(normalizeDcExportStructure("unknown")).toBeUndefined();
+  });
+
   it("returns empty HTML for an empty editor document", async () => {
     const document: JSONContent = {
       type: "doc",
