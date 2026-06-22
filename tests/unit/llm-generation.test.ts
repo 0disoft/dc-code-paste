@@ -8,6 +8,7 @@ import {
   openRouterTopWeeklyModelLimit,
   requestLlmMarkdown,
   requestOpenRouterModels,
+  umansModelIds,
 } from "../../src/lib/editor/llm-generation";
 
 type MockFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -37,6 +38,8 @@ describe("llm-generation", () => {
     expect(llmProviders.find((provider) => provider.id === "opencode-go")?.models).toEqual(
       openCodeGoModelIds,
     );
+    expect(llmProviders.find((provider) => provider.id === "umans")?.models).toEqual(umansModelIds);
+    expect(llmProviders.find((provider) => provider.id === "umans")?.requiresApiKey).toBe(false);
     expect(llmProviders.find((provider) => provider.id === "openai")?.models).toEqual([
       "gpt-5.5",
       "gpt-5.5-pro",
@@ -251,6 +254,42 @@ describe("llm-generation", () => {
         }),
         body: JSON.stringify({
           model: "gpt-5.5",
+          instructions:
+            "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
+          input: "테스트 글",
+        }),
+      }),
+    );
+  });
+
+  it("requests Umans through the local Responses adapter without an API key", async () => {
+    const fetcher = vi.fn<MockFetch>(async () =>
+      jsonResponse({
+        output_text: "# Umans 글",
+      }),
+    );
+
+    const markdown = await requestLlmMarkdown(
+      {
+        provider: "umans",
+        apiKey: "",
+        model: "umans/umans-glm-5.2",
+        userPrompt: "테스트 글",
+        authoringPrompt: "가이드",
+      },
+      fetcher,
+    );
+
+    expect(markdown).toBe("# Umans 글");
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://127.0.0.1:8789/v1/responses",
+      expect.objectContaining({
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "umans/umans-glm-5.2",
           instructions:
             "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
           input: "테스트 글",

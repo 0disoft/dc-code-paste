@@ -365,6 +365,38 @@ function collectCustomBlock(
   return undefined;
 }
 
+export function hasUnclosedCustomBlock(markdown: string): boolean {
+  const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
+  let isInCodeFence = false;
+  let isInCustomBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!isInCustomBlock && fencePattern.test(trimmed)) {
+      isInCodeFence = !isInCodeFence;
+      continue;
+    }
+
+    if (isInCodeFence) {
+      continue;
+    }
+
+    if (isInCustomBlock) {
+      if (customBlockEndPattern.test(trimmed)) {
+        isInCustomBlock = false;
+      }
+      continue;
+    }
+
+    if (customBlockStart(trimmed)) {
+      isInCustomBlock = true;
+    }
+  }
+
+  return isInCustomBlock;
+}
+
 function calloutKindFromCustomBlockName(name: string): CalloutKind | undefined {
   return isCalloutKind(name) ? name : undefined;
 }

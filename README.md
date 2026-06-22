@@ -52,6 +52,7 @@ DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정
 | ------------------ | ----------------------------------------------------------------- |
 | OpenRouter         | API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공. |
 | OpenCode Go        | minimax, kimi, glm, deepseek, qwen, mimo, hy3 계열 모델 내장      |
+| Umans              | 로컬 Responses adapter 사용. API 키는 선택 사항.                  |
 | OpenAI             | Responses API 사용                                                |
 | Claude (Anthropic) |                                                                   |
 | Gemini             |                                                                   |

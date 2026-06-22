@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseMarkdownInline, parseMarkdownToDocument } from "../../src/lib/editor/markdown-import";
+import {
+  hasUnclosedCustomBlock,
+  parseMarkdownInline,
+  parseMarkdownToDocument,
+} from "../../src/lib/editor/markdown-import";
 
 describe("markdown import", () => {
   it("turns markdown headings, inline code, and links into editor JSON", () => {
@@ -548,5 +552,13 @@ describe("markdown import", () => {
         content: [{ type: "text", text: "다음 제목" }],
       },
     ]);
+  });
+
+  it("detects unclosed custom blocks without flagging fenced code", () => {
+    expect(hasUnclosedCustomBlock([":::tip", "닫히지 않은 블록"].join("\n"))).toBe(true);
+    expect(hasUnclosedCustomBlock([":::tip", "닫힌 블록", ":::"].join("\n"))).toBe(false);
+    expect(
+      hasUnclosedCustomBlock(["```markdown", ":::tip", "코드 안의 텍스트", "```"].join("\n")),
+    ).toBe(false);
   });
 });

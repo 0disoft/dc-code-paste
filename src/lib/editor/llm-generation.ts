@@ -4,6 +4,7 @@ export type LlmProviderId =
   | "gemini"
   | "openrouter"
   | "opencode-go"
+  | "umans"
   | "deepseek"
   | "mistral"
   | "groq"
@@ -16,6 +17,7 @@ export type LlmProviderDefinition = {
   label: string;
   models: string[];
   apiKeyPlaceholder: string;
+  requiresApiKey?: boolean;
 };
 
 export type LlmRequestInput = {
@@ -74,6 +76,8 @@ export const openCodeGoModelIds = [
   "hy3-preview",
 ];
 
+export const umansModelIds = ["umans/umans-glm-5.2"];
+
 export const llmProviders: LlmProviderDefinition[] = [
   {
     id: "openrouter",
@@ -91,6 +95,13 @@ export const llmProviders: LlmProviderDefinition[] = [
     label: "OpenCode Go",
     models: openCodeGoModelIds,
     apiKeyPlaceholder: "opencode_go...",
+  },
+  {
+    id: "umans",
+    label: "Umans",
+    models: umansModelIds,
+    apiKeyPlaceholder: "선택 사항",
+    requiresApiKey: false,
   },
   {
     id: "openai",
@@ -212,9 +223,14 @@ export async function requestLlmMarkdown(
   const apiKey = input.apiKey.trim();
   const model = input.model.trim();
   const userPrompt = input.userPrompt.trim();
+  const requiresApiKey = providerDefinition(input.provider).requiresApiKey !== false;
 
-  if (!apiKey || !model || !userPrompt) {
-    throw new Error("API 키, 모델, 요청을 모두 입력해야 합니다.");
+  if ((requiresApiKey && !apiKey) || !model || !userPrompt) {
+    throw new Error(
+      requiresApiKey
+        ? "API 키, 모델, 요청을 모두 입력해야 합니다."
+        : "모델과 요청을 모두 입력해야 합니다.",
+    );
   }
 
   const messages = buildLlmAuthoringMessages(input.authoringPrompt, userPrompt);
@@ -228,9 +244,11 @@ export async function requestLlmMarkdown(
           ? await requestOpenAi(input, messages, fetcher)
           : input.provider === "opencode-go"
             ? await requestOpenCodeGo(input, messages, fetcher)
-            : input.provider === "openrouter"
-              ? await requestOpenRouter(input, messages, fetcher)
-              : await requestOpenAiCompatibleChat(input, messages, fetcher);
+            : input.provider === "umans"
+              ? await requestUmans(input, messages, fetcher)
+              : input.provider === "openrouter"
+                ? await requestOpenRouter(input, messages, fetcher)
+                : await requestOpenAiCompatibleChat(input, messages, fetcher);
 
   const markdown = normalizeGeneratedMarkdown(raw);
 
@@ -392,11 +410,38 @@ async function requestOpenAi(
   messages: ReturnType<typeof buildLlmAuthoringMessages>,
   fetcher: LlmFetch,
 ) {
-  const response = await fetcher("https://api.openai.com/v1/responses", {
+  return requestOpenAiCompatibleResponses(
+    input,
+    messages,
+    fetcher,
+    "https://api.openai.com/v1/responses",
+  );
+}
+
+async function requestUmans(
+  input: LlmRequestInput,
+  messages: ReturnType<typeof buildLlmAuthoringMessages>,
+  fetcher: LlmFetch,
+) {
+  return requestOpenAiCompatibleResponses(
+    input,
+    messages,
+    fetcher,
+    "http://127.0.0.1:8789/v1/responses",
+  );
+}
+
+async function requestOpenAiCompatibleResponses(
+  input: LlmRequestInput,
+  messages: ReturnType<typeof buildLlmAuthoringMessages>,
+  fetcher: LlmFetch,
+  endpoint: string,
+) {
+  const response = await fetcher(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${input.apiKey.trim()}`,
+      ...authorizationHeader(input.apiKey),
     },
     body: JSON.stringify({
       model: input.model.trim(),
@@ -407,6 +452,12 @@ async function requestOpenAi(
 
   const payload = await readJsonResponse(response);
   return extractOpenAiResponseText(payload);
+}
+
+function authorizationHeader(apiKey: string): Record<string, string> {
+  const trimmedKey = apiKey.trim();
+
+  return trimmedKey ? { Authorization: `Bearer ${trimmedKey}` } : {};
 }
 
 function openAiCompatibleChatOptions(provider: LlmProviderId): OpenAiCompatibleChatOptions {
