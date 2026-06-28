@@ -1,0 +1,35 @@
+name: Ohrisk Action Smoke
+
+on:
+  push:
+    branches:
+      - task/ohrisk-action-smoke
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ohrisk:
+    name: Run Ohrisk action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Scan license risk
+        uses: 0disoft/ohrisk@main
+        with:
+          command: scan
+          format: html
+          output: reports/ohrisk.html
+          prod: "true"
+          fail-on: ""
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ohrisk-html
+          path: reports/ohrisk.html
