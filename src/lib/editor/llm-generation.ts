@@ -55,28 +55,39 @@ type OpenAiCompatibleChatOptions = {
 };
 
 export const openCodeGoModelIds = [
+  "glm-5.2",
+  "glm-5.1",
+  "kimi-k2.7-code",
+  "kimi-k2.6",
+  "deepseek-v4-pro",
+  "deepseek-v4-flash",
+  "mimo-v2.5",
+  "mimo-v2.5-pro",
   "minimax-m3",
   "minimax-m2.7",
   "minimax-m2.5",
-  "kimi-k2.7-code",
-  "kimi-k2.6",
-  "kimi-k2.5",
-  "glm-5.1",
-  "glm-5",
-  "deepseek-v4-pro",
-  "deepseek-v4-flash",
   "qwen3.7-max",
   "qwen3.7-plus",
   "qwen3.6-plus",
-  "qwen3.5-plus",
-  "mimo-v2-pro",
-  "mimo-v2-omni",
-  "mimo-v2.5-pro",
-  "mimo-v2.5",
-  "hy3-preview",
 ];
 
-export const umansModelIds = ["umans/umans-glm-5.2"];
+const openCodeGoMessagesModelIds = new Set([
+  "minimax-m3",
+  "minimax-m2.7",
+  "minimax-m2.5",
+  "qwen3.7-max",
+  "qwen3.7-plus",
+  "qwen3.6-plus",
+]);
+
+export const umansModelIds = [
+  "umans/umans-coder",
+  "umans/umans-kimi-k2.7",
+  "umans/umans-glm-5.2",
+  "umans/umans-flash",
+  "umans/umans-qwen3.6-35b-a3b",
+  "umans/umans-glm-5.1",
+];
 
 export const llmProviders: LlmProviderDefinition[] = [
   {
@@ -168,7 +179,7 @@ export const llmProviders: LlmProviderDefinition[] = [
   {
     id: "xai",
     label: "xAI",
-    models: ["grok-4.3", "grok-4.3-latest", "grok-build-0.1"],
+    models: ["grok-4.5", "grok-4.5-latest"],
     apiKeyPlaceholder: "xai-...",
   },
   {
@@ -383,6 +394,10 @@ async function requestOpenCodeGo(
   messages: ReturnType<typeof buildLlmAuthoringMessages>,
   fetcher: LlmFetch,
 ) {
+  if (openCodeGoMessagesModelIds.has(input.model.trim())) {
+    return requestOpenCodeGoMessages(input, messages, fetcher);
+  }
+
   const response = await fetcher("https://opencode.ai/zen/go/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -403,6 +418,29 @@ async function requestOpenCodeGo(
 
   const payload = await readJsonResponse(response);
   return extractOpenAiCompatibleText(payload);
+}
+
+async function requestOpenCodeGoMessages(
+  input: LlmRequestInput,
+  messages: ReturnType<typeof buildLlmAuthoringMessages>,
+  fetcher: LlmFetch,
+) {
+  const response = await fetcher("https://opencode.ai/zen/go/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${input.apiKey.trim()}`,
+    },
+    body: JSON.stringify({
+      model: input.model.trim(),
+      max_tokens: 4500,
+      system: messages.system,
+      messages: [{ role: "user", content: messages.user }],
+    }),
+  });
+
+  const payload = await readJsonResponse(response);
+  return extractAnthropicText(payload);
 }
 
 async function requestOpenAi(

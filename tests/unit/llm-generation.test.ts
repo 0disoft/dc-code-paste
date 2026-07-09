@@ -35,9 +35,33 @@ describe("llm-generation", () => {
   });
 
   it("keeps built-in provider model suggestions current", () => {
+    expect(openCodeGoModelIds).toEqual([
+      "glm-5.2",
+      "glm-5.1",
+      "kimi-k2.7-code",
+      "kimi-k2.6",
+      "deepseek-v4-pro",
+      "deepseek-v4-flash",
+      "mimo-v2.5",
+      "mimo-v2.5-pro",
+      "minimax-m3",
+      "minimax-m2.7",
+      "minimax-m2.5",
+      "qwen3.7-max",
+      "qwen3.7-plus",
+      "qwen3.6-plus",
+    ]);
     expect(llmProviders.find((provider) => provider.id === "opencode-go")?.models).toEqual(
       openCodeGoModelIds,
     );
+    expect(umansModelIds).toEqual([
+      "umans/umans-coder",
+      "umans/umans-kimi-k2.7",
+      "umans/umans-glm-5.2",
+      "umans/umans-flash",
+      "umans/umans-qwen3.6-35b-a3b",
+      "umans/umans-glm-5.1",
+    ]);
     expect(llmProviders.find((provider) => provider.id === "umans")?.models).toEqual(umansModelIds);
     expect(llmProviders.find((provider) => provider.id === "umans")?.requiresApiKey).toBe(false);
     expect(llmProviders.find((provider) => provider.id === "openai")?.models).toEqual([
@@ -88,9 +112,8 @@ describe("llm-generation", () => {
       "zai-glm-4.7",
     ]);
     expect(llmProviders.find((provider) => provider.id === "xai")?.models).toEqual([
-      "grok-4.3",
-      "grok-4.3-latest",
-      "grok-build-0.1",
+      "grok-4.5",
+      "grok-4.5-latest",
     ]);
     expect(llmProviders.find((provider) => provider.id === "perplexity")?.models).toEqual([
       "sonar-pro",
@@ -226,6 +249,43 @@ describe("llm-generation", () => {
     );
   });
 
+  it("requests OpenCode Go message-only models through its messages endpoint", async () => {
+    const fetcher = vi.fn<MockFetch>(async () =>
+      jsonResponse({
+        content: [{ type: "text", text: "# OpenCode Go 메시지 모델 글" }],
+      }),
+    );
+
+    const markdown = await requestLlmMarkdown(
+      {
+        provider: "opencode-go",
+        apiKey: "opencode_go-test",
+        model: "minimax-m3",
+        userPrompt: "테스트 글",
+        authoringPrompt: "가이드",
+      },
+      fetcher,
+    );
+
+    expect(markdown).toBe("# OpenCode Go 메시지 모델 글");
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://opencode.ai/zen/go/v1/messages",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer opencode_go-test",
+        }),
+        body: JSON.stringify({
+          model: "minimax-m3",
+          max_tokens: 4500,
+          system:
+            "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
+          messages: [{ role: "user", content: "테스트 글" }],
+        }),
+      }),
+    );
+  });
+
   it("requests OpenAI through the Responses API", async () => {
     const fetcher = vi.fn<MockFetch>(async () =>
       jsonResponse({
@@ -330,7 +390,7 @@ describe("llm-generation", () => {
     {
       provider: "xai" as const,
       apiKey: "xai-test",
-      model: "grok-4.3",
+      model: "grok-4.5",
       endpoint: "https://api.x.ai/v1/chat/completions",
       tokenField: "max_tokens",
     },
