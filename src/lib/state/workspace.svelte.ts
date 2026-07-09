@@ -8,15 +8,12 @@ import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 
 import type { EditorView } from "@tiptap/pm/view";
 
-import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
-
 import { defaultProseFontFamily } from "$lib/dc/font-stacks";
 
 import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
 
 import {
   defaultDcExportStructure,
-  exportDocumentToDcHtml,
   type DcDocumentTheme,
   type DcExportOptions,
 } from "$lib/dc/export-document";
@@ -144,6 +141,13 @@ import {
   writePresetSnapshots,
   type PresetSnapshot,
 } from "$lib/editor/preset-storage";
+
+import {
+  copyDcPreview,
+  copyPlainTextWithState,
+  copySourceHtml as copySourceHtmlText,
+  createWorkspacePreviewRenderer,
+} from "$lib/state/workspace-export";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -364,13 +368,19 @@ export function createWorkspaceState() {
 
   let cardApplyTimer: ReturnType<typeof setTimeout> | undefined;
 
-  let previewRenderTimer: ReturnType<typeof setTimeout> | undefined;
-
   let draftPersistTimer: ReturnType<typeof setTimeout> | undefined;
 
-  let renderTurn = 0;
-
   let openRouterModelLoadTurn = 0;
+
+  const previewRenderer = createWorkspacePreviewRenderer({
+    debounceMs: previewRenderDebounceMs,
+    setHtml(value) {
+      html = value;
+    },
+    setIsRendering(value) {
+      isRendering = value;
+    },
+  });
 
   const htmlSize = $derived(html.length === 0 ? "0KB" : `${Math.ceil(html.length / 1024)}KB`);
 
@@ -664,10 +674,7 @@ export function createWorkspaceState() {
   }
 
   function clearScheduledPreviewRender() {
-    if (previewRenderTimer) {
-      clearTimeout(previewRenderTimer);
-      previewRenderTimer = undefined;
-    }
+    previewRenderer.clearScheduledPreviewRender();
   }
 
   function clearScheduledDraftPersist() {
@@ -1113,28 +1120,11 @@ export function createWorkspaceState() {
   }
 
   async function renderPreview(nextDocument: JSONContent, options: DcExportOptions) {
-    const turn = ++renderTurn;
-    isRendering = true;
-
-    try {
-      const nextHtml = await exportDocumentToDcHtml(nextDocument, options);
-
-      if (turn === renderTurn) {
-        html = nextHtml;
-      }
-    } finally {
-      if (turn === renderTurn) {
-        isRendering = false;
-      }
-    }
+    await previewRenderer.renderPreview(nextDocument, options);
   }
 
   function schedulePreviewRender(nextDocument: JSONContent, options: DcExportOptions) {
-    clearScheduledPreviewRender();
-    previewRenderTimer = setTimeout(() => {
-      previewRenderTimer = undefined;
-      void renderPreview(nextDocument, options);
-    }, previewRenderDebounceMs);
+    previewRenderer.schedulePreviewRender(nextDocument, options);
   }
 
   function persistCurrentDraftSnapshot(nextDocument: JSONContent, preferences: DraftPreferences) {
@@ -2706,50 +2696,32 @@ export function createWorkspaceState() {
   }
 
   async function copyPreview() {
-    copyState = "idle";
-
-    try {
-      const copyHtml = await exportDocumentToDcHtml(documentJson, {
-        ...exportOptions(),
-        includeAttribution: true,
-      });
-
-      await copyDcHtml(copyHtml, editor?.getText() ?? "");
-      copyState = "copied";
-      window.setTimeout(() => {
-        copyState = "idle";
-      }, 1300);
-    } catch {
-      copyState = "error";
-    }
+    await copyDcPreview({
+      document: documentJson,
+      exportOptions: exportOptions(),
+      plainText: editor?.getText() ?? "",
+      setState(value) {
+        copyState = value;
+      },
+    });
   }
 
   async function copySourceHtml() {
-    sourceCopyState = "idle";
-
-    try {
-      await copyPlainText(html);
-      sourceCopyState = "copied";
-      window.setTimeout(() => {
-        sourceCopyState = "idle";
-      }, 1300);
-    } catch {
-      sourceCopyState = "error";
-    }
+    await copySourceHtmlText({
+      html,
+      setState(value) {
+        sourceCopyState = value;
+      },
+    });
   }
 
   async function copyLlmAuthoringGuide() {
-    llmPromptCopyState = "idle";
-
-    try {
-      await copyPlainText(llmAuthoringPrompt);
-      llmPromptCopyState = "copied";
-      window.setTimeout(() => {
-        llmPromptCopyState = "idle";
-      }, 1300);
-    } catch {
-      llmPromptCopyState = "error";
-    }
+    await copyPlainTextWithState({
+      text: llmAuthoringPrompt,
+      setState(value) {
+        llmPromptCopyState = value;
+      },
+    });
   }
 
   async function generateMarkdownWithLlm() {
@@ -3614,21 +3586,22 @@ export function createWorkspaceState() {
     lastDraftHistoryFingerprint,
     lastDraftHistorySavedAt,
     cardApplyTimer,
-    previewRenderTimer,
+    get previewRenderTimer() {
+      return previewRenderer.previewRenderTimer;
+    },
     draftPersistTimer,
-    renderTurn,
+    get renderTurn() {
+      return previewRenderer.renderTurn;
+    },
     openRouterModelLoadTurn,
     onDestroy,
     onMount,
     tick,
     NodeSelection,
     TextSelection,
-    copyDcHtml,
-    copyPlainText,
     defaultProseFontFamily,
     sanitizeReadableTextColor,
     defaultDcExportStructure,
-    exportDocumentToDcHtml,
     sampleDocument,
     defaultLanguage,
     defaultTheme,

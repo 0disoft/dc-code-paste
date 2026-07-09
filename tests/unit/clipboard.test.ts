@@ -85,22 +85,22 @@ describe("copyPlainText", () => {
   it("clears fallback plain text selection even when copy is rejected", async () => {
     const target = {
       value: "",
-      setAttribute: vi.fn(),
+      setAttribute: vi.fn<(qualifiedName: string, value: string) => void>(),
       style: {},
-      select: vi.fn(),
-      blur: vi.fn(),
-      remove: vi.fn(),
+      select: vi.fn<() => void>(),
+      blur: vi.fn<() => void>(),
+      remove: vi.fn<() => void>(),
     };
-    const removeAllRanges = vi.fn();
+    const removeAllRanges = vi.fn<() => void>();
 
     vi.stubGlobal("navigator", {});
     vi.stubGlobal("window", {
       getSelection: () => ({ removeAllRanges }),
     });
     vi.stubGlobal("document", {
-      createElement: vi.fn(() => target),
-      body: { append: vi.fn() },
-      execCommand: vi.fn(() => false),
+      createElement: vi.fn<(tagName: string) => typeof target>(() => target),
+      body: { append: vi.fn<(node: unknown) => void>() },
+      execCommand: vi.fn<(commandId: string) => boolean>(() => false),
     });
 
     await expect(copyPlainText("복사")).rejects.toThrow("Copy command was rejected.");
