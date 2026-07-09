@@ -436,6 +436,10 @@ export function createWorkspaceState() {
 
   const isActiveLlmApiKeyRequired = $derived(activeLlmProvider.requiresApiKey !== false);
 
+  const isActiveLlmBrowserGenerationSupported = $derived(
+    activeLlmProvider.supportsBrowserGeneration !== false,
+  );
+
   const llmModelOptions = $derived(
     llmProvider === "openrouter" && openRouterModels.length > 0
       ? openRouterModels
@@ -477,6 +481,7 @@ export function createWorkspaceState() {
 
   const isLlmGenerateDisabled = $derived(
     llmGenerationState === "loading" ||
+      !isActiveLlmBrowserGenerationSupported ||
       (isActiveLlmApiKeyRequired && !llmApiKey.trim()) ||
       !llmModel.trim() ||
       !llmUserPrompt.trim(),
@@ -502,7 +507,7 @@ export function createWorkspaceState() {
 
   const openCodeGoModelStateLabel = $derived(
     llmProvider === "opencode-go"
-      ? `${activeLlmProvider.models.length.toLocaleString()}개 준비됨`
+      ? (activeLlmProvider.browserGenerationBlockedReason ?? "브라우저 직접 실행 불가")
       : "",
   );
 
@@ -767,9 +772,10 @@ export function createWorkspaceState() {
   }
 
   function selectLlmProvider(value: string) {
-    const nextProvider = llmProviders.some((provider) => provider.id === value)
-      ? (value as LlmProviderId)
-      : defaultLlmProviderId;
+    const nextProviderDefinition = llmProviders.find(
+      (provider) => provider.id === value && provider.supportsBrowserGeneration !== false,
+    );
+    const nextProvider = nextProviderDefinition?.id ?? defaultLlmProviderId;
 
     llmProvider = nextProvider;
     llmModel = "";

@@ -18,6 +18,8 @@ export type LlmProviderDefinition = {
   models: string[];
   apiKeyPlaceholder: string;
   requiresApiKey?: boolean;
+  supportsBrowserGeneration?: boolean;
+  browserGenerationBlockedReason?: string;
 };
 
 export type LlmRequestInput = {
@@ -106,6 +108,8 @@ export const llmProviders: LlmProviderDefinition[] = [
     label: "OpenCode Go",
     models: openCodeGoModelIds,
     apiKeyPlaceholder: "opencode_go...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "서버 프록시 필요",
   },
   {
     id: "umans",

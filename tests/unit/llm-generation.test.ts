@@ -54,6 +54,10 @@ describe("llm-generation", () => {
     expect(llmProviders.find((provider) => provider.id === "opencode-go")?.models).toEqual(
       openCodeGoModelIds,
     );
+    expect(llmProviders.find((provider) => provider.id === "opencode-go")).toMatchObject({
+      supportsBrowserGeneration: false,
+      browserGenerationBlockedReason: "서버 프록시 필요",
+    });
     expect(umansModelIds).toEqual([
       "umans/umans-coder",
       "umans/umans-kimi-k2.7",

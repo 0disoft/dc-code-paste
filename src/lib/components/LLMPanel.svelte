@@ -5,7 +5,12 @@
 
     type Props = {
         llmProvider: string;
-        llmProviders: { id: string; label: string }[];
+        llmProviders: {
+            id: string;
+            label: string;
+            supportsBrowserGeneration?: boolean;
+            browserGenerationBlockedReason?: string;
+        }[];
         llmModel: string;
         llmApiKey: string;
         llmUserPrompt: string;
@@ -83,7 +88,15 @@
                     onSelectProvider(event.currentTarget.value)}
             >
                 {#each llmProviders as provider}
-                    <option value={provider.id}>{provider.label}</option>
+                    <option
+                        value={provider.id}
+                        disabled={provider.supportsBrowserGeneration === false}
+                    >
+                        {provider.label}{provider.supportsBrowserGeneration ===
+                        false
+                            ? ` (${provider.browserGenerationBlockedReason ?? "사용 불가"})`
+                            : ""}
+                    </option>
                 {/each}
             </select>
         </label>
