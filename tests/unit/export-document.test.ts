@@ -1276,7 +1276,7 @@ describe("exportDocumentToDcHtml", () => {
     });
 
     expect(html).toContain('<td width="49%" bgcolor="#fff0ee"');
-    expect(html).toContain('<td width="2%" bgcolor="#ffffff"');
+    expect(html).toContain('<td width="2%" bgcolor="#fbfaf4"');
     expect(html).toContain('<td width="49%" bgcolor="#e9f9ef"');
     expect(html).toContain('bgcolor="#fff0ee"');
     expect(html).toContain('bgcolor="#e9f9ef"');

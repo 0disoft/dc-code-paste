@@ -21,6 +21,7 @@ import type { DcExportOptions, DcDocumentTheme } from "./types";
 const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
 const linkColor = "oklch(56.77% 0.154 252.96)";
 const articleBackground = "oklch(98.38% 0.01 97.33)";
+const articleSurfaceFallbackBackground = "#fbfaf4";
 const inlineCodeBackground = "oklch(94.93% 0.016 255.07)";
 const inlineCodeText = "oklch(34.86% 0.087 278.64)";
 const quoteAccentColor = "oklch(61.2% 0.049 77.83)";
@@ -1849,6 +1850,7 @@ function comparisonBlockPalette(options: DcExportOptions) {
       rightTitle: "oklch(92.34% 0.029 154.17)",
       text: "oklch(91.88% 0.016 91.83)",
       divider: "#353535",
+      spacerFallbackBackground: dcDarkPageBackground,
     };
   }
 
@@ -1867,6 +1869,7 @@ function comparisonBlockPalette(options: DcExportOptions) {
     rightTitle: "oklch(29.24% 0.08 154.12)",
     text: "oklch(31.82% 0.02 255.28)",
     divider: "oklch(85.31% 0.027 84.92)",
+    spacerFallbackBackground: articleSurfaceFallbackBackground,
   };
 }
 
@@ -2094,7 +2097,7 @@ async function renderComparisonBlockTable(
     }),
   );
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells[0]}<td width="2%" bgcolor="${palette.fallbackBackground}" style="${spacerCellStyle}">&nbsp;</td>${cells[1]}</tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells[0]}<td width="2%" bgcolor="${palette.spacerFallbackBackground}" style="${spacerCellStyle}">&nbsp;</td>${cells[1]}</tr></tbody></table>`;
 }
 
 async function renderBlockAsync(

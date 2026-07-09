@@ -1213,6 +1213,7 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
         margin: 0 0 18px;
+        background: oklch(98.38% 0.01 97.33);
     }
 
     .editor-surface :global(.dc-comparison-column) {
@@ -1253,6 +1254,10 @@
         border-left-color: oklch(75.02% 0.17 24.82);
         background: oklch(13.02% 0.026 24.58);
         color: oklch(91.88% 0.016 91.83);
+    }
+
+    .editor-surface-dark :global(.dc-comparison-block) {
+        background: oklch(7.2% 0.012 94.1);
     }
 
     .editor-surface-dark :global(.dc-comparison-column[data-side="right"]) {
