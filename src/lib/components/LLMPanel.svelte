@@ -68,7 +68,12 @@
     }: Props = $props();
 </script>
 
-<section id="llm-panel" class="llm-panel" aria-label="AI 글 작성">
+<section
+    id="llm-panel"
+    class="llm-panel"
+    class:has-model-suggestions={shouldShowLlmModelAutocomplete}
+    aria-label="AI 글 작성"
+>
     <div class="llm-grid">
         <label class="llm-field">
             <span>제공자</span>
@@ -263,12 +268,18 @@
     .llm-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: start;
         gap: 10px;
+    }
+
+    .llm-panel.has-model-suggestions .llm-grid {
+        margin-bottom: min(238px, 36vh);
     }
 
     .llm-field {
         display: grid;
         align-items: stretch;
+        align-content: start;
         gap: 5px;
         min-width: 0;
         color: var(--muted);
@@ -325,16 +336,16 @@
     .llm-model-suggestions {
         position: absolute;
         z-index: 30;
-        top: calc(100% + 5px);
+        top: calc(100% + 6px);
         right: 0;
         left: 0;
         display: grid;
-        max-height: 250px;
+        max-height: min(230px, 36vh);
         overflow: auto;
         border: 1px solid var(--border);
         border-radius: 7px;
         background: var(--panel);
-        box-shadow: 0 16px 34px color-mix(in oklch, black 36%, transparent);
+        box-shadow: 0 14px 30px color-mix(in oklch, black 30%, transparent);
         padding: 4px;
     }
 
