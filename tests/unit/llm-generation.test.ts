@@ -125,6 +125,24 @@ describe("llm-generation", () => {
       "sonar-reasoning-pro",
       "sonar-deep-research",
     ]);
+    expect(
+      llmProviders
+        .filter((provider) =>
+          [
+            "opencode-go",
+            "openai",
+            "anthropic",
+            "gemini",
+            "deepseek",
+            "mistral",
+            "groq",
+            "cerebras",
+            "xai",
+            "perplexity",
+          ].includes(provider.id),
+        )
+        .every((provider) => provider.supportsBrowserGeneration === false),
+    ).toBe(true);
   });
 
   it("autocompletes model IDs and names after a short query", () => {
@@ -209,121 +227,40 @@ describe("llm-generation", () => {
     );
   });
 
-  it("requests OpenCode Go through its OpenAI-compatible endpoint", async () => {
+  it("blocks provider-native remote calls that require OpenRouter or a proxy", async () => {
     const fetcher = vi.fn<MockFetch>(async () =>
       jsonResponse({
-        choices: [{ message: { content: "# OpenCode Go 글" } }],
+        choices: [{ message: { content: "# 직접 호출 글" } }],
       }),
     );
 
-    const markdown = await requestLlmMarkdown(
-      {
-        provider: "opencode-go",
-        apiKey: "opencode_go-test",
-        model: "kimi-k2.6",
-        userPrompt: "테스트 글",
-        authoringPrompt: "가이드",
-      },
-      fetcher,
-    );
-
-    expect(markdown).toBe("# OpenCode Go 글");
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://opencode.ai/zen/go/v1/chat/completions",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer opencode_go-test",
-        }),
-        body: JSON.stringify({
-          model: "kimi-k2.6",
-          messages: [
-            {
-              role: "system",
-              content:
-                "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
-            },
-            { role: "user", content: "테스트 글" },
-          ],
-          thinking: { type: "disabled" },
-          max_tokens: 4500,
-          stream: false,
-        }),
-      }),
-    );
-  });
-
-  it("requests OpenCode Go message-only models through its messages endpoint", async () => {
-    const fetcher = vi.fn<MockFetch>(async () =>
-      jsonResponse({
-        content: [{ type: "text", text: "# OpenCode Go 메시지 모델 글" }],
-      }),
-    );
-
-    const markdown = await requestLlmMarkdown(
-      {
-        provider: "opencode-go",
-        apiKey: "opencode_go-test",
-        model: "minimax-m3",
-        userPrompt: "테스트 글",
-        authoringPrompt: "가이드",
-      },
-      fetcher,
-    );
-
-    expect(markdown).toBe("# OpenCode Go 메시지 모델 글");
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://opencode.ai/zen/go/v1/messages",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer opencode_go-test",
-        }),
-        body: JSON.stringify({
-          model: "minimax-m3",
-          max_tokens: 4500,
-          system:
-            "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
-          messages: [{ role: "user", content: "테스트 글" }],
-        }),
-      }),
-    );
-  });
-
-  it("requests OpenAI through the Responses API", async () => {
-    const fetcher = vi.fn<MockFetch>(async () =>
-      jsonResponse({
-        output_text: "# OpenAI 글",
-      }),
-    );
-
-    const markdown = await requestLlmMarkdown(
-      {
-        provider: "openai",
-        apiKey: "sk-test",
-        model: "gpt-5.5",
-        userPrompt: "테스트 글",
-        authoringPrompt: "가이드",
-      },
-      fetcher,
-    );
-
-    expect(markdown).toBe("# OpenAI 글");
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/responses",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: "Bearer sk-test",
-        }),
-        body: JSON.stringify({
+    await expect(
+      requestLlmMarkdown(
+        {
+          provider: "openai",
+          apiKey: "sk-test",
           model: "gpt-5.5",
-          instructions:
-            "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
-          input: "테스트 글",
-        }),
-      }),
-    );
+          userPrompt: "테스트 글",
+          authoringPrompt: "가이드",
+        },
+        fetcher,
+      ),
+    ).rejects.toThrow("OpenAI 직접 호출은 이 정적 페이지에서 지원하지 않습니다.");
+
+    await expect(
+      requestLlmMarkdown(
+        {
+          provider: "opencode-go",
+          apiKey: "opencode_go-test",
+          model: "kimi-k2.6",
+          userPrompt: "테스트 글",
+          authoringPrompt: "가이드",
+        },
+        fetcher,
+      ),
+    ).rejects.toThrow("OpenCode Go 직접 호출은 이 정적 페이지에서 지원하지 않습니다.");
+
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("requests Umans through the local Responses adapter without an API key", async () => {
@@ -363,134 +300,35 @@ describe("llm-generation", () => {
   });
 
   it.each([
-    {
-      provider: "deepseek" as const,
-      apiKey: "sk-deepseek-test",
-      model: "deepseek-v4-pro",
-      endpoint: "https://api.deepseek.com/chat/completions",
-      tokenField: "max_tokens",
-    },
-    {
-      provider: "mistral" as const,
-      apiKey: "mistral-test",
-      model: "mistral-medium-latest",
-      endpoint: "https://api.mistral.ai/v1/chat/completions",
-      tokenField: "max_tokens",
-    },
-    {
-      provider: "groq" as const,
-      apiKey: "gsk_test",
-      model: "openai/gpt-oss-120b",
-      endpoint: "https://api.groq.com/openai/v1/chat/completions",
-      tokenField: "max_tokens",
-    },
-    {
-      provider: "cerebras" as const,
-      apiKey: "csk-test",
-      model: "gpt-oss-120b",
-      endpoint: "https://api.cerebras.ai/v1/chat/completions",
-      tokenField: "max_completion_tokens",
-    },
-    {
-      provider: "xai" as const,
-      apiKey: "xai-test",
-      model: "grok-4.5",
-      endpoint: "https://api.x.ai/v1/chat/completions",
-      tokenField: "max_tokens",
-    },
-    {
-      provider: "perplexity" as const,
-      apiKey: "pplx-test",
-      model: "sonar-pro",
-      endpoint: "https://api.perplexity.ai/chat/completions",
-      tokenField: "max_tokens",
-    },
-  ])("requests $provider through an OpenAI-compatible chat endpoint", async (caseItem) => {
+    "anthropic",
+    "gemini",
+    "deepseek",
+    "mistral",
+    "groq",
+    "cerebras",
+    "xai",
+    "perplexity",
+  ] as const)("does not fetch for %s native calls from the static app", async (provider) => {
     const fetcher = vi.fn<MockFetch>(async () =>
       jsonResponse({
-        choices: [{ message: { content: `# ${caseItem.provider} 글` } }],
-      }),
-    );
-
-    const markdown = await requestLlmMarkdown(
-      {
-        provider: caseItem.provider,
-        apiKey: caseItem.apiKey,
-        model: caseItem.model,
-        userPrompt: "테스트 글",
-        authoringPrompt: "가이드",
-      },
-      fetcher,
-    );
-
-    expect(markdown).toBe(`# ${caseItem.provider} 글`);
-    expect(fetcher).toHaveBeenCalledWith(
-      caseItem.endpoint,
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${caseItem.apiKey}`,
-        }),
-      }),
-    );
-
-    const body = JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body));
-    expect(body).toMatchObject({
-      model: caseItem.model,
-      temperature: 0.7,
-      stream: false,
-      messages: [
-        {
-          role: "system",
-          content:
-            "가이드\n\n위 규칙을 우선 적용해서 dc-code-paste Markdown 본문만 작성해라.\n인사말, 확인 질문, 코드펜스 바깥 설명, 사족은 출력하지 마라.\n응답 전체가 Markdown 입력창에 바로 들어갈 수 있어야 한다.",
-        },
-        { role: "user", content: "테스트 글" },
-      ],
-      [caseItem.tokenField]: 4500,
-    });
-  });
-
-  it("extracts Claude text responses", async () => {
-    const fetcher = vi.fn<MockFetch>(async () =>
-      jsonResponse({
-        content: [{ type: "text", text: "# Claude 글" }],
+        choices: [{ message: { content: "# 직접 호출 글" } }],
       }),
     );
 
     await expect(
       requestLlmMarkdown(
         {
-          provider: "anthropic",
-          apiKey: "sk-ant-test",
-          model: "claude-fable-5",
+          provider,
+          apiKey: "provider-test-key",
+          model: "provider-model",
           userPrompt: "테스트 글",
           authoringPrompt: "가이드",
         },
         fetcher,
       ),
-    ).resolves.toBe("# Claude 글");
-  });
+    ).rejects.toThrow("직접 호출은 이 정적 페이지에서 지원하지 않습니다.");
 
-  it("extracts Gemini candidate text responses", async () => {
-    const fetcher = vi.fn<MockFetch>(async () =>
-      jsonResponse({
-        candidates: [{ content: { parts: [{ text: "# Gemini 글" }] } }],
-      }),
-    );
-
-    await expect(
-      requestLlmMarkdown(
-        {
-          provider: "gemini",
-          apiKey: "AIza-test",
-          model: "gemini-3.5-flash",
-          userPrompt: "테스트 글",
-          authoringPrompt: "가이드",
-        },
-        fetcher,
-      ),
-    ).resolves.toBe("# Gemini 글");
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("loads OpenRouter models with the user key when provided", async () => {

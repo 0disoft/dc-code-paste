@@ -48,20 +48,20 @@ DCInside 글쓰기 화면에 붙여넣을 리치 텍스트 HTML을 만드는 정
 
 ### 지원 제공자
 
-| 제공자             | 비고                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| OpenRouter         | API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공.                     |
-| OpenCode Go        | 모델 목록은 내장. GitHub Pages 브라우저 직접 호출은 CORS 때문에 막혀 서버 프록시 필요 |
-| Umans              | 로컬 Responses adapter 사용. API 키는 선택 사항.                                      |
-| OpenAI             | Responses API 사용                                                                    |
-| Claude (Anthropic) |                                                                                       |
-| Gemini             |                                                                                       |
-| DeepSeek           |                                                                                       |
-| Mistral            |                                                                                       |
-| Groq               |                                                                                       |
-| Cerebras           |                                                                                       |
-| xAI                |                                                                                       |
-| Perplexity         |                                                                                       |
+| 제공자             | 비고                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| OpenRouter         | 브라우저에서 직접 사용. API 키 없이도 공개 모델 목록 조회 가능. 주간 인기 80개 필터 제공 |
+| Umans              | 로컬 Responses adapter 사용. API 키는 선택 사항.                                         |
+| OpenCode Go        | 모델 목록은 참고용. GitHub Pages 브라우저 직접 호출은 막혀 서버 프록시 필요              |
+| OpenAI             | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Claude (Anthropic) | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Gemini             | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| DeepSeek           | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Mistral            | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Groq               | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Cerebras           | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| xAI                | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
+| Perplexity         | 정적 페이지 직접 호출 미지원. OpenRouter 또는 서버 프록시 필요                           |
 
 OpenRouter를 사용하면 API 키 하나로 여러 모델을 전환할 수 있어 편리하다.
 

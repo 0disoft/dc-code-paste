@@ -123,12 +123,16 @@ export const llmProviders: LlmProviderDefinition[] = [
     label: "OpenAI",
     models: ["gpt-5.5", "gpt-5.5-pro", "gpt-5.4", "gpt-5.4-pro", "gpt-5.4-mini", "gpt-5.4-nano"],
     apiKeyPlaceholder: "sk-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "anthropic",
     label: "Claude",
     models: ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
     apiKeyPlaceholder: "sk-ant-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "gemini",
@@ -141,12 +145,16 @@ export const llmProviders: LlmProviderDefinition[] = [
       "gemini-flash-latest",
     ],
     apiKeyPlaceholder: "AIza...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "deepseek",
     label: "DeepSeek",
     models: ["deepseek-v4-pro", "deepseek-v4-flash", "deepseek-chat", "deepseek-reasoner"],
     apiKeyPlaceholder: "sk-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "mistral",
@@ -162,6 +170,8 @@ export const llmProviders: LlmProviderDefinition[] = [
       "codestral-latest",
     ],
     apiKeyPlaceholder: "...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "groq",
@@ -173,24 +183,32 @@ export const llmProviders: LlmProviderDefinition[] = [
       "meta-llama/llama-4-scout-17b-16e-instruct",
     ],
     apiKeyPlaceholder: "gsk_...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "cerebras",
     label: "Cerebras",
     models: ["gpt-oss-120b", "zai-glm-4.7"],
     apiKeyPlaceholder: "csk-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "xai",
     label: "xAI",
     models: ["grok-4.5", "grok-4.5-latest"],
     apiKeyPlaceholder: "xai-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
   {
     id: "perplexity",
     label: "Perplexity",
     models: ["sonar-pro", "sonar", "sonar-reasoning-pro", "sonar-deep-research"],
     apiKeyPlaceholder: "pplx-...",
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "OpenRouter 또는 프록시 필요",
   },
 ];
 
@@ -238,7 +256,16 @@ export async function requestLlmMarkdown(
   const apiKey = input.apiKey.trim();
   const model = input.model.trim();
   const userPrompt = input.userPrompt.trim();
-  const requiresApiKey = providerDefinition(input.provider).requiresApiKey !== false;
+  const provider = providerDefinition(input.provider);
+  const requiresApiKey = provider.requiresApiKey !== false;
+
+  if (provider.supportsBrowserGeneration === false) {
+    throw new Error(
+      `${provider.label} 직접 호출은 이 정적 페이지에서 지원하지 않습니다. ${
+        provider.browserGenerationBlockedReason ?? "서버 프록시가 필요합니다."
+      }`,
+    );
+  }
 
   if ((requiresApiKey && !apiKey) || !model || !userPrompt) {
     throw new Error(
@@ -585,6 +612,7 @@ async function requestAnthropic(
       "Content-Type": "application/json",
       "x-api-key": input.apiKey.trim(),
       "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
       model: input.model.trim(),
