@@ -117,6 +117,8 @@ export const llmProviders: LlmProviderDefinition[] = [
     models: umansModelIds,
     apiKeyPlaceholder: "선택 사항",
     requiresApiKey: false,
+    supportsBrowserGeneration: false,
+    browserGenerationBlockedReason: "서버 프록시 필요",
   },
   {
     id: "openai",
