@@ -810,6 +810,13 @@
         font-weight: 500;
     }
 
+    .toolbar .copy-button:hover:not(:disabled),
+    .toolbar .copy-button:focus-visible:not(:disabled) {
+        border-color: color-mix(in oklch, var(--accent) 82%, transparent);
+        background: color-mix(in oklch, var(--accent) 88%, white 12%);
+        color: oklch(18.8% 0.05 118.8);
+    }
+
     .toolbar .copy-button:disabled {
         cursor: not-allowed;
         opacity: 0.72;
