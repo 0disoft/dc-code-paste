@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Check, Clipboard, Github, Loader2, Type } from "lucide-svelte";
+    import { Check, Clipboard, Eye, Github, Loader2, Type } from "lucide-svelte";
     import { setContext } from "svelte";
     import { createWorkspaceState } from "$lib/state/workspace.svelte";
     import { WORKSPACE_CONTEXT_KEY } from "$lib/state/workspace-context";
@@ -8,7 +8,75 @@
     import LLMPanel from "$lib/components/LLMPanel.svelte";
     import Toolbar from "$lib/components/Toolbar.svelte";
 
+    type WorkspaceView = "editor" | "preview";
+
+    const voidHtmlTags = new Set([
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    ]);
+
+    function formatHtmlSource(html: string) {
+        const trimmedHtml = html.trim();
+
+        if (!trimmedHtml) {
+            return "";
+        }
+
+        let indentLevel = 0;
+
+        return trimmedHtml
+            .replace(/>\s*</g, ">\n<")
+            .split("\n")
+            .map((line) => {
+                const trimmedLine = line.trim();
+                const tagMatch = /^<\/?([a-zA-Z][\w:-]*)/.exec(trimmedLine);
+                const tagName = tagMatch?.[1]?.toLowerCase();
+                const isClosingTag = /^<\//.test(trimmedLine);
+                const isDoctypeOrComment = /^<!(?:--)?/.test(trimmedLine);
+                const isSelfClosingTag = /\/>$/.test(trimmedLine);
+                const isVoidTag = tagName ? voidHtmlTags.has(tagName) : false;
+                const isSingleLinePair = /^<([a-zA-Z][\w:-]*)\b[^>]*>.*<\/\1>$/.test(
+                    trimmedLine,
+                );
+
+                if (isClosingTag) {
+                    indentLevel = Math.max(indentLevel - 1, 0);
+                }
+
+                const formattedLine = `${"  ".repeat(indentLevel)}${trimmedLine}`;
+
+                if (
+                    tagName &&
+                    !isClosingTag &&
+                    !isDoctypeOrComment &&
+                    !isSelfClosingTag &&
+                    !isVoidTag &&
+                    !isSingleLinePair
+                ) {
+                    indentLevel += 1;
+                }
+
+                return formattedLine;
+            })
+            .join("\n");
+    }
+
     const workspace = createWorkspaceState();
+    let activeWorkspaceView = $state<WorkspaceView>("editor");
+    const formattedHtmlSource = $derived(formatHtmlSource(workspace.html));
+
     setContext(WORKSPACE_CONTEXT_KEY, workspace);
 </script>
 
@@ -105,8 +173,31 @@
     {/if}
     </div>
 
-    <section class="workbench">
-        <div class="editor-panel">
+    <section class="workbench" aria-label="글쓰기 작업 영역">
+        <div class="workbench-controls">
+            <div class="mode-switch view-switch" role="group" aria-label="작업 모드">
+                <button
+                    class:active={activeWorkspaceView === "editor"}
+                    type="button"
+                    aria-pressed={activeWorkspaceView === "editor"}
+                    onclick={() => (activeWorkspaceView = "editor")}
+                >
+                    <Type size={15} />
+                    <span>글쓰기</span>
+                </button>
+                <button
+                    class:active={activeWorkspaceView === "preview"}
+                    type="button"
+                    aria-pressed={activeWorkspaceView === "preview"}
+                    onclick={() => (activeWorkspaceView = "preview")}
+                >
+                    <Eye size={15} />
+                    <span>미리보기</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="editor-panel" hidden={activeWorkspaceView !== "editor"}>
             <div class="panel-head">
                 <div class="panel-title">
                     <Type size={18} />
@@ -149,7 +240,11 @@
             {/if}
         </div>
 
-        <aside class="preview-panel" aria-live="polite">
+        <aside
+            class="preview-panel"
+            aria-live="polite"
+            hidden={activeWorkspaceView !== "preview"}
+        >
             <div class="panel-head">
                 <div class="panel-title">
                     {#if workspace.isRendering}
@@ -216,8 +311,8 @@
                     class="html-source"
                     readonly
                     spellcheck="false"
-                    aria-label="복사용 HTML 원문"
-                    value={workspace.html}
+                    aria-label="보기 좋게 정리된 HTML 원문"
+                    value={formattedHtmlSource}
                 ></textarea>
             {/if}
         </aside>
@@ -245,7 +340,8 @@
     </a>
 </main>
 
-<style>    .workspace {
+<style>
+    .workspace {
         width: min(1560px, calc(100vw - 28px));
         min-height: 100vh;
         margin: 0 auto;
@@ -257,9 +353,9 @@
         top: 8px;
         z-index: 20;
         display: grid;
-        gap: 5px;
+        gap: 6px;
         max-height: calc(100vh - 16px);
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         overflow: auto;
         overscroll-behavior: contain;
         scrollbar-gutter: stable;
@@ -298,18 +394,31 @@
 
     .workbench {
         display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
-        gap: 12px;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
         align-items: stretch;
+    }
+
+    .workbench-controls {
+        display: flex;
+        justify-content: flex-end;
+        min-width: 0;
+        padding: 0 2px;
     }
 
     .editor-panel,
     .preview-panel {
         min-width: 0;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: color-mix(in oklch, var(--panel) 90%, transparent);
-        box-shadow: 0 20px 70px oklch(0% 0 0 / 0.16);
+        overflow: hidden;
+        border: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
+        border-radius: 10px;
+        background: color-mix(in oklch, var(--panel) 76%, transparent);
+        box-shadow: 0 20px 62px oklch(0% 0 0 / 0.13);
+    }
+
+    .editor-panel[hidden],
+    .preview-panel[hidden] {
+        display: none;
     }
 
     .panel-head {
@@ -319,7 +428,8 @@
         gap: 12px;
         min-height: 48px;
         padding: 0 14px;
-        border-bottom: 1px solid var(--line);
+        border-bottom: 1px solid color-mix(in oklch, var(--line) 38%, transparent);
+        background: color-mix(in oklch, var(--panel) 62%, transparent);
     }
 
     .panel-title {
@@ -341,9 +451,9 @@
         justify-content: center;
         min-height: 28px;
         padding: 0 9px;
-        border: 1px solid color-mix(in oklch, var(--accent-2) 46%, var(--line));
+        border: 1px solid color-mix(in oklch, var(--accent-2) 34%, transparent);
         border-radius: 999px;
-        background: color-mix(in oklch, var(--accent-2) 13%, var(--panel-2));
+        background: color-mix(in oklch, var(--accent-2) 12%, transparent);
         color: color-mix(in oklch, var(--accent-2) 70%, var(--text));
         font-size: 12px;
         font-weight: 850;
@@ -363,28 +473,45 @@
         grid-template-columns: repeat(2, minmax(74px, 1fr));
         height: 32px;
         overflow: hidden;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        background: var(--panel-2);
+        border: 0;
+        border-radius: 8px;
+        background: color-mix(in oklch, var(--panel-2) 64%, transparent);
     }
 
     .mode-switch button {
         border: 0;
-        border-right: 1px solid var(--line);
         background: transparent;
         color: var(--muted);
         font-size: 13px;
         font-weight: 850;
         cursor: pointer;
+        transition:
+            background-color 0.16s ease,
+            color 0.16s ease;
     }
 
-    .mode-switch button:last-child {
-        border-right: 0;
+    .mode-switch button:hover {
+        background: color-mix(in oklch, var(--panel) 58%, transparent);
     }
 
     .mode-switch button.active {
-        background: color-mix(in oklch, var(--accent) 18%, transparent);
+        background: color-mix(in oklch, var(--accent) 20%, transparent);
         color: var(--accent);
+    }
+
+    .view-switch {
+        grid-template-columns: repeat(2, minmax(112px, 1fr));
+        height: 36px;
+    }
+
+    .view-switch button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-width: 0;
+        padding: 0 12px;
+        white-space: nowrap;
     }
 
     .source-copy-button {
@@ -393,9 +520,9 @@
         justify-content: center;
         gap: 6px;
         height: 32px;
-        border: 1px solid var(--line);
+        border: 1px solid color-mix(in oklch, var(--line) 48%, transparent);
         border-radius: 7px;
-        background: var(--panel-2);
+        background: color-mix(in oklch, var(--panel-2) 58%, transparent);
         color: var(--text);
         font-size: 13px;
         font-weight: 850;
@@ -1361,7 +1488,9 @@
         font-size: 13px;
         line-height: 1.6;
         outline: none;
-        white-space: pre;
+        overflow-wrap: anywhere;
+        tab-size: 2;
+        white-space: pre-wrap;
     }
 
     .preview-surface :global(pre) {

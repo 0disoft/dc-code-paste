@@ -672,30 +672,30 @@
     .toolbar {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: 9px 10px;
+        gap: 8px;
         align-items: stretch;
-        padding: 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: color-mix(in oklch, var(--panel) 98%, oklch(0% 0 0 / 0));
-        box-shadow: 0 18px 44px oklch(0% 0 0 / 0.18);
+        padding: 8px;
+        border: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
+        border-radius: 10px;
+        background: color-mix(in oklch, var(--panel) 82%, transparent);
+        box-shadow: 0 16px 38px oklch(0% 0 0 / 0.14);
+        backdrop-filter: blur(10px);
     }
 
     .tool-group {
         display: flex;
         align-items: center;
-        gap: 7px;
+        gap: 4px;
         min-width: 0;
-        min-height: 44px;
-        padding: 6px 10px;
-        border: 1px solid color-mix(in oklch, var(--line) 78%, transparent);
+        min-height: 40px;
+        padding: 4px 6px;
+        border: 0;
         border-radius: 8px;
-        background: color-mix(in oklch, var(--panel-2) 46%, transparent);
+        background: color-mix(in oklch, var(--panel-2) 28%, transparent);
     }
 
-    .tool-group:last-child {
-        border-right: 1px solid
-            color-mix(in oklch, var(--line) 78%, transparent);
+    .tool-group + .tool-group {
+        box-shadow: inset 1px 0 0 color-mix(in oklch, var(--line) 42%, transparent);
     }
 
     .tool-group-wide {
@@ -748,7 +748,7 @@
     .toolbar button,
     .toolbar label,
     .switch {
-        height: 36px;
+        height: 34px;
         flex: 0 0 auto;
         white-space: nowrap;
     }
@@ -758,14 +758,27 @@
         align-items: center;
         justify-content: center;
         gap: 6px;
-        min-width: 36px;
-        padding: 0 10px;
-        border: 1px solid var(--line);
+        min-width: 34px;
+        padding: 0 9px;
+        border: 1px solid transparent;
         border-radius: 7px;
-        background: var(--panel-2);
+        background: transparent;
         color: var(--text);
         font-weight: 500;
         cursor: pointer;
+        transition:
+            background-color 0.16s ease,
+            border-color 0.16s ease,
+            color 0.16s ease,
+            transform 0.16s ease;
+    }
+
+    .toolbar button:hover:not(:disabled) {
+        background: color-mix(in oklch, var(--panel-2) 72%, transparent);
+    }
+
+    .toolbar button:active:not(:disabled) {
+        transform: translateY(1px);
     }
 
     .toolbar :global(svg) {
@@ -779,8 +792,8 @@
     }
 
     .toolbar button.active {
-        border-color: var(--accent);
-        background: color-mix(in oklch, var(--accent) 22%, var(--panel-2));
+        border-color: color-mix(in oklch, var(--accent) 52%, transparent);
+        background: color-mix(in oklch, var(--accent) 18%, transparent);
         color: var(--accent);
     }
 
@@ -791,7 +804,7 @@
 
     .toolbar .copy-button {
         min-width: 112px;
-        border-color: color-mix(in oklch, var(--accent) 72%, oklch(0% 0 0));
+        border-color: color-mix(in oklch, var(--accent) 62%, transparent);
         background: var(--accent);
         color: oklch(22.89% 0.055 118.8);
         font-weight: 500;
@@ -818,20 +831,20 @@
     }
 
     select {
-        height: 36px;
+        height: 34px;
         min-width: 104px;
-        border: 1px solid var(--line);
+        border: 1px solid color-mix(in oklch, var(--line) 62%, transparent);
         border-radius: 7px;
-        background: var(--panel-2);
+        background: color-mix(in oklch, var(--panel-2) 66%, transparent);
         padding: 0 9px;
     }
 
     input[type="url"] {
         width: min(320px, 48vw);
-        height: 36px;
-        border: 1px solid var(--line);
+        height: 34px;
+        border: 1px solid color-mix(in oklch, var(--line) 62%, transparent);
         border-radius: 7px;
-        background: var(--panel-2);
+        background: color-mix(in oklch, var(--panel-2) 66%, transparent);
         color: var(--text);
         padding: 0 10px;
     }
@@ -848,10 +861,10 @@
 
     input[type="text"] {
         width: min(260px, 44vw);
-        height: 36px;
-        border: 1px solid var(--line);
+        height: 34px;
+        border: 1px solid color-mix(in oklch, var(--line) 62%, transparent);
         border-radius: 7px;
-        background: var(--panel-2);
+        background: color-mix(in oklch, var(--panel-2) 66%, transparent);
         color: var(--text);
         padding: 0 10px;
     }
@@ -931,9 +944,9 @@
 
     .switch {
         padding: 0 10px;
-        border: 1px solid var(--line);
+        border: 1px solid color-mix(in oklch, var(--line) 62%, transparent);
         border-radius: 7px;
-        background: var(--panel-2);
+        background: color-mix(in oklch, var(--panel-2) 56%, transparent);
     }
 
     input[type="checkbox"] {
@@ -973,8 +986,7 @@
 
         .tool-group {
             width: 100%;
-            border-right: 1px solid
-                color-mix(in oklch, var(--line) 78%, transparent);
+            box-shadow: none;
         }
 
         .tool-group:last-child {

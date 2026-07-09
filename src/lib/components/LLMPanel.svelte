@@ -171,11 +171,12 @@
             <span>API 키</span>
             <input
                 class="llm-secret-input"
-                type="password"
-                name="dc-code-paste-api-token"
+                type="text"
+                name="dc-code-paste-llm-token"
                 bind:value={llmApiKey}
                 autocomplete="off"
                 autocapitalize="off"
+                autocorrect="off"
                 inputmode="text"
                 spellcheck="false"
                 data-form-type="other"
