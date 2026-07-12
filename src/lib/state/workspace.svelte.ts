@@ -372,6 +372,8 @@ export function createWorkspaceState() {
 
   let openRouterModelLoadTurn = 0;
 
+  let llmGenerationTurn = 0;
+
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
     setHtml(value) {
@@ -651,6 +653,14 @@ export function createWorkspaceState() {
     return draftHistoryFingerprint(cloneDocumentContent(documentJson), currentDraftPreferences());
   }
 
+  function checkpointCurrentDraftBeforeReplacement() {
+    if (currentDraftHistoryFingerprint() === lastDraftHistoryFingerprint) {
+      return true;
+    }
+
+    return saveDraftHistorySnapshot({ automatic: true });
+  }
+
   function draftHistorySummary(snapshot: DraftHistorySnapshot) {
     const themeLabel =
       snapshot.preferences.documentTheme === "darkEditorial" ? "어두운 글" : "밝은 글";
@@ -718,6 +728,7 @@ export function createWorkspaceState() {
   }
 
   function closeTransientPanels() {
+    cancelLlmGeneration();
     closeCodeLineContextMenu();
     cancelRename();
     isLinkPanelOpen = false;
@@ -740,6 +751,7 @@ export function createWorkspaceState() {
     resetMarkdownImportState();
 
     if (isMarkdownPanelOpen) {
+      cancelLlmGeneration();
       isLlmPanelOpen = false;
       isStoragePanelOpen = false;
     }
@@ -749,6 +761,7 @@ export function createWorkspaceState() {
     isStoragePanelOpen = !isStoragePanelOpen;
 
     if (isStoragePanelOpen) {
+      cancelLlmGeneration();
       isMarkdownPanelOpen = false;
       isLlmPanelOpen = false;
       resetMarkdownImportState();
@@ -766,9 +779,14 @@ export function createWorkspaceState() {
       if (llmProvider === "openrouter" && openRouterModelState === "idle") {
         void refreshOpenRouterModels();
       }
-    } else if (llmGenerationState !== "loading") {
-      llmGenerationState = "idle";
+    } else {
+      cancelLlmGeneration();
     }
+  }
+
+  function cancelLlmGeneration() {
+    llmGenerationTurn += 1;
+    llmGenerationState = "idle";
   }
 
   function selectLlmProvider(value: string) {
@@ -968,6 +986,11 @@ export function createWorkspaceState() {
   function restoreDraftHistorySnapshot(snapshot: DraftHistorySnapshot) {
     const preferences = cloneDraftPreferences(snapshot.preferences);
     const nextDocument = cloneDocumentContent(snapshot.document);
+
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      return;
+    }
+
     applyDraftPreferences(preferences);
     replaceEditorDocument(nextDocument);
 
@@ -1020,7 +1043,11 @@ export function createWorkspaceState() {
       return;
     }
 
-    saveDraftHistorySnapshot({ automatic: true });
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      markdownImportState = "error";
+      markdownImportError = "복구 지점 저장 실패";
+      return;
+    }
 
     const nextDocument = parseMarkdownToDocument(markdownDraft, {
       defaultLanguage: language,
@@ -1076,6 +1103,11 @@ export function createWorkspaceState() {
   }
 
   function applyPreset(preset: PresetSnapshot) {
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      presetState = "error";
+      return;
+    }
+
     applyDraftPreferences(cloneDraftPreferences(preset.preferences));
     replaceEditorDocument(preset.document);
 
@@ -1152,6 +1184,14 @@ export function createWorkspaceState() {
       draftPersistTimer = undefined;
       persistCurrentDraftSnapshot(nextDocument, preferences);
     }, draftPersistDebounceMs);
+  }
+
+  function flushScheduledDraftPersist() {
+    clearScheduledDraftPersist();
+
+    if (canPersistDraft) {
+      persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
+    }
   }
 
   function normalizeBlockLabel(value: unknown) {
@@ -2673,6 +2713,10 @@ export function createWorkspaceState() {
       return;
     }
 
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      return;
+    }
+
     const storage = draftStorage();
     if (storage) {
       clearDraftSnapshot(storage);
@@ -2692,6 +2736,9 @@ export function createWorkspaceState() {
       return;
     }
 
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      return;
+    }
     applyDraftPreferences(defaultDraftPreferences());
     replaceEditorDocument(sampleDocument);
     isLinkPanelOpen = false;
@@ -2735,6 +2782,8 @@ export function createWorkspaceState() {
       return;
     }
 
+    const turn = ++llmGenerationTurn;
+    const markdownAtRequestStart = markdownDraft;
     llmGenerationState = "loading";
     llmGenerationError = "";
 
@@ -2749,6 +2798,13 @@ export function createWorkspaceState() {
         appTitle: "dc-code-paste",
       });
 
+      if (turn !== llmGenerationTurn || markdownDraft !== markdownAtRequestStart) {
+        if (turn === llmGenerationTurn) {
+          llmGenerationState = "idle";
+        }
+        return;
+      }
+
       markdownDraft = markdown;
       resetMarkdownImportState();
       isLlmPanelOpen = false;
@@ -2756,6 +2812,10 @@ export function createWorkspaceState() {
       isStoragePanelOpen = false;
       llmGenerationState = "ready";
     } catch (error) {
+      if (turn !== llmGenerationTurn) {
+        return;
+      }
+
       llmGenerationError =
         llmProvider === "opencode-go" && error instanceof TypeError
           ? "OpenCode Go 직접 호출이 브라우저에서 막혔습니다."
@@ -2773,9 +2833,10 @@ export function createWorkspaceState() {
   }
 
   onDestroy(() => {
+    cancelLlmGeneration();
     clearPendingCardApply();
     clearScheduledPreviewRender();
-    clearScheduledDraftPersist();
+    flushScheduledDraftPersist();
   });
 
   onMount(() => {
@@ -2783,6 +2844,12 @@ export function createWorkspaceState() {
     let mountedEditor: Editor | undefined;
     const savedDraft = readDraftSnapshot(window.localStorage);
     const closeFloatingMenus = () => closeCodeLineContextMenu();
+    const flushDraftOnPageExit = () => flushScheduledDraftPersist();
+    const flushDraftWhenHidden = () => {
+      if (document.visibilityState === "hidden") {
+        flushScheduledDraftPersist();
+      }
+    };
     const closePanelsOnOutsidePointer = (event: PointerEvent) => {
       const target = event.target;
 
@@ -2831,6 +2898,8 @@ export function createWorkspaceState() {
     window.addEventListener("resize", closeFloatingMenus);
     window.addEventListener("scroll", closeFloatingMenus, true);
     window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("pagehide", flushDraftOnPageExit);
+    document.addEventListener("visibilitychange", flushDraftWhenHidden);
     refreshPresetSnapshots();
     refreshDraftHistorySnapshots();
 
@@ -2962,6 +3031,8 @@ export function createWorkspaceState() {
       window.removeEventListener("resize", closeFloatingMenus);
       window.removeEventListener("scroll", closeFloatingMenus, true);
       window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("pagehide", flushDraftOnPageExit);
+      document.removeEventListener("visibilitychange", flushDraftWhenHidden);
       window.removeEventListener("pointerdown", closePanelsOnOutsidePointer);
       mountedEditor?.destroy();
     };

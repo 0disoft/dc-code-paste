@@ -665,13 +665,30 @@ async function requestGemini(
 
 async function readJsonResponse(response: Response) {
   const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
+  let payload: unknown = {};
+
+  if (text) {
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      if (!response.ok) {
+        throw new Error(`LLM 요청 실패 (${response.status}): ${summarizeErrorText(text)}`);
+      }
+
+      throw new Error("LLM 응답이 올바른 JSON 형식이 아닙니다.");
+    }
+  }
 
   if (!response.ok) {
     throw new Error(`LLM 요청 실패 (${response.status}): ${summarizeErrorPayload(payload)}`);
   }
 
   return payload;
+}
+
+function summarizeErrorText(text: string) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  return normalized ? normalized.slice(0, 160) : "응답을 확인할 수 없습니다.";
 }
 
 function summarizeErrorPayload(payload: unknown) {

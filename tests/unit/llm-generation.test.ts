@@ -232,6 +232,52 @@ describe("llm-generation", () => {
     );
   });
 
+  it("preserves the HTTP status for a non-JSON provider error", async () => {
+    const fetcher = vi.fn<MockFetch>(
+      async () =>
+        new Response("upstream timeout", {
+          status: 502,
+          headers: { "Content-Type": "text/plain" },
+        }),
+    );
+
+    await expect(
+      requestLlmMarkdown(
+        {
+          provider: "openrouter",
+          apiKey: "sk-or-v1-test",
+          model: "provider/model",
+          userPrompt: "테스트 글",
+          authoringPrompt: "가이드",
+        },
+        fetcher,
+      ),
+    ).rejects.toThrow("LLM 요청 실패 (502): upstream timeout");
+  });
+
+  it("reports malformed JSON from a successful provider response", async () => {
+    const fetcher = vi.fn<MockFetch>(
+      async () =>
+        new Response("not-json", {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    );
+
+    await expect(
+      requestLlmMarkdown(
+        {
+          provider: "openrouter",
+          apiKey: "sk-or-v1-test",
+          model: "provider/model",
+          userPrompt: "테스트 글",
+          authoringPrompt: "가이드",
+        },
+        fetcher,
+      ),
+    ).rejects.toThrow("LLM 응답이 올바른 JSON 형식이 아닙니다.");
+  });
+
   it("blocks provider-native remote calls that require OpenRouter or a proxy", async () => {
     const fetcher = vi.fn<MockFetch>(async () =>
       jsonResponse({
