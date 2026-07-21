@@ -1118,14 +1118,17 @@
 
         .command-group {
             grid-column: 1;
+            grid-row: 1;
         }
 
         .tool-panel-tabs {
             grid-column: 2;
+            grid-row: 1;
         }
 
         .inline-group {
             grid-column: 1 / -1;
+            grid-row: 2;
             width: 100%;
             overflow-x: visible;
             scrollbar-gutter: auto;
