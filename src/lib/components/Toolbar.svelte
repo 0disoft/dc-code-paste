@@ -2,7 +2,7 @@
     import { getContext } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "$lib/state/workspace-context";
     import type { WorkspaceState } from "$lib/state/workspace.svelte";
-    import { Undo2, Redo2, RotateCcw, LayoutTemplate, Check, Loader2, Clipboard, FileText, Sparkles, Save, Heading1, Rows3, Bold, Italic, Link2, LinkIcon, Code2, Paintbrush, List, Quote, SeparatorHorizontal, Type, BookOpen, Highlighter, Unlink } from "lucide-svelte";
+    import { Undo2, Redo2, RotateCcw, LayoutTemplate, Check, Loader2, Clipboard, FileText, Sparkles, Save, Heading1, Rows3, Bold, Italic, Link2, LinkIcon, Code2, Paintbrush, List, Quote, SeparatorHorizontal, Type, BookOpen, Highlighter, Unlink, ChevronDown, SlidersHorizontal } from "lucide-svelte";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 </script>
@@ -201,38 +201,41 @@
             <button
                 class:active={workspace.activeToolPanel === "blocks"}
                 type="button"
-                title="블록 도구"
+                title={workspace.activeToolPanel === "blocks" ? "블록 도구 닫기" : "블록 도구 열기"}
                 aria-label="블록 도구"
                 aria-expanded={workspace.activeToolPanel === "blocks"}
                 aria-controls="block-tools"
                 onclick={() => workspace.toggleToolPanel("blocks")}
             >
                 <Rows3 size={17} />
-                <span>블록</span>
+                <span>블록 도구</span>
+                <ChevronDown class="panel-chevron" size={15} aria-hidden="true" />
             </button>
             <button
                 class:active={workspace.activeToolPanel === "code"}
                 type="button"
-                title="코드 도구"
+                title={workspace.activeToolPanel === "code" ? "코드 도구 닫기" : "코드 도구 열기"}
                 aria-label="코드 도구"
                 aria-expanded={workspace.activeToolPanel === "code"}
                 aria-controls="code-tools"
                 onclick={() => workspace.toggleToolPanel("code")}
             >
                 <Code2 size={17} />
-                <span>코드</span>
+                <span>코드 도구</span>
+                <ChevronDown class="panel-chevron" size={15} aria-hidden="true" />
             </button>
             <button
                 class:active={workspace.activeToolPanel === "style"}
                 type="button"
-                title="스타일 도구"
-                aria-label="스타일 도구"
+                title={workspace.activeToolPanel === "style" ? "글 모양 도구 닫기" : "글 모양 도구 열기"}
+                aria-label="글 모양 도구"
                 aria-expanded={workspace.activeToolPanel === "style"}
                 aria-controls="style-tools"
                 onclick={() => workspace.toggleToolPanel("style")}
             >
                 <Paintbrush size={17} />
-                <span>스타일</span>
+                <span>글 모양</span>
+                <ChevronDown class="panel-chevron" size={15} aria-hidden="true" />
             </button>
         </div>
 
@@ -282,6 +285,7 @@
 
         {#if workspace.activeToolPanel === "blocks"}
             <div id="block-tools" class="tool-group tool-panel block-insert-group">
+            <span class="panel-section-title">블록 추가</span>
             <button
                 class:active={workspace.isActive("bulletList")}
                 type="button"
@@ -376,28 +380,6 @@
             >
                 <SeparatorHorizontal size={17} />
             </button>
-            <label class="block-label-field">
-                <span><Type size={15} /> 라벨</span>
-                <input
-                    type="text"
-                    bind:this={workspace.blockLabelInput}
-                    bind:value={workspace.blockLabelDraft}
-                    aria-label="블록 라벨"
-                    placeholder={workspace.blockLabelPlaceholder()}
-                    disabled={workspace.blockLabelTarget === null}
-                    onkeydown={workspace.applyBlockLabelOnEnter}
-                />
-            </label>
-            <button
-                type="button"
-                title="라벨 적용"
-                aria-label="라벨 적용"
-                disabled={workspace.blockLabelTarget === null}
-                onclick={workspace.applyBlockLabel}
-            >
-                <Check size={17} />
-                <span>적용</span>
-            </button>
             <button
                 class:active={workspace.isCalloutActive()}
                 type="button"
@@ -480,146 +462,187 @@
                     {/each}
                 </select>
             </label>
+            {#if workspace.blockLabelTarget !== null}
+                <span class="panel-section-divider" aria-hidden="true"></span>
+                <span class="panel-section-title">선택 블록</span>
+                <label class="block-label-field">
+                    <span><Type size={15} /> 라벨</span>
+                    <input
+                        type="text"
+                        bind:this={workspace.blockLabelInput}
+                        bind:value={workspace.blockLabelDraft}
+                        aria-label="블록 라벨"
+                        placeholder={workspace.blockLabelPlaceholder()}
+                        onkeydown={workspace.applyBlockLabelOnEnter}
+                    />
+                </label>
+                <button
+                    type="button"
+                    title="라벨 적용"
+                    aria-label="라벨 적용"
+                    onclick={workspace.applyBlockLabel}
+                >
+                    <Check size={17} />
+                    <span>적용</span>
+                </button>
+            {/if}
             </div>
         {/if}
 
         {#if workspace.activeToolPanel === "code"}
             <div id="code-tools" class="tool-group tool-panel tool-group-wide code-settings-group">
-            <button
-                class:active={workspace.isActive("codeBlock")}
-                type="button"
-                onclick={workspace.applyCodeBlock}
-            >
-                <Code2 size={17} />
-                <span>코드</span>
-            </button>
-            <label>
-                <span><Code2 size={15} /> 언어</span>
-                <select
-                    bind:value={workspace.language}
-                    aria-label="코드 언어"
-                    onchange={() =>
-                        workspace.runEditorCommand((current) =>
-                            current
-                                .chain()
-                                .focus()
-                                .updateAttributes("codeBlock", { language: workspace.language })
-                                .run(),
-                        )}
+            <div class="panel-section panel-section-primary">
+                <span class="panel-section-title">코드블록</span>
+                <button
+                    class="panel-primary-action"
+                    class:active={workspace.isActive("codeBlock")}
+                    type="button"
+                    title={workspace.isActive("codeBlock") ? "코드블록 해제" : "선택한 내용 또는 현재 문단을 코드블록으로 바꾸기"}
+                    aria-label={workspace.isActive("codeBlock") ? "코드블록 해제" : "코드블록 적용"}
+                    aria-pressed={workspace.isActive("codeBlock")}
+                    onclick={workspace.applyCodeBlock}
                 >
-                    {#each workspace.supportedLanguageGroups as group}
-                        <optgroup label={group.label}>
-                            {#each group.languages as item}
+                    <Code2 size={17} />
+                    <span>{workspace.isActive("codeBlock") ? "코드블록 해제" : "코드블록 적용"}</span>
+                </button>
+                <label>
+                    <span><Code2 size={15} /> 언어</span>
+                    <select
+                        bind:value={workspace.language}
+                        aria-label="코드 언어"
+                        onchange={() =>
+                            workspace.runEditorCommand((current) =>
+                                current
+                                    .chain()
+                                    .focus()
+                                    .updateAttributes("codeBlock", { language: workspace.language })
+                                    .run(),
+                            )}
+                    >
+                        {#each workspace.supportedLanguageGroups as group}
+                            <optgroup label={group.label}>
+                                {#each group.languages as item}
+                                    <option value={item.id}>{item.label}</option>
+                                {/each}
+                            </optgroup>
+                        {/each}
+                    </select>
+                </label>
+                <label>
+                    <span><FileText size={15} /> 파일명</span>
+                    <input
+                        class="code-filename-input"
+                        type="text"
+                        bind:this={workspace.codeFilenameInput}
+                        bind:value={workspace.codeFilename}
+                        aria-label="코드 파일명"
+                        placeholder="main.cpp"
+                        onblur={workspace.applyCodeFilename}
+                        onkeydown={(event) => {
+                            if (event.key === "Enter") {
+                                workspace.applyCodeFilename();
+                            }
+                        }}
+                    />
+                </label>
+            </div>
+            <details class="tool-disclosure">
+                <summary>
+                    <SlidersHorizontal size={16} aria-hidden="true" />
+                    <span>세부 설정</span>
+                    <ChevronDown class="disclosure-chevron" size={15} aria-hidden="true" />
+                </summary>
+                <div class="tool-disclosure-content">
+                    <label>
+                        <span><Highlighter size={15} /> 강조줄</span>
+                        <input
+                            class="line-highlight-input"
+                            class:error={workspace.codeLineHighlightsInvalid}
+                            type="text"
+                            bind:value={workspace.codeLineHighlights}
+                            aria-label="코드 강조 줄"
+                            aria-invalid={workspace.codeLineHighlightsInvalid}
+                            aria-describedby={workspace.codeLineHighlightsInvalid ? "code-line-range-help" : undefined}
+                            placeholder="2,4-6"
+                            onblur={workspace.applyCodeLineHighlights}
+                            onkeydown={(event) => {
+                                if (event.key === "Enter") {
+                                    workspace.applyCodeLineHighlights();
+                                }
+                            }}
+                        />
+                    </label>
+                    <label>
+                        <span>추가줄</span>
+                        <input
+                            class="line-highlight-input"
+                            class:error={workspace.codeAdditionLinesInvalid}
+                            type="text"
+                            bind:value={workspace.codeAdditionLines}
+                            aria-label="코드 추가 줄"
+                            aria-invalid={workspace.codeAdditionLinesInvalid}
+                            aria-describedby={workspace.codeAdditionLinesInvalid ? "code-line-range-help" : undefined}
+                            placeholder="2,4-6"
+                            onblur={workspace.applyCodeAdditionLines}
+                            onkeydown={(event) => {
+                                if (event.key === "Enter") {
+                                    workspace.applyCodeAdditionLines();
+                                }
+                            }}
+                        />
+                    </label>
+                    <label>
+                        <span>삭제줄</span>
+                        <input
+                            class="line-highlight-input"
+                            class:error={workspace.codeDeletionLinesInvalid}
+                            type="text"
+                            bind:value={workspace.codeDeletionLines}
+                            aria-label="코드 삭제 줄"
+                            aria-invalid={workspace.codeDeletionLinesInvalid}
+                            aria-describedby={workspace.codeDeletionLinesInvalid ? "code-line-range-help" : undefined}
+                            placeholder="2,4-6"
+                            onblur={workspace.applyCodeDeletionLines}
+                            onkeydown={(event) => {
+                                if (event.key === "Enter") {
+                                    workspace.applyCodeDeletionLines();
+                                }
+                            }}
+                        />
+                    </label>
+                    {#if workspace.codeLineHighlightsInvalid || workspace.codeAdditionLinesInvalid || workspace.codeDeletionLinesInvalid}
+                        <span id="code-line-range-help" class="line-range-hint"
+                            >{workspace.lineRangeHelp}</span
+                        >
+                    {/if}
+                    <label>
+                        <span><Paintbrush size={15} /> 테마</span>
+                        <select bind:value={workspace.theme} aria-label="코드 테마">
+                            {#each workspace.supportedThemes as item}
                                 <option value={item.id}>{item.label}</option>
                             {/each}
-                        </optgroup>
-                    {/each}
-                </select>
-            </label>
-            <label>
-                <span><FileText size={15} /> 파일명</span>
-                <input
-                    class="code-filename-input"
-                    type="text"
-                    bind:this={workspace.codeFilenameInput}
-                    bind:value={workspace.codeFilename}
-                    aria-label="코드 파일명"
-                    placeholder="main.cpp"
-                    onblur={workspace.applyCodeFilename}
-                    onkeydown={(event) => {
-                        if (event.key === "Enter") {
-                            workspace.applyCodeFilename();
-                        }
-                    }}
-                />
-            </label>
-            <label>
-                <span><Highlighter size={15} /> 강조줄</span>
-                <input
-                    class="line-highlight-input"
-                    class:error={workspace.codeLineHighlightsInvalid}
-                    type="text"
-                    bind:value={workspace.codeLineHighlights}
-                    aria-label="코드 강조 줄"
-                    aria-invalid={workspace.codeLineHighlightsInvalid}
-                    aria-describedby={workspace.codeLineHighlightsInvalid ? "code-line-range-help" : undefined}
-                    placeholder="2,4-6"
-                    onblur={workspace.applyCodeLineHighlights}
-                    onkeydown={(event) => {
-                        if (event.key === "Enter") {
-                            workspace.applyCodeLineHighlights();
-                        }
-                    }}
-                />
-            </label>
-            <label>
-                <span>추가줄</span>
-                <input
-                    class="line-highlight-input"
-                    class:error={workspace.codeAdditionLinesInvalid}
-                    type="text"
-                    bind:value={workspace.codeAdditionLines}
-                    aria-label="코드 추가 줄"
-                    aria-invalid={workspace.codeAdditionLinesInvalid}
-                    aria-describedby={workspace.codeAdditionLinesInvalid ? "code-line-range-help" : undefined}
-                    placeholder="2,4-6"
-                    onblur={workspace.applyCodeAdditionLines}
-                    onkeydown={(event) => {
-                        if (event.key === "Enter") {
-                            workspace.applyCodeAdditionLines();
-                        }
-                    }}
-                />
-            </label>
-            <label>
-                <span>삭제줄</span>
-                <input
-                    class="line-highlight-input"
-                    class:error={workspace.codeDeletionLinesInvalid}
-                    type="text"
-                    bind:value={workspace.codeDeletionLines}
-                    aria-label="코드 삭제 줄"
-                    aria-invalid={workspace.codeDeletionLinesInvalid}
-                    aria-describedby={workspace.codeDeletionLinesInvalid ? "code-line-range-help" : undefined}
-                    placeholder="2,4-6"
-                    onblur={workspace.applyCodeDeletionLines}
-                    onkeydown={(event) => {
-                        if (event.key === "Enter") {
-                            workspace.applyCodeDeletionLines();
-                        }
-                    }}
-                />
-            </label>
-            {#if workspace.codeLineHighlightsInvalid || workspace.codeAdditionLinesInvalid || workspace.codeDeletionLinesInvalid}
-                <span id="code-line-range-help" class="line-range-hint"
-                    >{workspace.lineRangeHelp}</span
-                >
-            {/if}
-            <label>
-                <span><Paintbrush size={15} /> 테마</span>
-                <select bind:value={workspace.theme} aria-label="코드 테마">
-                    {#each workspace.supportedThemes as item}
-                        <option value={item.id}>{item.label}</option>
-                    {/each}
-                </select>
-            </label>
-            <label>
-                <span>코드 글자</span>
-                <select bind:value={workspace.codeFontSize} aria-label="코드 글자 크기">
-                    {#each workspace.codeSizes as item}
-                        <option value={item}>{item}</option>
-                    {/each}
-                </select>
-            </label>
-            <label class="switch">
-                <input type="checkbox" bind:checked={workspace.showLineNumbers} />
-                <span>줄번호</span>
-            </label>
+                        </select>
+                    </label>
+                    <label>
+                        <span>코드 글자</span>
+                        <select bind:value={workspace.codeFontSize} aria-label="코드 글자 크기">
+                            {#each workspace.codeSizes as item}
+                                <option value={item}>{item}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <label class="switch">
+                        <input type="checkbox" bind:checked={workspace.showLineNumbers} />
+                        <span>줄번호</span>
+                    </label>
+                </div>
+            </details>
             </div>
         {/if}
 
         {#if workspace.activeToolPanel === "style"}
             <div id="style-tools" class="tool-group tool-panel tool-group-wide typography-group">
+            <span class="panel-section-title">문서</span>
             <label>
                 <span><Paintbrush size={15} /> 글 배경</span>
                 <select
@@ -640,6 +663,8 @@
                     {/each}
                 </select>
             </label>
+            <span class="panel-section-divider" aria-hidden="true"></span>
+            <span class="panel-section-title">선택 영역</span>
             <label>
                 <span>선택 글자</span>
                 <select
@@ -722,7 +747,17 @@
     }
 
     .toolbar .tool-panel-tabs button {
-        min-width: 82px;
+        min-width: 118px;
+    }
+
+    .panel-chevron,
+    .disclosure-chevron {
+        transition: transform 0.16s ease;
+    }
+
+    .tool-panel-tabs button.active .panel-chevron,
+    .tool-disclosure[open] .disclosure-chevron {
+        transform: rotate(180deg);
     }
 
     .link-tool,
@@ -743,6 +778,86 @@
 
     .block-insert-group > * {
         flex: 0 0 auto;
+    }
+
+    .panel-section {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .panel-section-primary {
+        flex-wrap: wrap;
+    }
+
+    .panel-section-title {
+        flex: 0 0 auto;
+        padding: 0 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+
+    .panel-section-divider {
+        flex: 0 0 auto;
+        width: 1px;
+        height: 24px;
+        margin: 0 4px;
+        background: color-mix(in oklch, var(--line) 62%, transparent);
+    }
+
+    .tool-disclosure {
+        flex: 0 1 auto;
+        min-width: 0;
+    }
+
+    .tool-disclosure[open] {
+        flex: 1 0 100%;
+        width: 100%;
+    }
+
+    .tool-disclosure summary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-width: 116px;
+        height: 34px;
+        padding: 0 9px;
+        border: 1px solid color-mix(in oklch, var(--line) 62%, transparent);
+        border-radius: 7px;
+        background: color-mix(in oklch, var(--panel-2) 42%, transparent);
+        color: var(--text);
+        font-weight: 500;
+        cursor: pointer;
+        list-style: none;
+    }
+
+    .tool-disclosure summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .tool-disclosure summary:hover,
+    .tool-disclosure summary:focus-visible {
+        border-color: color-mix(in oklch, var(--accent) 52%, transparent);
+        background: color-mix(in oklch, var(--accent) 12%, var(--panel-2));
+    }
+
+    .tool-disclosure summary:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
+    }
+
+    .tool-disclosure-content {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        margin-top: 6px;
+        padding: 8px 6px 2px;
+        border-top: 1px solid color-mix(in oklch, var(--line) 44%, transparent);
     }
 
     .toolbar button,
@@ -820,6 +935,27 @@
     .toolbar .copy-button:disabled {
         cursor: not-allowed;
         opacity: 0.72;
+    }
+
+    .toolbar .panel-primary-action {
+        min-width: 132px;
+        border-color: color-mix(in oklch, var(--accent) 62%, transparent);
+        background: var(--accent);
+        color: oklch(22.89% 0.055 118.8);
+        font-weight: 700;
+    }
+
+    .toolbar .panel-primary-action:hover:not(:disabled),
+    .toolbar .panel-primary-action:focus-visible:not(:disabled) {
+        border-color: color-mix(in oklch, var(--accent) 82%, transparent);
+        background: color-mix(in oklch, var(--accent) 88%, white 12%);
+        color: oklch(18.8% 0.05 118.8);
+    }
+
+    .toolbar .panel-primary-action.active {
+        border-color: color-mix(in oklch, var(--line) 72%, transparent);
+        background: color-mix(in oklch, var(--panel-2) 82%, transparent);
+        color: var(--text);
     }
 
     label {
@@ -998,6 +1134,26 @@
 
         .tool-group:last-child {
             padding-bottom: 6px;
+        }
+
+        .tool-panel-tabs {
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .panel-section {
+            flex-wrap: wrap;
+        }
+
+        .tool-disclosure {
+            width: 100%;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .panel-chevron,
+        .disclosure-chevron {
+            transition: none;
         }
     }
 </style>

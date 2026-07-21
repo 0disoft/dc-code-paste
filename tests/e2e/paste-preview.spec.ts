@@ -1,5 +1,28 @@
 import { expect, test } from "@playwright/test";
 
+test("makes the code block action explicit and applies it to the current paragraph", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const editor = page.locator(".article-editor");
+  await expect(editor).toContainText("LLM을 써서 글을 빠르게 초안으로 만들 수도 있다");
+
+  const codeBlocks = editor.locator("pre");
+  const initialCodeBlockCount = await codeBlocks.count();
+  const topLevelParagraphs = editor.locator(":scope > p");
+  await expect(topLevelParagraphs).toHaveCount(1);
+  await topLevelParagraphs.click();
+
+  await page.getByRole("button", { name: "코드 도구" }).click();
+  const applyCodeBlock = page.getByRole("button", { name: "코드블록 적용" });
+  await expect(applyCodeBlock).toBeVisible();
+  await applyCodeBlock.click();
+
+  await expect(codeBlocks).toHaveCount(initialCodeBlockCount + 1);
+  await expect(page.getByRole("button", { name: "코드블록 해제" })).toBeVisible();
+});
+
 test("renders the paste tool", async ({ page }) => {
   await page.goto("/");
 
@@ -8,7 +31,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("글 편집 도구")).toBeVisible();
   await expect(page.getByRole("button", { name: "블록 도구" })).toBeVisible();
   await expect(page.getByRole("button", { name: "코드 도구" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "스타일 도구" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "글 모양 도구" })).toBeVisible();
   await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
   await expect(page.getByLabel("코드 파일명")).toHaveCount(0);
   await expect(page.getByLabel("전체 글자 크기")).toHaveCount(0);
@@ -20,6 +43,7 @@ test("renders the paste tool", async ({ page }) => {
     "aria-expanded",
     "true",
   );
+  await expect(page.getByText("블록 추가", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "콜아웃", exact: true })).toBeVisible();
   await expect(page.getByLabel("콜아웃 색상 프리셋")).toBeVisible();
   await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCount(1);
@@ -63,8 +87,10 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "콜아웃" })).toHaveCount(0);
   await expect(page.getByLabel("콜아웃 색상 프리셋")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "코드", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "코드블록 적용" })).toBeVisible();
   await expect(page.getByLabel("코드 파일명")).toBeVisible();
+  await expect(page.getByLabel("코드 강조 줄")).toBeHidden();
+  await page.getByText("세부 설정", { exact: true }).click();
   await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
   await expect(page.getByLabel("코드 추가 줄")).toBeVisible();
   await expect(page.getByLabel("코드 삭제 줄")).toBeVisible();
@@ -123,7 +149,9 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("코드 삭제 줄")).toHaveValue("6");
   await expect(page.getByLabel("코드 강조 줄")).toHaveValue("3");
 
-  await page.getByRole("button", { name: "스타일 도구" }).click();
+  await page.getByRole("button", { name: "글 모양 도구" }).click();
+  await expect(page.getByText("문서", { exact: true })).toBeVisible();
+  await expect(page.getByText("선택 영역", { exact: true })).toBeVisible();
   await expect(page.getByLabel("전체 글자 크기")).toBeVisible();
   await expect(page.getByLabel("전체 글자 크기")).toHaveValue("17px");
   await expect(page.getByLabel("선택 글자 크기")).toHaveValue("17px");
@@ -188,7 +216,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByLabel("현재 복붙 구조")).toHaveText("DC 테이블");
   await expect(page.getByLabel("현재 글 배경")).toHaveText("밝은 글");
   if ((await page.getByLabel("복사될 글 배경", { exact: true }).count()) === 0) {
-    await page.getByRole("button", { name: "스타일 도구" }).click();
+    await page.getByRole("button", { name: "글 모양 도구" }).click();
   }
   await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("darkEditorial");
   await expect(page.getByLabel("현재 글 배경")).toHaveText("어두운 글");
