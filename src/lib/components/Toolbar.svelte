@@ -1111,6 +1111,27 @@
         background: var(--swatch);
     }
 
+    @media (min-width: 721px) and (max-width: 1480px) {
+        .toolbar {
+            grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .command-group {
+            grid-column: 1;
+        }
+
+        .tool-panel-tabs {
+            grid-column: 2;
+        }
+
+        .inline-group {
+            grid-column: 1 / -1;
+            width: 100%;
+            overflow-x: visible;
+            scrollbar-gutter: auto;
+        }
+    }
+
     @media (max-width: 720px) {
         .toolbar {
             grid-template-columns: minmax(0, 1fr);
