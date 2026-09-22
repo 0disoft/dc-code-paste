@@ -50,14 +50,16 @@ export function createWorkspacePreviewRenderer({
   let previewRenderTimer: ReturnType<typeof setTimeout> | undefined;
 
   function clearScheduledPreviewRender() {
-    if (previewRenderTimer) {
+    // Invalidate running exports as soon as the document changes or cleanup runs.
+    renderTurn += 1;
+    if (previewRenderTimer !== undefined) {
       clearTimeout(previewRenderTimer);
       previewRenderTimer = undefined;
     }
+    setIsRendering(false);
   }
 
-  async function renderPreview(document: JSONContent, options: DcExportOptions) {
-    const turn = ++renderTurn;
+  async function renderForTurn(document: JSONContent, options: DcExportOptions, turn: number) {
     setIsRendering(true);
 
     try {
@@ -73,11 +75,18 @@ export function createWorkspacePreviewRenderer({
     }
   }
 
+  async function renderPreview(document: JSONContent, options: DcExportOptions) {
+    clearScheduledPreviewRender();
+    await renderForTurn(document, options, renderTurn);
+  }
+
   function schedulePreviewRender(document: JSONContent, options: DcExportOptions) {
     clearScheduledPreviewRender();
+    const turn = renderTurn;
+    setIsRendering(true);
     previewRenderTimer = setTimeout(() => {
       previewRenderTimer = undefined;
-      void renderPreview(document, options);
+      void renderForTurn(document, options, turn);
     }, debounceMs);
   }
 
