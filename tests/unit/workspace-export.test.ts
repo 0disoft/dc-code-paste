@@ -3,8 +3,13 @@ import type { JSONContent } from "@tiptap/core";
 import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
 import { createWorkspacePreviewRenderer } from "$lib/state/workspace-export";
 
-vi.mock("$lib/dc/export-document", () => ({ exportDocumentToDcHtml: vi.fn() }));
-vi.mock("$lib/dc/clipboard", () => ({ copyDcHtml: vi.fn(), copyPlainText: vi.fn() }));
+vi.mock("$lib/dc/export-document", () => ({
+  exportDocumentToDcHtml: vi.fn<typeof exportDocumentToDcHtml>(),
+}));
+vi.mock("$lib/dc/clipboard", () => ({
+  copyDcHtml: vi.fn<(html: string, plainText: string) => Promise<void>>(),
+  copyPlainText: vi.fn<(text: string) => Promise<void>>(),
+}));
 
 const options: DcExportOptions = {
   theme: "github-dark",
@@ -32,8 +37,8 @@ function deferred() {
 }
 
 function createRenderer() {
-  const setHtml = vi.fn();
-  const setIsRendering = vi.fn();
+  const setHtml = vi.fn<(html: string) => void>();
+  const setIsRendering = vi.fn<(isRendering: boolean) => void>();
   const renderer = createWorkspacePreviewRenderer({
     debounceMs: 90,
     setHtml,
@@ -139,11 +144,11 @@ describe("workspace preview render lifecycle", () => {
       .mockResolvedValueOnce("new-html");
     const { renderer, setHtml, setIsRendering } = createRenderer();
     const oldRender = renderer.renderPreview(document("old"), options);
-    const rejected = expect(oldRender).rejects.toThrow("old failure");
+    const oldOutcome = oldRender.catch((error: unknown) => error);
 
     renderer.schedulePreviewRender(document("new"), options);
     old.reject(new Error("old failure"));
-    await rejected;
+    expect(await oldOutcome).toEqual(new Error("old failure"));
 
     expect(setHtml).not.toHaveBeenCalled();
     expect(setIsRendering).toHaveBeenLastCalledWith(true);
