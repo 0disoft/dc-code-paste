@@ -1,0 +1,84 @@
+name: Pull Request CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun from packageManager
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check Svelte
+        run: bun run check
+
+      - name: Check TypeScript with tsgo
+        run: bun run typecheck:go
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Check formatting
+        run: bun run format:check
+
+      - name: Unit tests
+        run: bun run test --run
+
+      - name: Build for GitHub Pages
+        env:
+          BASE_PATH: /dc-code-paste
+        run: bun run build
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun from packageManager
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium and system dependencies
+        run: bunx --no-install playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: bun run test:e2e
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-failure-diagnostics
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
