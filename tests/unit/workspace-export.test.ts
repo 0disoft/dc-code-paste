@@ -1,0 +1,153 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { JSONContent } from "@tiptap/core";
+import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
+import { createWorkspacePreviewRenderer } from "$lib/state/workspace-export";
+
+vi.mock("$lib/dc/export-document", () => ({ exportDocumentToDcHtml: vi.fn() }));
+vi.mock("$lib/dc/clipboard", () => ({ copyDcHtml: vi.fn(), copyPlainText: vi.fn() }));
+
+const options: DcExportOptions = {
+  theme: "github-dark",
+  bodyFontFamily: "Pretendard",
+  bodyFontSize: "17px",
+  codeFontSize: "15px",
+  showLineNumbers: false,
+};
+
+function document(text: string): JSONContent {
+  return {
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  };
+}
+
+function deferred() {
+  let resolve!: (value: string) => void;
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<string>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+function createRenderer() {
+  const setHtml = vi.fn();
+  const setIsRendering = vi.fn();
+  const renderer = createWorkspacePreviewRenderer({
+    debounceMs: 90,
+    setHtml,
+    setIsRendering,
+  });
+  return { renderer, setHtml, setIsRendering };
+}
+
+describe("workspace preview render lifecycle", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.mocked(exportDocumentToDcHtml).mockReset();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("invalidates old results while a newer document is still debouncing", async () => {
+    const old = deferred();
+    vi.mocked(exportDocumentToDcHtml)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce("new-html");
+    const { renderer, setHtml, setIsRendering } = createRenderer();
+    const oldRender = renderer.renderPreview(document("old"), options);
+
+    renderer.schedulePreviewRender(document("new"), options);
+    old.resolve("old-html");
+    await oldRender;
+
+    expect(setHtml).not.toHaveBeenCalled();
+    expect(setIsRendering).toHaveBeenLastCalledWith(true);
+    await vi.advanceTimersByTimeAsync(90);
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("new-html");
+    expect(setIsRendering).toHaveBeenLastCalledWith(false);
+  });
+
+  it("prevents a running export from publishing after cleanup", async () => {
+    const old = deferred();
+    vi.mocked(exportDocumentToDcHtml).mockReturnValueOnce(old.promise);
+    const { renderer, setHtml, setIsRendering } = createRenderer();
+    const oldRender = renderer.renderPreview(document("old"), options);
+
+    renderer.clearScheduledPreviewRender();
+    old.resolve("old-html");
+    await oldRender;
+
+    expect(setHtml).not.toHaveBeenCalled();
+    expect(setIsRendering).toHaveBeenLastCalledWith(false);
+    expect(renderer.previewRenderTimer).toBeUndefined();
+  });
+
+  it("cancels delayed work when an immediate render starts", async () => {
+    vi.mocked(exportDocumentToDcHtml).mockResolvedValue("now-html");
+    const { renderer, setHtml } = createRenderer();
+    const immediateDocument = document("now");
+
+    renderer.schedulePreviewRender(document("scheduled"), options);
+    await renderer.renderPreview(immediateDocument, options);
+    await vi.advanceTimersByTimeAsync(90);
+
+    expect(exportDocumentToDcHtml).toHaveBeenCalledExactlyOnceWith(immediateDocument, options);
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("now-html");
+  });
+
+  it("reports queued work as busy and coalesces rapid edits", async () => {
+    vi.mocked(exportDocumentToDcHtml).mockResolvedValue("b-html");
+    const { renderer, setHtml, setIsRendering } = createRenderer();
+    const latestDocument = document("b");
+
+    renderer.schedulePreviewRender(document("a"), options);
+    expect(setIsRendering).toHaveBeenLastCalledWith(true);
+    renderer.schedulePreviewRender(latestDocument, options);
+    await vi.advanceTimersByTimeAsync(90);
+
+    expect(exportDocumentToDcHtml).toHaveBeenCalledExactlyOnceWith(latestDocument, options);
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("b-html");
+  });
+
+  it("keeps the latest result when the older export finishes last", async () => {
+    const old = deferred();
+    const next = deferred();
+    vi.mocked(exportDocumentToDcHtml)
+      .mockReturnValueOnce(old.promise)
+      .mockReturnValueOnce(next.promise);
+    const { renderer, setHtml } = createRenderer();
+
+    const oldRender = renderer.renderPreview(document("old"), options);
+    const nextRender = renderer.renderPreview(document("new"), options);
+    next.resolve("new-html");
+    await nextRender;
+    old.resolve("old-html");
+    await oldRender;
+
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("new-html");
+  });
+
+  it("does not let an old rejection reset a newer queued busy state", async () => {
+    const old = deferred();
+    vi.mocked(exportDocumentToDcHtml)
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce("new-html");
+    const { renderer, setHtml, setIsRendering } = createRenderer();
+    const oldRender = renderer.renderPreview(document("old"), options);
+    const rejected = expect(oldRender).rejects.toThrow("old failure");
+
+    renderer.schedulePreviewRender(document("new"), options);
+    old.reject(new Error("old failure"));
+    await rejected;
+
+    expect(setHtml).not.toHaveBeenCalled();
+    expect(setIsRendering).toHaveBeenLastCalledWith(true);
+    await vi.advanceTimersByTimeAsync(90);
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("new-html");
+  });
+});

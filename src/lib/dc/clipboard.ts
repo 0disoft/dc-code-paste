@@ -27,10 +27,13 @@ export async function copyDcHtml(html: string, plainText: string): Promise<void>
   const ClipboardItemCtor = getClipboardItemConstructor();
 
   if (ClipboardItemCtor && typeof navigator !== "undefined" && navigator.clipboard?.write) {
-    const item = new ClipboardItemCtor(createDcClipboardPayload(html, plainText));
-
-    await navigator.clipboard.write([item]);
-    return;
+    try {
+      const item = new ClipboardItemCtor(createDcClipboardPayload(html, plainText));
+      await navigator.clipboard.write([item]);
+      return;
+    } catch {
+      // An exposed async API can still reject; try the existing browser fallback.
+    }
   }
 
   if (typeof window === "undefined" || typeof document === "undefined") {
@@ -64,8 +67,12 @@ export async function copyDcHtml(html: string, plainText: string): Promise<void>
 
 export async function copyPlainText(text: string): Promise<void> {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // The fallback may also be denied; its failure must still reach the caller.
+    }
   }
 
   if (typeof window === "undefined" || typeof document === "undefined") {
