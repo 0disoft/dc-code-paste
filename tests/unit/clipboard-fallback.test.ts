@@ -8,23 +8,26 @@ function mockBrowser(copied = true) {
     value: "",
     innerHTML: "",
     style: {},
-    setAttribute: vi.fn(),
-    select: vi.fn(),
-    blur: vi.fn(),
-    remove: vi.fn(),
+    setAttribute: vi.fn<(name: string, value: string) => void>(),
+    select: vi.fn<() => void>(),
+    blur: vi.fn<() => void>(),
+    remove: vi.fn<() => void>(),
   };
   const write = vi.fn<() => Promise<void>>().mockRejectedValue(new Error("async rejected"));
   const writeText = vi.fn<() => Promise<void>>().mockRejectedValue(new Error("async rejected"));
-  const execCommand = vi.fn(() => copied);
+  const execCommand = vi.fn<(command: string) => boolean>(() => copied);
   vi.stubGlobal("ClipboardItem", MockClipboardItem);
   vi.stubGlobal("navigator", { clipboard: { write, writeText } });
   vi.stubGlobal("window", {
-    getSelection: () => ({ removeAllRanges: vi.fn(), addRange: vi.fn() }),
+    getSelection: () => ({
+      removeAllRanges: vi.fn<() => void>(),
+      addRange: vi.fn<(range: unknown) => void>(),
+    }),
   });
   vi.stubGlobal("document", {
-    createElement: vi.fn(() => target),
-    createRange: () => ({ selectNodeContents: vi.fn() }),
-    body: { append: vi.fn() },
+    createElement: vi.fn<(tagName: string) => typeof target>(() => target),
+    createRange: () => ({ selectNodeContents: vi.fn<(node: unknown) => void>() }),
+    body: { append: vi.fn<(node: unknown) => void>() },
     execCommand,
   });
   return { target, write, writeText, execCommand };
@@ -33,17 +36,22 @@ function mockBrowser(copied = true) {
 describe("clipboard fallback after async API failure", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it.each(["html", "text"])("tries the browser fallback for rejected %s writes", async (kind) => {
+  it("tries the browser fallback for rejected HTML writes", async () => {
     const { target, execCommand } = mockBrowser();
 
-    if (kind === "html") {
-      await copyDcHtml("<p>복사</p>", "복사");
-      expect(target.innerHTML).toBe("<p>복사</p>");
-    } else {
-      await copyPlainText("복사");
-      expect(target.value).toBe("복사");
-    }
+    await copyDcHtml("<p>복사</p>", "복사");
 
+    expect(target.innerHTML).toBe("<p>복사</p>");
+    expect(execCommand).toHaveBeenCalledExactlyOnceWith("copy");
+    expect(target.remove).toHaveBeenCalledOnce();
+  });
+
+  it("tries the browser fallback for rejected plain text writes", async () => {
+    const { target, execCommand } = mockBrowser();
+
+    await copyPlainText("복사");
+
+    expect(target.value).toBe("복사");
     expect(execCommand).toHaveBeenCalledExactlyOnceWith("copy");
     expect(target.remove).toHaveBeenCalledOnce();
   });
