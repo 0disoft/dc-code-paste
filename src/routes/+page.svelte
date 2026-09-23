@@ -237,10 +237,16 @@
                                 ? `저장됨${draftSavedAtLabel ? ` · ${draftSavedAtLabel}` : ""}`
                                 : workspace.draftSaveState === "error"
                                   ? "저장 실패 · 이 탭의 내용을 복사해 보관하세요"
+                                  : workspace.draftSaveState === "conflict"
+                                    ? "다른 탭에서 초안이 변경됐습니다 · 자동 저장 중지"
                                   : "저장 준비 중"}
                     </span>
                     {#if workspace.draftSaveState === "error"}
                         <button type="button" onclick={workspace.retryDraftSave}>다시 저장</button>
+                    {/if}
+                    {#if workspace.draftSaveState === "conflict"}
+                        <button type="button" onclick={workspace.loadOtherTabDraft}>다른 탭 초안 불러오기</button>
+                        <button type="button" onclick={workspace.overwriteOtherTabDraft}>이 탭 내용으로 저장</button>
                     {/if}
                 </div>
                 <span class="counter"

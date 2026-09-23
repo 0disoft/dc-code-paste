@@ -62,6 +62,7 @@ import {
   deleteDraftHistorySnapshot,
   draftStorageKey,
   maxDraftHistoryCount,
+  parseDraftSnapshot,
   readDraftHistorySnapshots,
   readDraftSnapshot,
   readDraftSnapshotWithRecovery,
@@ -366,9 +367,10 @@ export function createWorkspaceState() {
   let editorSignal = $state(0);
 
   let canPersistDraft = $state(false);
-  let draftSaveState = $state<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
+  let draftSaveState = $state<"idle" | "dirty" | "saving" | "saved" | "error" | "conflict">("idle");
   let draftLastSavedAt = $state("");
   let lastSavedDraftFingerprint = "";
+  let lastObservedDraftRaw: string | null = null;
   let invalidDraftRaw = $state("");
   let invalidDraftBackupKey = $state("");
   let invalidDraftDownloaded = $state(false);
@@ -1251,6 +1253,18 @@ export function createWorkspaceState() {
       return false;
     }
 
+    let currentRaw: string | null;
+    try {
+      currentRaw = storage.getItem(draftStorageKey);
+    } catch {
+      draftSaveState = "error";
+      return false;
+    }
+    if (currentRaw !== lastObservedDraftRaw) {
+      observeDraftStorageChange(currentRaw);
+      return draftSaveState !== "conflict";
+    }
+
     const snapshot = createDraftSnapshot(
       cloneDocumentContent(nextDocument),
       cloneDraftPreferences(preferences),
@@ -1261,6 +1275,7 @@ export function createWorkspaceState() {
       return false;
     }
 
+    lastObservedDraftRaw = JSON.stringify(snapshot);
     lastSavedDraftFingerprint = draftHistoryFingerprint(snapshot.document, snapshot.preferences);
     draftLastSavedAt = snapshot.updatedAt;
     draftSaveState = "saved";
@@ -1270,6 +1285,9 @@ export function createWorkspaceState() {
 
   function scheduleDraftPersist(nextDocument: JSONContent, preferences: DraftPreferences) {
     clearScheduledDraftPersist();
+    if (draftSaveState === "conflict") {
+      return;
+    }
     if (draftHistoryFingerprint(nextDocument, preferences) === lastSavedDraftFingerprint) {
       draftSaveState = "saved";
       return;
@@ -1294,6 +1312,88 @@ export function createWorkspaceState() {
     if (canPersistDraft) {
       persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
     }
+  }
+
+  function observeDraftStorageChange(raw: string | null) {
+    if (raw === lastObservedDraftRaw) {
+      return;
+    }
+
+    const remote = raw ? parseDraftSnapshot(raw) : undefined;
+    const currentFingerprint = draftHistoryFingerprint(documentJson, currentDraftPreferences());
+    if (
+      remote &&
+      draftHistoryFingerprint(remote.document, remote.preferences) === currentFingerprint
+    ) {
+      lastObservedDraftRaw = raw;
+      lastSavedDraftFingerprint = currentFingerprint;
+      draftLastSavedAt = remote.updatedAt;
+      draftSaveState = "saved";
+      clearScheduledDraftPersist();
+      return;
+    }
+
+    clearScheduledDraftPersist();
+    draftSaveState = "conflict";
+  }
+
+  function loadOtherTabDraft() {
+    const storage = draftStorage();
+    if (!storage || !editor || draftSaveState !== "conflict") {
+      return;
+    }
+
+    let raw: string | null;
+    try {
+      raw = storage.getItem(draftStorageKey);
+    } catch {
+      return;
+    }
+    const remote = raw ? parseDraftSnapshot(raw) : undefined;
+    if (!remote) {
+      return;
+    }
+    try {
+      editor.schema.nodeFromJSON(remote.document).check();
+    } catch {
+      return;
+    }
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      return;
+    }
+
+    lastObservedDraftRaw = raw;
+    lastSavedDraftFingerprint = draftHistoryFingerprint(remote.document, remote.preferences);
+    draftLastSavedAt = remote.updatedAt;
+    applyDraftPreferences(cloneDraftPreferences(remote.preferences));
+    replaceEditorDocument(remote.document);
+    draftSaveState = "saved";
+  }
+
+  function overwriteOtherTabDraft() {
+    const storage = draftStorage();
+    if (!storage || draftSaveState !== "conflict") {
+      return;
+    }
+
+    const recovered = readDraftSnapshotWithRecovery(storage, (snapshot) => {
+      try {
+        editor?.schema.nodeFromJSON(snapshot.document).check();
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (recovered.invalidRaw && !recovered.backupKey) {
+      return;
+    }
+    try {
+      lastObservedDraftRaw = storage.getItem(draftStorageKey);
+    } catch {
+      return;
+    }
+    draftSaveState = "dirty";
+    persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
   }
 
   function normalizeBlockLabel(value: unknown) {
@@ -2984,6 +3084,11 @@ export function createWorkspaceState() {
     let mountedEditor: Editor | undefined;
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
+    const handleDraftStorageEvent = (event: StorageEvent) => {
+      if (event.key === draftStorageKey && canPersistDraft) {
+        observeDraftStorageChange(event.newValue);
+      }
+    };
     const flushDraftWhenHidden = () => {
       if (document.visibilityState === "hidden") {
         flushScheduledDraftPersist();
@@ -3038,6 +3143,7 @@ export function createWorkspaceState() {
     window.addEventListener("scroll", closeFloatingMenus, true);
     window.addEventListener("keydown", closeOnEscape);
     window.addEventListener("pagehide", flushDraftOnPageExit);
+    window.addEventListener("storage", handleDraftStorageEvent);
     document.addEventListener("visibilitychange", flushDraftWhenHidden);
     refreshPresetSnapshots();
     refreshDraftHistorySnapshots();
@@ -3073,6 +3179,11 @@ export function createWorkspaceState() {
             }
           })
         : {};
+      try {
+        lastObservedDraftRaw = storage?.getItem(draftStorageKey) ?? null;
+      } catch {
+        lastObservedDraftRaw = null;
+      }
       invalidDraftRaw = draftRead.invalidRaw ?? "";
       invalidDraftBackupKey = draftRead.backupKey ?? "";
       if (draftRead.snapshot) {
@@ -3192,6 +3303,7 @@ export function createWorkspaceState() {
       window.removeEventListener("scroll", closeFloatingMenus, true);
       window.removeEventListener("keydown", closeOnEscape);
       window.removeEventListener("pagehide", flushDraftOnPageExit);
+      window.removeEventListener("storage", handleDraftStorageEvent);
       document.removeEventListener("visibilitychange", flushDraftWhenHidden);
       window.removeEventListener("pointerdown", closePanelsOnOutsidePointer);
       mountedEditor?.destroy();
@@ -3214,6 +3326,8 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    loadOtherTabDraft,
+    overwriteOtherTabDraft,
     get draftSaveState() {
       return draftSaveState;
     },

@@ -52,6 +52,31 @@ test("reports a failed autosave while keeping the editor usable", async ({ page 
   await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
 });
 
+test("stops a stale tab from overwriting another tab's draft", async ({ page, context }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await waitForEditor(page);
+  await expect(page.getByText(/저장됨/)).toBeVisible();
+
+  const otherTab = await context.newPage();
+  await otherTab.goto("/");
+  await waitForEditor(otherTab);
+  await openMarkdown(otherTab, "# OTHER_TAB_DRAFT");
+  await expect
+    .poll(() => otherTab.evaluate((key) => localStorage.getItem(key), draftKey))
+    .toContain("OTHER_TAB_DRAFT");
+
+  await expect(page.getByText("다른 탭에서 초안이 변경됐습니다 · 자동 저장 중지")).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
+  expect(await page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(
+    "OTHER_TAB_DRAFT",
+  );
+  await page.getByRole("button", { name: "다른 탭 초안 불러오기" }).click();
+  await expect(page.locator(".article-editor")).toContainText("OTHER_TAB_DRAFT");
+  await otherTab.close();
+});
+
 async function waitForEditor(page: Page) {
   await expect(page.locator(".article-editor")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
