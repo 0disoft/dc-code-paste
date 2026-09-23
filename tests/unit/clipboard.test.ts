@@ -82,7 +82,7 @@ describe("copyPlainText", () => {
     );
   });
 
-  it("clears fallback plain text selection even when copy is rejected", async () => {
+  it("cleans up fallback plain text selection even when copy is rejected", async () => {
     const target = {
       value: "",
       setAttribute: vi.fn<(qualifiedName: string, value: string) => void>(),
@@ -106,7 +106,6 @@ describe("copyPlainText", () => {
     await expect(copyPlainText("복사")).rejects.toThrow("Copy command was rejected.");
 
     expect(target.select).toHaveBeenCalledOnce();
-    expect(target.blur).toHaveBeenCalledOnce();
     expect(removeAllRanges).toHaveBeenCalledOnce();
     expect(target.remove).toHaveBeenCalledOnce();
   });

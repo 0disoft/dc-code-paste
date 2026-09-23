@@ -23,6 +23,45 @@ function getClipboardItemConstructor(): ClipboardItemConstructor | undefined {
   return undefined;
 }
 
+function preserveBrowserSelection() {
+  const activeElement = document.activeElement as HTMLElement | null;
+  const selection = window.getSelection();
+  const ranges = selection
+    ? Array.from({ length: selection.rangeCount }, (_, index) =>
+        selection.getRangeAt(index).cloneRange(),
+      )
+    : [];
+  const input = activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+  const inputSelection =
+    input &&
+    typeof input.selectionStart === "number" &&
+    typeof input.setSelectionRange === "function"
+      ? {
+          start: input.selectionStart,
+          end: input.selectionEnd ?? input.selectionStart,
+          direction: input.selectionDirection,
+        }
+      : undefined;
+  const scrollX = window.scrollX;
+  const scrollY = window.scrollY;
+
+  return () => {
+    if (activeElement?.isConnected) {
+      activeElement.focus({ preventScroll: true });
+      if (inputSelection) {
+        input?.setSelectionRange(
+          inputSelection.start,
+          inputSelection.end,
+          inputSelection.direction ?? "none",
+        );
+      }
+    }
+    selection?.removeAllRanges();
+    for (const range of ranges) selection?.addRange(range);
+    if (typeof window.scrollTo === "function") window.scrollTo(scrollX, scrollY);
+  };
+}
+
 export async function copyDcHtml(html: string, plainText: string): Promise<void> {
   const ClipboardItemCtor = getClipboardItemConstructor();
 
@@ -45,23 +84,30 @@ export async function copyDcHtml(html: string, plainText: string): Promise<void>
   target.style.position = "fixed";
   target.style.left = "-10000px";
   target.style.top = "0";
-  target.innerHTML = html;
-  document.body.append(target);
-
-  const selection = window.getSelection();
-  const range = document.createRange();
-  range.selectNodeContents(target);
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-
+  const restore = preserveBrowserSelection();
+  const onCopy = (event: ClipboardEvent) => {
+    if (!event.clipboardData) return;
+    event.clipboardData.setData("text/html", html);
+    event.clipboardData.setData("text/plain", plainText);
+    event.preventDefault();
+  };
   try {
+    target.innerHTML = html;
+    document.body.append(target);
+    const selection = window.getSelection();
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.addEventListener("copy", onCopy);
     const copied = document.execCommand("copy");
     if (!copied) {
       throw new Error("Copy command was rejected.");
     }
   } finally {
-    selection?.removeAllRanges();
+    document.removeEventListener("copy", onCopy);
     target.remove();
+    restore();
   }
 }
 
@@ -85,17 +131,16 @@ export async function copyPlainText(text: string): Promise<void> {
   target.style.position = "fixed";
   target.style.left = "-10000px";
   target.style.top = "0";
-  document.body.append(target);
-  target.select();
-
+  const restore = preserveBrowserSelection();
   try {
+    document.body.append(target);
+    target.select();
     const copied = document.execCommand("copy");
     if (!copied) {
       throw new Error("Copy command was rejected.");
     }
   } finally {
-    target.blur();
-    window.getSelection()?.removeAllRanges();
     target.remove();
+    restore();
   }
 }
