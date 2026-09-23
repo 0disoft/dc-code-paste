@@ -73,7 +73,7 @@ describe("draft storage", () => {
     expect(writeDraftSnapshot(storage, snapshot)).toBe(true);
 
     const restored = readDraftSnapshot(storage);
-    expect(restored?.version).toBe(1);
+    expect(restored?.version).toBe(2);
     expect(restored?.document).toEqual(sampleDocument);
     expect(restored?.preferences).toEqual(preferences);
 
@@ -203,171 +203,52 @@ describe("draft storage", () => {
     expect(restored?.preferences.documentTheme).toBe("lightLecture");
   });
 
-  it("restores collapsed markdown table paragraphs in saved drafts", () => {
-    const snapshot = {
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      document: {
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: "| 설정 항목 | 추천값 | 효과 | | --- | --- | --- | | 화면 밝기 | 자동 밝기 또는 40% 이하 | 최대 20% 절약 |",
-              },
-            ],
-          },
-        ],
-      },
-      preferences,
-    };
-
-    const restored = parseDraftSnapshot(JSON.stringify(snapshot));
-
-    expect(restored?.document.content?.[0]).toEqual({
-      type: "dcDataTable",
-      content: [
-        {
-          type: "dcDataTableRow",
-          content: [
-            {
-              type: "dcDataTableCell",
-              attrs: { header: true },
-              content: [{ type: "text", text: "설정 항목" }],
-            },
-            {
-              type: "dcDataTableCell",
-              attrs: { header: true },
-              content: [{ type: "text", text: "추천값" }],
-            },
-            {
-              type: "dcDataTableCell",
-              attrs: { header: true },
-              content: [{ type: "text", text: "효과" }],
-            },
-          ],
-        },
-        {
-          type: "dcDataTableRow",
-          content: [
-            {
-              type: "dcDataTableCell",
-              content: [{ type: "text", text: "화면 밝기" }],
-            },
-            {
-              type: "dcDataTableCell",
-              content: [{ type: "text", text: "자동 밝기 또는 40% 이하" }],
-            },
-            {
-              type: "dcDataTableCell",
-              content: [{ type: "text", text: "최대 20% 절약" }],
-            },
-          ],
-        },
-      ],
-    });
-  });
-
-  it("restores inline markdown in legacy custom block snapshots", () => {
-    const snapshot = {
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      document: {
-        type: "doc",
-        content: [
-          {
-            type: "summaryBox",
-            attrs: { label: "체크" },
-            content: [
-              {
-                type: "summaryItem",
-                content: [{ type: "text", text: "`fcstValue`는 문자열이다." }],
-              },
-            ],
-          },
-          {
-            type: "tutorialBlock",
-            content: [
-              {
-                type: "tutorialStep",
-                attrs: { title: "`items` 배열을 추출한다.", number: "01" },
-                content: [],
-              },
-              {
-                type: "tutorialStep",
-                attrs: { title: "파싱 실패 시 에러를 로깅한다.", number: "04" },
-                content: [],
-              },
-            ],
-          },
-          {
-            type: "comparisonBlock",
-            content: [
-              {
-                type: "comparisonColumn",
-                attrs: { side: "left", title: "Before" },
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [{ type: "text", text: "`int,string`으로 받는다." }],
-                  },
-                ],
-              },
-              {
-                type: "comparisonColumn",
-                attrs: { side: "right", title: "After" },
-                content: [
-                  {
-                    type: "paragraph",
-                    content: [{ type: "text", text: "`string`으로 보존한다." }],
-                  },
-                ],
-              },
-            ],
-          },
-        ],
-      },
-      preferences,
-    };
-
-    const restored = parseDraftSnapshot(JSON.stringify(snapshot));
-
-    expect(restored?.document.content?.[0]?.content?.[0]?.content).toEqual([
-      { type: "text", text: "fcstValue", marks: [{ type: "code" }] },
-      { type: "text", text: "는 문자열이다." },
-    ]);
-    expect(restored?.document.content?.[1]?.content?.[0]).toEqual({
-      type: "tutorialStep",
-      attrs: { number: "01" },
+  it("preserves literal Markdown-like text in legacy and current snapshots", () => {
+    const document = {
+      type: "doc",
       content: [
         {
           type: "paragraph",
-          content: [
-            { type: "text", text: "items", marks: [{ type: "code" }] },
-            { type: "text", text: " 배열을 추출한다." },
-          ],
+          content: [{ type: "text", text: "| A |  | B | | --- | --- | --- |" }],
         },
-      ],
-    });
-    expect(restored?.document.content?.[1]?.content?.[1]).toEqual({
-      type: "tutorialStep",
-      attrs: { number: "04" },
-      content: [
         {
-          type: "paragraph",
-          content: [{ type: "text", text: "파싱 실패 시 에러를 로깅한다." }],
+          type: "summaryBox",
+          content: [{ type: "summaryItem", content: [{ type: "text", text: "`literal`" }] }],
         },
       ],
-    });
-    expect(restored?.document.content?.[2]?.content?.[0]?.content?.[0]?.content).toEqual([
-      { type: "text", text: "int,string", marks: [{ type: "code" }] },
-      { type: "text", text: "으로 받는다." },
-    ]);
+    };
+
+    for (const version of [1, 2]) {
+      const restored = parseDraftSnapshot(
+        JSON.stringify({ version, updatedAt: "now", document, preferences }),
+      );
+      expect(restored?.version).toBe(2);
+      expect(restored?.document).toEqual(document);
+    }
   });
 
-  it("restores saved code highlight ranges without decorative blank or closing lines", () => {
+  it("repairs only the known title-only legacy tutorial shape without parsing its text", () => {
+    const document = {
+      type: "doc",
+      content: [
+        {
+          type: "tutorialBlock",
+          content: [{ type: "tutorialStep", attrs: { title: "`items` 배열" }, content: [] }],
+        },
+      ],
+    };
+    const restored = parseDraftSnapshot(
+      JSON.stringify({ version: 1, updatedAt: "now", document, preferences }),
+    );
+
+    expect(restored?.document.content?.[0]?.content?.[0]).toEqual({
+      type: "tutorialStep",
+      attrs: {},
+      content: [{ type: "paragraph", content: [{ type: "text", text: "`items` 배열" }] }],
+    });
+  });
+
+  it("keeps saved code highlight ranges unchanged", () => {
     const snapshot = {
       version: 1,
       updatedAt: new Date().toISOString(),
@@ -407,7 +288,7 @@ describe("draft storage", () => {
 
     expect(restored?.document.content?.[0]?.attrs).toEqual({
       language: "rust",
-      highlightLines: "4-5",
+      highlightLines: "4-5,9",
       filename: "rust_vec.rs",
     });
   });
