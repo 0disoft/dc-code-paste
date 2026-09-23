@@ -184,6 +184,14 @@
                     >{workspace.editor?.getText().length.toLocaleString() ?? 0}자</span
                 >
             </div>
+            {#if workspace.editorMountState === "error"}
+                <div class="copy-error" role="alert">
+                    편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.
+                    <button type="button" onclick={workspace.retryEditor}>다시 시도</button>
+                </div>
+            {:else if workspace.editorMountState === "loading"}
+                <p role="status">편집기 여는 중</p>
+            {/if}
             <div
                 class="editor-surface"
                 class:editor-surface-dark={workspace.documentTheme === "darkEditorial"}
@@ -225,12 +233,16 @@
                 <div class="panel-title">
                     {#if workspace.isRendering}
                         <span class="spin-icon"><Loader2 size={18} /></span>
-                    {:else}
+                    {:else if !workspace.previewError}
                         <Check size={18} />
                     {/if}
                     <span>미리보기</span>
                     <span class="preview-render-status" role="status">
-                        {workspace.isRendering ? "업데이트 중" : "업데이트 완료"}
+                        {workspace.isRendering
+                            ? "업데이트 중"
+                            : workspace.previewError
+                              ? "업데이트 실패"
+                              : "업데이트 완료"}
                     </span>
                 </div>
                 <div class="preview-tools">
@@ -261,7 +273,7 @@
                             class="source-copy-button"
                             type="button"
                             onclick={workspace.copySourceHtml}
-                            disabled={!workspace.html || workspace.isRendering}
+                            disabled={!workspace.html || workspace.isRendering || !!workspace.previewError}
                         >
                             {#if workspace.sourceCopyState === "copied"}
                                 <Check size={15} />
@@ -274,6 +286,13 @@
                     <span class="counter">HTML {workspace.htmlSize}</span>
                 </div>
             </div>
+
+            {#if workspace.previewError}
+                <div class="copy-error" role="alert">
+                    {workspace.previewError}
+                    <button type="button" onclick={workspace.retryPreview}>다시 시도</button>
+                </div>
+            {/if}
 
             {#if workspace.previewMode === "rendered"}
                 <div
@@ -290,7 +309,7 @@
                     class="html-source"
                     readonly
                     spellcheck="false"
-                    aria-label="복사용 HTML 원문"
+                    aria-label={workspace.previewError ? "이전 미리보기 HTML 원문" : "복사용 HTML 원문"}
                     value={workspace.html}
                 ></textarea>
             {/if}

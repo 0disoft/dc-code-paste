@@ -9,6 +9,7 @@ type PreviewRendererOptions = {
   debounceMs: number;
   setHtml: (html: string) => void;
   setIsRendering: (isRendering: boolean) => void;
+  setError: (error: string) => void;
 };
 
 type CopyStateOptions = {
@@ -45,6 +46,7 @@ export function createWorkspacePreviewRenderer({
   debounceMs,
   setHtml,
   setIsRendering,
+  setError,
 }: PreviewRendererOptions) {
   let renderTurn = 0;
   let previewRenderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -60,6 +62,8 @@ export function createWorkspacePreviewRenderer({
   }
 
   async function renderForTurn(document: JSONContent, options: DcExportOptions, turn: number) {
+    if (turn !== renderTurn) return;
+    setError("");
     setIsRendering(true);
 
     try {
@@ -67,6 +71,10 @@ export function createWorkspacePreviewRenderer({
 
       if (turn === renderTurn) {
         setHtml(nextHtml);
+      }
+    } catch {
+      if (turn === renderTurn) {
+        setError("미리보기 생성에 실패했습니다. 이전 결과가 표시될 수 있습니다.");
       }
     } finally {
       if (turn === renderTurn) {
@@ -83,6 +91,7 @@ export function createWorkspacePreviewRenderer({
   function schedulePreviewRender(document: JSONContent, options: DcExportOptions) {
     clearScheduledPreviewRender();
     const turn = renderTurn;
+    setError("");
     setIsRendering(true);
     previewRenderTimer = setTimeout(() => {
       previewRenderTimer = undefined;

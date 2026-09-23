@@ -39,12 +39,14 @@ function deferred() {
 function createRenderer() {
   const setHtml = vi.fn<(html: string) => void>();
   const setIsRendering = vi.fn<(isRendering: boolean) => void>();
+  const setError = vi.fn<(error: string) => void>();
   const renderer = createWorkspacePreviewRenderer({
     debounceMs: 90,
     setHtml,
     setIsRendering,
+    setError,
   });
-  return { renderer, setHtml, setIsRendering };
+  return { renderer, setHtml, setIsRendering, setError };
 }
 
 describe("workspace preview render lifecycle", () => {
@@ -144,15 +146,33 @@ describe("workspace preview render lifecycle", () => {
       .mockResolvedValueOnce("new-html");
     const { renderer, setHtml, setIsRendering } = createRenderer();
     const oldRender = renderer.renderPreview(document("old"), options);
-    const oldOutcome = oldRender.catch((error: unknown) => error);
 
     renderer.schedulePreviewRender(document("new"), options);
     old.reject(new Error("old failure"));
-    expect(await oldOutcome).toEqual(new Error("old failure"));
+    await oldRender;
 
     expect(setHtml).not.toHaveBeenCalled();
     expect(setIsRendering).toHaveBeenLastCalledWith(true);
     await vi.advanceTimersByTimeAsync(90);
     expect(setHtml).toHaveBeenCalledExactlyOnceWith("new-html");
+  });
+
+  it("marks the latest failed render stale and recovers on retry", async () => {
+    vi.mocked(exportDocumentToDcHtml)
+      .mockRejectedValueOnce(new Error("grammar chunk failed"))
+      .mockResolvedValueOnce("recovered-html");
+    const { renderer, setHtml, setIsRendering, setError } = createRenderer();
+
+    renderer.schedulePreviewRender(document("first"), options);
+    await vi.advanceTimersByTimeAsync(90);
+    expect(setHtml).not.toHaveBeenCalled();
+    expect(setError).toHaveBeenLastCalledWith(
+      "미리보기 생성에 실패했습니다. 이전 결과가 표시될 수 있습니다.",
+    );
+    expect(setIsRendering).toHaveBeenLastCalledWith(false);
+
+    await renderer.renderPreview(document("retry"), options);
+    expect(setHtml).toHaveBeenCalledExactlyOnceWith("recovered-html");
+    expect(setError).toHaveBeenLastCalledWith("");
   });
 });

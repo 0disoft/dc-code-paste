@@ -118,6 +118,9 @@ const lightThemes = new Set<DcThemeId>([
 function getHighlighter(): Promise<HighlighterCore> {
   highlighterPromise ??= createHighlighterCore({
     engine: createJavaScriptRegexEngine(),
+  }).catch((error: unknown) => {
+    highlighterPromise = undefined;
+    throw error;
   });
 
   return highlighterPromise;

@@ -285,6 +285,9 @@ export function createWorkspaceState() {
   let html = $state("");
 
   let isRendering = $state(false);
+  let previewError = $state("");
+  let editorMountState = $state<"idle" | "loading" | "ready" | "error">("idle");
+  let retryEditorMount: (() => Promise<void>) | undefined;
 
   let previewMode = $state<"rendered" | "source">("rendered");
 
@@ -397,6 +400,9 @@ export function createWorkspaceState() {
     },
     setIsRendering(value) {
       isRendering = value;
+    },
+    setError(value) {
+      previewError = value;
     },
   });
 
@@ -1224,6 +1230,14 @@ export function createWorkspaceState() {
 
   async function renderPreview(nextDocument: JSONContent, options: DcExportOptions) {
     await previewRenderer.renderPreview(nextDocument, options);
+  }
+
+  async function retryPreview() {
+    await renderPreview(documentJson, exportOptions());
+  }
+
+  function retryEditor() {
+    void retryEditorMount?.();
   }
 
   function schedulePreviewRender(nextDocument: JSONContent, options: DcExportOptions) {
@@ -3278,10 +3292,26 @@ export function createWorkspaceState() {
       });
     }
 
-    void mountEditor();
+    async function attemptMountEditor() {
+      if (editorMountState === "loading" || editorMountState === "ready" || disposed) return;
+      editorMountState = "loading";
+      try {
+        await mountEditor();
+        if (!disposed && mountedEditor) editorMountState = "ready";
+      } catch {
+        if (!disposed) {
+          canPersistDraft = false;
+          editorMountState = "error";
+        }
+      }
+    }
+
+    retryEditorMount = attemptMountEditor;
+    void attemptMountEditor();
 
     return () => {
       disposed = true;
+      retryEditorMount = undefined;
       window.removeEventListener("resize", closeFloatingMenus);
       window.removeEventListener("scroll", closeFloatingMenus, true);
       window.removeEventListener("keydown", closeOnEscape);
@@ -3466,6 +3496,12 @@ export function createWorkspaceState() {
     },
     set isRendering(value) {
       isRendering = value;
+    },
+    get previewError() {
+      return previewError;
+    },
+    get editorMountState() {
+      return editorMountState;
     },
     get previewMode() {
       return previewMode;
@@ -3817,6 +3853,8 @@ export function createWorkspaceState() {
     exportOptions,
     renderPreview,
     schedulePreviewRender,
+    retryPreview,
+    retryEditor,
     persistCurrentDraftSnapshot,
     scheduleDraftPersist,
     normalizeBlockLabel,

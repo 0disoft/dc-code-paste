@@ -4,7 +4,7 @@ import { copyDcHtml, copyPlainText } from "../../src/lib/dc/clipboard";
 class MockClipboardItem {}
 
 function mockBrowser(copied = true) {
-  const originalRange = { cloneRange: vi.fn<() => unknown>(() => originalRange) };
+  const originalRange: { cloneRange: () => unknown } = { cloneRange: () => originalRange };
   const selection = {
     rangeCount: 1,
     getRangeAt: vi.fn<(index: number) => unknown>(() => originalRange),
