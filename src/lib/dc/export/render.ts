@@ -677,6 +677,8 @@ function renderTextStyle(
           attrs.color,
           context.background ?? palette.articleBackground,
           context.text ?? palette.text,
+          4.5,
+          palette.articleBackground,
         )
       : undefined;
   const fontFamily =
@@ -750,7 +752,10 @@ function applyMarks(
     }
 
     if (mark.type === "textStyle") {
-      const style = joinStyle(renderTextStyle(mark, palette, context));
+      const style = joinStyle(
+        renderTextStyle(mark, palette, context),
+        context.background ?? palette.articleBackground,
+      );
       if (style) {
         html = `<span style="${style}">${html}</span>`;
       }

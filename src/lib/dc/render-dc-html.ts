@@ -1,6 +1,6 @@
 import { escapeHtml } from "./escape-html";
 import { safeDcCodeFontFamily } from "./font-stacks";
-import { joinStyle, sanitizeColor } from "./sanitize-style";
+import { compositeColor, joinStyle, sanitizeColor } from "./sanitize-style";
 
 export type DcToken = {
   content: string;
@@ -36,41 +36,52 @@ function escapeCodeContent(content: string): string {
   return escapeHtml(normalizeTokenContent(content)).replace(/ /g, "&nbsp;");
 }
 
-function tokenStyle(token: DcToken, foreground: string): string {
+function tokenStyle(token: DcToken, foreground: string, background: string): string {
   const fontStyle = token.fontStyle ?? 0;
-  return joinStyle({
-    color: sanitizeColor(token.color, foreground),
-    "font-style": fontStyle > 0 && (fontStyle & 1) === 1 ? "italic" : undefined,
-    "font-weight": fontStyle > 0 && (fontStyle & 2) === 2 ? 700 : undefined,
-    "text-decoration": fontStyle > 0 && (fontStyle & 4) === 4 ? "underline" : undefined,
-  });
+  return joinStyle(
+    {
+      color: sanitizeColor(token.color, foreground),
+      "font-style": fontStyle > 0 && (fontStyle & 1) === 1 ? "italic" : undefined,
+      "font-weight": fontStyle > 0 && (fontStyle & 2) === 2 ? 700 : undefined,
+      "text-decoration": fontStyle > 0 && (fontStyle & 4) === 4 ? "underline" : undefined,
+    },
+    background,
+  );
 }
 
-function renderToken(token: DcToken, foreground: string): string {
+function renderToken(token: DcToken, foreground: string, background: string): string {
   const content = escapeCodeContent(token.content);
   if (!content) {
     return "";
   }
 
-  return `<span style="${tokenStyle(token, foreground)}">${content}</span>`;
+  return `<span style="${tokenStyle(token, foreground, background)}">${content}</span>`;
 }
 
-function renderLineNumber(index: number, foreground: string, width: string): string {
-  const style = joinStyle({
-    color: foreground,
-    opacity: "0.45",
-    display: "inline-block",
-    width,
-    "padding-right": "12px",
-    "text-align": "right",
-    "user-select": "none",
-    "box-sizing": "content-box",
-    "white-space": "pre",
-    "word-break": "normal",
-    "overflow-wrap": "normal",
-    "font-variant-numeric": "tabular-nums",
-    "vertical-align": "top",
-  });
+function renderLineNumber(
+  index: number,
+  foreground: string,
+  width: string,
+  background: string,
+): string {
+  const style = joinStyle(
+    {
+      color: foreground,
+      opacity: "0.45",
+      display: "inline-block",
+      width,
+      "padding-right": "12px",
+      "text-align": "right",
+      "user-select": "none",
+      "box-sizing": "content-box",
+      "white-space": "pre",
+      "word-break": "normal",
+      "overflow-wrap": "normal",
+      "font-variant-numeric": "tabular-nums",
+      "vertical-align": "top",
+    },
+    background,
+  );
 
   return `<span style="${style}">${index + 1}</span>`;
 }
@@ -78,60 +89,78 @@ function renderLineNumber(index: number, foreground: string, width: string): str
 export function renderDcHtml(input: DcRenderInput): string {
   const background = sanitizeColor(input.background, fallbackBackground);
   const foreground = sanitizeColor(input.foreground, fallbackForeground);
+  let codeBackground = "#ffffff";
+  if (input.showBackground) {
+    codeBackground = compositeColor(background, fallbackBackground) ?? fallbackBackground;
+  }
   const filename = input.filename?.trim();
   const hasDecorations = input.lineDecorations?.some(Boolean) ?? false;
   const codeFontFamily = safeDcCodeFontFamily();
-  const blockStyle = joinStyle({
-    "background-color": input.showBackground ? background : undefined,
-    color: foreground,
-    "font-family": codeFontFamily,
-    "font-size": input.fontSize ?? "14px",
-    "line-height": "1.4",
-    margin: filename ? 0 : "0 0 16px",
-    "max-width": "100%",
-    padding: input.showBackground ? "14px 16px" : 0,
-    "word-break": "normal",
-    "overflow-wrap": "anywhere",
-  });
+  const blockStyle = joinStyle(
+    {
+      "background-color": input.showBackground ? background : undefined,
+      color: foreground,
+      "font-family": codeFontFamily,
+      "font-size": input.fontSize ?? "14px",
+      "line-height": "1.4",
+      margin: filename ? 0 : "0 0 16px",
+      "max-width": "100%",
+      padding: input.showBackground ? "14px 16px" : 0,
+      "word-break": "normal",
+      "overflow-wrap": "anywhere",
+    },
+    fallbackBackground,
+  );
 
   const lineNumberWidth = `${Math.min(5, Math.max(2, String(input.lines.length).length))}ch`;
   const renderedLines = input.lines.map((line, index) => {
     const decoration = input.lineDecorations?.[index];
     const lineForeground = sanitizeColor(decoration?.foreground, foreground);
+    let lineBackground = codeBackground;
+    if (decoration?.background) {
+      const decorationBackground = sanitizeColor(decoration.background, codeBackground);
+      lineBackground = compositeColor(decorationBackground, codeBackground) ?? codeBackground;
+    }
     const prefix = input.showLineNumbers
-      ? renderLineNumber(index, lineForeground, lineNumberWidth)
+      ? renderLineNumber(index, lineForeground, lineNumberWidth, lineBackground)
       : "";
-    const body = line.map((token) => renderToken(token, lineForeground)).join("");
+    const renderedTokens = line.map((token) => renderToken(token, lineForeground, lineBackground));
+    const body = renderedTokens.join("");
     const content = `${prefix}${body || "&nbsp;"}`;
 
     if (!decoration) {
       if (!hasDecorations) {
-        const plainLineStyle = joinStyle({
-          margin: 0,
-          padding: 0,
-          "min-height": "1.4em",
-        });
+        const plainLineStyle = joinStyle(
+          { margin: 0, padding: 0, "min-height": "1.4em" },
+          codeBackground,
+        );
 
         return `<div style="${plainLineStyle}">${content}</div>`;
       }
 
-      const neutralLineStyle = joinStyle({
-        margin: input.showBackground ? "0 -16px" : undefined,
-        padding: input.showBackground ? "0 16px" : undefined,
-      });
+      const neutralLineStyle = joinStyle(
+        {
+          margin: input.showBackground ? "0 -16px" : undefined,
+          padding: input.showBackground ? "0 16px" : undefined,
+        },
+        codeBackground,
+      );
 
       return `<div style="${neutralLineStyle}">${content}</div>`;
     }
 
-    const lineStyle = joinStyle({
-      margin: input.showBackground ? "0 -16px" : undefined,
-      padding: input.showBackground ? "0 16px 0 12px" : "0 0 0 8px",
-      "min-height": "1.4em",
-      "background-color": sanitizeColor(decoration.background, "transparent"),
-      color: lineForeground,
-      "border-left": `4px solid ${sanitizeColor(decoration.borderColor, lineForeground)}`,
-      "box-sizing": "border-box",
-    });
+    const lineStyle = joinStyle(
+      {
+        margin: input.showBackground ? "0 -16px" : undefined,
+        padding: input.showBackground ? "0 16px 0 12px" : "0 0 0 8px",
+        "min-height": "1.4em",
+        "background-color": sanitizeColor(decoration.background, "transparent"),
+        color: lineForeground,
+        "border-left": `4px solid ${sanitizeColor(decoration.borderColor, lineForeground)}`,
+        "box-sizing": "border-box",
+      },
+      codeBackground,
+    );
 
     return `<div style="${lineStyle}">${content}</div>`;
   });

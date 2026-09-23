@@ -13,6 +13,9 @@ type OklchColor = {
   alpha: number;
 };
 
+type SrgbColor = { red: number; green: number; blue: number };
+const white: SrgbColor = { red: 1, green: 1, blue: 1 };
+
 function expandHexPair(value: string): string {
   return value.length === 1 ? `${value}${value}` : value;
 }
@@ -63,7 +66,7 @@ function parseOklch(value: string): OklchColor | undefined {
   const rawAlpha = match[5] ? Number.parseFloat(match[5]) : 1;
   const alpha = match[6] === "%" ? rawAlpha / 100 : rawAlpha;
 
-  if ([lightness, chroma, hue, alpha].some((part) => Number.isNaN(part))) {
+  if (![lightness, chroma, hue, alpha].every(Number.isFinite)) {
     return undefined;
   }
 
@@ -93,43 +96,122 @@ function oklchToLinearRgb(color: OklchColor): { red: number; green: number; blue
   };
 }
 
-function relativeLuminance(color: OklchColor): number {
+function oklchToSrgb(color: OklchColor): SrgbColor {
   const rgb = oklchToLinearRgb(color);
-  return 0.2126 * rgb.red + 0.7152 * rgb.green + 0.0722 * rgb.blue;
+  const channel = (value: number) => {
+    const srgb = clamp(linearToSrgb(value), 0, 1);
+    return srgb > 1 - 0.000001 ? 1 : srgb < 0.000001 ? 0 : srgb;
+  };
+  return {
+    red: channel(rgb.red),
+    green: channel(rgb.green),
+    blue: channel(rgb.blue),
+  };
 }
 
-function oklchToHex(value: string): string | undefined {
-  const color = parseOklch(value);
+function composite(foreground: SrgbColor, alpha: number, background: SrgbColor): SrgbColor {
+  return {
+    red: foreground.red * alpha + background.red * (1 - alpha),
+    green: foreground.green * alpha + background.green * (1 - alpha),
+    blue: foreground.blue * alpha + background.blue * (1 - alpha),
+  };
+}
+
+function cssColorToSrgb(value: string): { rgb: SrgbColor; alpha: number } | undefined {
+  const normalized = value.trim();
+  if (hexColorPattern.test(normalized)) {
+    const raw = normalized.slice(1);
+    const step = raw.length <= 4 ? 1 : 2;
+    const byte = (offset: number) =>
+      Number.parseInt(expandHexPair(raw.slice(offset, offset + step)), 16) / 255;
+    return {
+      rgb: { red: byte(0), green: byte(step), blue: byte(step * 2) },
+      alpha: raw.length === 4 || raw.length === 8 ? byte(step * 3) : 1,
+    };
+  }
+
+  const color = parseOklch(normalized);
+  return color ? { rgb: oklchToSrgb(color), alpha: color.alpha } : undefined;
+}
+
+function visibleSrgb(value: string, background: SrgbColor): SrgbColor | undefined {
+  const color = cssColorToSrgb(value);
+  return color ? composite(color.rgb, color.alpha, background) : undefined;
+}
+
+function srgbToHex(color: SrgbColor): string {
+  return `#${toHexByte(color.red)}${toHexByte(color.green)}${toHexByte(color.blue)}`;
+}
+
+function quantizeSrgb(color: SrgbColor): SrgbColor {
+  return {
+    red: Math.round(color.red * 255) / 255,
+    green: Math.round(color.green * 255) / 255,
+    blue: Math.round(color.blue * 255) / 255,
+  };
+}
+
+export function compositeColor(value: string, background = "#ffffff"): string | undefined {
+  const base = quantizeSrgb(visibleSrgb(background, white) ?? white);
+  const visible = visibleSrgb(value, base);
+  return visible ? srgbToHex(visible) : undefined;
+}
+
+function relativeLuminance(color: SrgbColor): number {
+  return (
+    0.2126 * srgbToLinear(color.red) +
+    0.7152 * srgbToLinear(color.green) +
+    0.0722 * srgbToLinear(color.blue)
+  );
+}
+
+function oklchToHex(value: string, background: SrgbColor): string | undefined {
+  const color = visibleSrgb(value, background);
 
   if (!color) {
     return undefined;
   }
 
-  const rgb = oklchToLinearRgb(color);
-  return `#${toHexByte(linearToSrgb(rgb.red))}${toHexByte(linearToSrgb(rgb.green))}${toHexByte(
-    linearToSrgb(rgb.blue),
-  )}`;
+  return srgbToHex(color);
 }
 
-function contrastRatio(foreground: OklchColor, background: OklchColor): number {
-  const foregroundLuminance = relativeLuminance(foreground);
-  const backgroundLuminance = relativeLuminance(background);
+function contrastRatio(
+  foreground: OklchColor,
+  background: OklchColor,
+  backdrop: SrgbColor,
+): number {
+  const visibleBackground = quantizeSrgb(
+    composite(oklchToSrgb(background), background.alpha, backdrop),
+  );
+  const visibleForeground = quantizeSrgb(
+    composite(oklchToSrgb(foreground), foreground.alpha, visibleBackground),
+  );
+  const foregroundLuminance = relativeLuminance(visibleForeground);
+  const backgroundLuminance = relativeLuminance(visibleBackground);
   const lighter = Math.max(foregroundLuminance, backgroundLuminance);
   const darker = Math.min(foregroundLuminance, backgroundLuminance);
 
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function readableFallbackColor(background: OklchColor): string {
-  return relativeLuminance(background) < 0.5 ? "oklch(94% 0.018 90)" : "oklch(22% 0.018 255)";
+function prefersLightText(background: SrgbColor): boolean {
+  const luminance = relativeLuminance(background);
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.05;
+}
+
+function readableFallbackColor(background: OklchColor, backdrop: SrgbColor): string {
+  const visibleBackground = composite(oklchToSrgb(background), background.alpha, backdrop);
+  return prefersLightText(visibleBackground) ? "oklch(100% 0 0)" : "oklch(0% 0 0)";
 }
 
 function adjustReadableTextColor(
   foreground: OklchColor,
   background: OklchColor,
   minContrast: number,
+  backdrop: SrgbColor,
 ): string {
-  const shouldLighten = relativeLuminance(background) < 0.5;
+  const visibleBackground = composite(oklchToSrgb(background), background.alpha, backdrop);
+  const shouldLighten = prefersLightText(visibleBackground);
   const start = foreground.lightness;
   const end = shouldLighten ? 0.96 : 0.18;
   const direction = shouldLighten ? 1 : -1;
@@ -147,12 +229,12 @@ function adjustReadableTextColor(
       alpha: 1,
     };
 
-    if (contrastRatio(candidate, background) >= minContrast) {
+    if (contrastRatio(candidate, background, backdrop) >= minContrast) {
       return formatOklch(candidate.lightness, candidate.chroma, candidate.hue, candidate.alpha);
     }
   }
 
-  return readableFallbackColor(background);
+  return readableFallbackColor(background, backdrop);
 }
 
 function hexToOklch(value: string): string | undefined {
@@ -165,7 +247,7 @@ function hexToOklch(value: string): string | undefined {
     raw.length === 4 || raw.length === 8 ? raw.slice(step * 3, step * 4) : undefined;
   const alpha = alphaText ? Number.parseInt(expandHexPair(alphaText), 16) / 255 : 1;
 
-  if ([red, green, blue, alpha].some((part) => Number.isNaN(part))) {
+  if (![red, green, blue, alpha].every(Number.isFinite)) {
     return undefined;
   }
 
@@ -213,6 +295,7 @@ export function sanitizeReadableTextColor(
   background: string,
   fallback: string,
   minContrast = 4.5,
+  backdrop = "#ffffff",
 ): string {
   const foreground = sanitizeColor(value, fallback);
   const normalizedBackground = sanitizeColor(background, fallback);
@@ -223,20 +306,45 @@ export function sanitizeReadableTextColor(
     return foreground;
   }
 
-  if (contrastRatio(foregroundColor, backgroundColor) >= minContrast) {
+  const visibleBackdrop = visibleSrgb(backdrop, white) ?? white;
+
+  if (contrastRatio(foregroundColor, backgroundColor, visibleBackdrop) >= minContrast) {
     return foreground;
   }
 
-  return adjustReadableTextColor(foregroundColor, backgroundColor, minContrast);
+  return adjustReadableTextColor(foregroundColor, backgroundColor, minContrast, visibleBackdrop);
 }
 
-function pasteSafeStyleValue(value: string): string {
-  return value.replace(oklchFunctionPattern, (match) => oklchToHex(match) ?? match);
+function pasteSafeStyleValue(value: string, background: SrgbColor): string {
+  return value
+    .replace(oklchFunctionPattern, (match) => oklchToHex(match, background) ?? match)
+    .replace(/#[0-9a-f]{4}(?:[0-9a-f]{4})?\b/gi, (match) =>
+      srgbToHex(visibleSrgb(match, background) ?? background),
+    );
 }
 
-export function joinStyle(parts: Record<string, string | number | boolean | undefined>): string {
+export function joinStyle(
+  parts: Record<string, string | number | boolean | undefined>,
+  backdrop = "#ffffff",
+): string {
+  const base = quantizeSrgb(visibleSrgb(backdrop, white) ?? white);
+  const backgroundValue = parts["background-color"];
+  const visibleBackground =
+    typeof backgroundValue === "string"
+      ? quantizeSrgb(visibleSrgb(backgroundValue, base) ?? base)
+      : base;
+
   return Object.entries(parts)
-    .filter(([, value]) => value !== undefined && value !== false && value !== "")
-    .map(([property, value]) => `${property}:${pasteSafeStyleValue(String(value))}`)
+    .filter(
+      ([, value]) =>
+        value !== undefined &&
+        value !== false &&
+        value !== "" &&
+        (typeof value !== "number" || Number.isFinite(value)),
+    )
+    .map(([property, value]) => {
+      const background = property === "background-color" ? base : visibleBackground;
+      return `${property}:${pasteSafeStyleValue(String(value), background)}`;
+    })
     .join(";");
 }

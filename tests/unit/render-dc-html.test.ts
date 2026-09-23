@@ -3,6 +3,21 @@ import { safeDcCodeFontFamily } from "../../src/lib/dc/font-stacks";
 import { renderDcHtml } from "../../src/lib/dc/render-dc-html";
 
 describe("renderDcHtml", () => {
+  it("composites a translucent row and token against the dark code background", () => {
+    const html = renderDcHtml({
+      background: "#000000",
+      foreground: "#ffffff",
+      showBackground: true,
+      showLineNumbers: false,
+      lines: [[{ content: "visible", color: "oklch(100% 0 0 / 0.5)" }]],
+      lineDecorations: [{ background: "oklch(100% 0 0 / 0.5)" }],
+    });
+
+    expect(html).toContain("background-color:#808080");
+    expect(html).toContain("color:#c0c0c0");
+    expect(html).not.toMatch(/NaN|Infinity|oklch\(/);
+  });
+
   it("renders simple inline-style HTML for rich paste targets", () => {
     const html = renderDcHtml({
       background: "#111111",
