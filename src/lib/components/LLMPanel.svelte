@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
     import { Loader2, RotateCcw, Sparkles, X } from "lucide-svelte";
 
     type LlmModelOption = { id: string; name: string };
@@ -18,12 +19,10 @@
         activeLlmModelAutocompleteOptions: LlmModelOption[];
         isOpenRouterTopWeeklyOnly: boolean;
         openRouterModelState: "idle" | "loading" | "loaded" | "fallback" | "error";
-        openRouterModelError: string;
         openRouterModelStateLabel: string;
         openCodeGoModelStateLabel: string;
         activeLlmProvider: { apiKeyPlaceholder: string };
         llmGenerationState: "idle" | "loading" | "stale" | "ready" | "incomplete" | "error";
-        llmGenerationError: string;
         llmGenerationStateLabel: string;
         isLlmGenerateDisabled: boolean;
         onSelectProvider: (value: string) => void;
@@ -31,6 +30,7 @@
         onSelectModel: (modelId: string) => void;
         onFocusModelInput: () => void;
         onBlurModelInput: () => void;
+        onCloseModelAutocomplete: () => void;
         onSetOpenRouterTopWeeklyOnly: (value: boolean) => void;
         onRefreshModels: () => void;
         onInputApiKey: () => void;
@@ -50,12 +50,10 @@
         activeLlmModelAutocompleteOptions,
         isOpenRouterTopWeeklyOnly,
         openRouterModelState,
-        openRouterModelError,
         openRouterModelStateLabel,
         openCodeGoModelStateLabel,
         activeLlmProvider,
         llmGenerationState,
-        llmGenerationError,
         llmGenerationStateLabel,
         isLlmGenerateDisabled,
         onSelectProvider,
@@ -63,6 +61,7 @@
         onSelectModel,
         onFocusModelInput,
         onBlurModelInput,
+        onCloseModelAutocomplete,
         onSetOpenRouterTopWeeklyOnly,
         onRefreshModels,
         onInputApiKey,
@@ -71,6 +70,39 @@
         onGenerate,
         onClose,
     }: Props = $props();
+
+    let activeModelId = $state<string | null>(null);
+    const activeModelIndex = $derived(
+        activeLlmModelAutocompleteOptions.findIndex((model) => model.id === activeModelId),
+    );
+
+    function handleModelKeydown(event: KeyboardEvent) {
+        if (isComposingKeyEvent(event)) return;
+
+        if (event.key === "Escape" && shouldShowLlmModelAutocomplete) {
+            event.preventDefault();
+            event.stopPropagation();
+            activeModelId = null;
+            onCloseModelAutocomplete();
+            return;
+        }
+
+        if (!shouldShowLlmModelAutocomplete) return;
+
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const count = activeLlmModelAutocompleteOptions.length;
+            const nextIndex = event.key === "ArrowDown"
+                ? (activeModelIndex + 1) % count
+                : (activeModelIndex + count) % count;
+            activeModelId = activeLlmModelAutocompleteOptions[nextIndex].id;
+            document.getElementById(`llm-model-option-${nextIndex}`)?.scrollIntoView({ block: "nearest" });
+        } else if (event.key === "Enter" && activeModelIndex >= 0) {
+            event.preventDefault();
+            onSelectModel(activeLlmModelAutocompleteOptions[activeModelIndex].id);
+            activeModelId = null;
+        }
+    }
 </script>
 
 <section
@@ -120,11 +152,15 @@
                         aria-haspopup="listbox"
                         aria-expanded={shouldShowLlmModelAutocomplete}
                         aria-controls="llm-model-suggestions"
+                        aria-activedescendant={shouldShowLlmModelAutocomplete && activeModelIndex >= 0
+                            ? `llm-model-option-${activeModelIndex}`
+                            : undefined}
                         placeholder="모델 ID 직접 입력"
                         onfocus={onFocusModelInput}
                         onblur={onBlurModelInput}
                         oninput={(event) =>
-                            onInputModel(event.currentTarget.value)}
+                            { activeModelId = null; onInputModel(event.currentTarget.value); }}
+                        onkeydown={handleModelKeydown}
                     />
                     {#if shouldShowLlmModelAutocomplete}
                         <div
@@ -133,14 +169,16 @@
                             role="listbox"
                             aria-label="모델 추천"
                         >
-                            {#each activeLlmModelAutocompleteOptions as model}
+                            {#each activeLlmModelAutocompleteOptions as model, index}
                                 <button
+                                    id={`llm-model-option-${index}`}
                                     type="button"
                                     role="option"
-                                    aria-selected={model.id === llmModel}
+                                    tabindex="-1"
+                                    aria-selected={model.id === activeModelId}
                                     onmousedown={(event) =>
                                         event.preventDefault()}
-                                    onclick={() => onSelectModel(model.id)}
+                                    onclick={() => { onSelectModel(model.id); activeModelId = null; }}
                                 >
                                     <span>{model.id}</span>
                                     {#if model.name !== model.id}
@@ -245,17 +283,14 @@
             role="status"
             class:error={llmGenerationState === "error" || llmGenerationState === "incomplete"}
             class="markdown-status llm-status"
-            title={llmGenerationState === "error" || llmGenerationState === "incomplete"
-                ? llmGenerationError
-                : ""}>{llmGenerationStateLabel}</span
+            >{llmGenerationStateLabel}</span
         >
         {#if llmProvider === "openrouter"}
             <span
+                role="status"
                 class:error={openRouterModelState === "error"}
                 class="markdown-status llm-status"
-                title={openRouterModelState === "error"
-                    ? openRouterModelError
-                    : ""}>{openRouterModelStateLabel}</span
+                >{openRouterModelStateLabel}</span
             >
         {/if}
         {#if llmProvider === "opencode-go"}
@@ -469,8 +504,7 @@
     .llm-status {
         min-width: 0;
         max-width: min(520px, 100%);
-        overflow: hidden;
-        text-overflow: ellipsis;
+        overflow-wrap: anywhere;
     }
 
     .llm-note {
@@ -515,7 +549,7 @@
         color: var(--muted);
         font-size: 12px;
         font-weight: 850;
-        white-space: nowrap;
+        white-space: normal;
     }
 
     .markdown-status.error {

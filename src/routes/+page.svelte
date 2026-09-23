@@ -72,12 +72,10 @@
             activeLlmModelAutocompleteOptions={workspace.activeLlmModelAutocompleteOptions}
             isOpenRouterTopWeeklyOnly={workspace.isOpenRouterTopWeeklyOnly}
             openRouterModelState={workspace.openRouterModelState}
-            openRouterModelError={workspace.openRouterModelError}
             openRouterModelStateLabel={workspace.openRouterModelStateLabel}
             openCodeGoModelStateLabel={workspace.openCodeGoModelStateLabel}
             activeLlmProvider={workspace.activeLlmProvider}
             llmGenerationState={workspace.llmGenerationState}
-            llmGenerationError={workspace.llmGenerationError}
             llmGenerationStateLabel={workspace.llmGenerationStateLabel}
             isLlmGenerateDisabled={workspace.isLlmGenerateDisabled}
             onSelectProvider={workspace.selectLlmProvider}
@@ -85,6 +83,7 @@
             onSelectModel={workspace.selectLlmModel}
             onFocusModelInput={() => (workspace.isLlmModelAutocompleteOpen = true)}
             onBlurModelInput={workspace.closeLlmModelAutocompleteSoon}
+            onCloseModelAutocomplete={workspace.closeLlmModelAutocomplete}
             onSetOpenRouterTopWeeklyOnly={workspace.setOpenRouterTopWeeklyOnly}
             onRefreshModels={workspace.refreshOpenRouterModels}
             onInputApiKey={workspace.markLlmInputChanged}
@@ -220,7 +219,6 @@
 
         <aside
             class="preview-panel"
-            aria-live="polite"
             hidden={activeWorkspaceView !== "preview"}
         >
             <div class="panel-head">
@@ -231,6 +229,9 @@
                         <Check size={18} />
                     {/if}
                     <span>미리보기</span>
+                    <span class="preview-render-status" role="status">
+                        {workspace.isRendering ? "업데이트 중" : "업데이트 완료"}
+                    </span>
                 </div>
                 <div class="preview-tools">
                     <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>

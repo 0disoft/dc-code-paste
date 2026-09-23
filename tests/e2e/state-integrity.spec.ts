@@ -207,6 +207,48 @@ test("ignores a late LLM response after the user edits Markdown", async ({ page 
   await expect(page.getByLabel("Markdown 원문")).toHaveValue("# MANUAL_MARKDOWN");
 });
 
+test("selects model suggestions with the keyboard without losing focus", async ({ page }) => {
+  await page.route("**/api/v1/models**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: [
+          { id: "test/alpha", name: "Alpha", architecture: { input_modalities: ["text"] } },
+          { id: "test/beta", name: "Beta", architecture: { input_modalities: ["text"] } },
+        ],
+      }),
+    }),
+  );
+
+  await page.goto("/");
+  await waitForEditor(page);
+  await page.getByRole("button", { name: "AI 작성" }).click();
+  const modelInput = page.getByRole("combobox", { name: "모델" });
+  await modelInput.fill("test/");
+  const options = page.getByRole("listbox", { name: "모델 추천" }).getByRole("option");
+  await expect(options).toHaveCount(2);
+  await modelInput.press("ArrowDown");
+  await expect(options.nth(0)).toHaveAttribute("aria-selected", "true");
+  await expect(modelInput).toHaveAttribute("aria-activedescendant", "llm-model-option-0");
+  await modelInput.press("ArrowDown");
+  await expect(options.nth(1)).toHaveAttribute("aria-selected", "true");
+  await modelInput.dispatchEvent("keydown", { key: "Enter", isComposing: true, bubbles: true });
+  await expect(modelInput).toHaveValue("test/");
+  await modelInput.press("Enter");
+  await expect(modelInput).toHaveValue("test/beta");
+  await expect(modelInput).toBeFocused();
+  await expect(modelInput).toHaveAttribute("aria-expanded", "false");
+
+  await modelInput.fill("test/");
+  await expect(options).toHaveCount(2);
+  await modelInput.press("Escape");
+  await expect(modelInput).toHaveValue("test/");
+  await expect(modelInput).toBeFocused();
+  await expect(modelInput).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("button", { name: "AI 작성 닫기" })).toBeVisible();
+});
+
 test("keeps one LLM request in flight when its inputs change", async ({ page }) => {
   let releaseResponse!: () => void;
   const responseGate = new Promise<void>((resolve) => {

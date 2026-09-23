@@ -897,6 +897,10 @@ export function createWorkspaceState() {
     }, 120);
   }
 
+  function closeLlmModelAutocomplete() {
+    isLlmModelAutocompleteOpen = false;
+  }
+
   async function refreshOpenRouterModels() {
     if (llmProvider !== "openrouter") {
       return;
@@ -3786,6 +3790,7 @@ export function createWorkspaceState() {
     selectLlmProvider,
     updateLlmModel,
     selectLlmModel,
+    closeLlmModelAutocomplete,
     closeLlmModelAutocompleteSoon,
     refreshOpenRouterModels,
     setOpenRouterTopWeeklyOnly,
