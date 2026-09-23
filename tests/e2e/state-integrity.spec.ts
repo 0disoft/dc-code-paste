@@ -152,6 +152,23 @@ test("renames a saved preset without applying it on double click", async ({ page
   await expect(page.getByRole("button", { name: "RENAMED_PRESET 이름 변경" })).toBeVisible();
 });
 
+test("ignores Enter and Escape while an input is composing", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await waitForEditor(page);
+  await page.getByRole("button", { name: "저장함" }).click();
+  const name = page.getByLabel("프리셋 이름");
+  await name.fill("조합 중 이름");
+  await name.dispatchEvent("keydown", { key: "Enter", isComposing: true, bubbles: true });
+  await expect(page.getByLabel("저장된 프리셋").getByRole("button")).toHaveCount(0);
+  await name.dispatchEvent("keydown", { key: "Escape", isComposing: true, bubbles: true });
+  await expect(page.getByLabel("프리셋 이름")).toBeVisible();
+
+  await name.press("Enter");
+  await expect(page.getByRole("button", { name: "조합 중 이름 이름 변경" })).toBeVisible();
+});
+
 test("ignores a late LLM response after the user edits Markdown", async ({ page }) => {
   let releaseResponse!: () => void;
   const responseGate = new Promise<void>((resolve) => {

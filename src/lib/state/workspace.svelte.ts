@@ -53,6 +53,7 @@ import {
   selectedInlineRangeToSectionHeadingCommand,
   selectedInlineRangeToLinkBoxCommand,
 } from "$lib/editor/selection-commands";
+import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
 import {
   appendDraftHistorySnapshot,
@@ -1609,7 +1610,7 @@ export function createWorkspaceState() {
   }
 
   function applyBlockLabelOnEnter(event: KeyboardEvent) {
-    if (event.key !== "Enter") {
+    if (event.key !== "Enter" || isComposingKeyEvent(event)) {
       return;
     }
 
@@ -3100,7 +3101,7 @@ export function createWorkspaceState() {
       }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isComposingKeyEvent(event)) {
         if (
           codeLineContextMenu ||
           isLinkPanelOpen ||

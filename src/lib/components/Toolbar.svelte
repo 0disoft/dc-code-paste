@@ -1,6 +1,7 @@
 <script lang="ts">
     import { getContext } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "$lib/state/workspace-context";
+    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
     import type { WorkspaceState } from "$lib/state/workspace.svelte";
     import { Undo2, Redo2, RotateCcw, LayoutTemplate, Check, Loader2, Clipboard, FileText, Sparkles, Save, Heading1, Rows3, Bold, Italic, Link2, LinkIcon, Code2, Paintbrush, List, Quote, SeparatorHorizontal, Type, BookOpen, Highlighter, Unlink, ChevronDown, SlidersHorizontal } from "lucide-svelte";
 
@@ -252,6 +253,7 @@
                         placeholder="https://example.com"
                         oninput={() => (workspace.linkError = false)}
                         onkeydown={(event) => {
+                            if (isComposingKeyEvent(event)) return;
                             if (event.key === "Enter") {
                                 event.preventDefault();
                                 workspace.setLink();
@@ -539,7 +541,7 @@
                         placeholder="main.cpp"
                         onblur={workspace.applyCodeFilename}
                         onkeydown={(event) => {
-                            if (event.key === "Enter") {
+                            if (event.key === "Enter" && !isComposingKeyEvent(event)) {
                                 workspace.applyCodeFilename();
                             }
                         }}
@@ -566,7 +568,7 @@
                             placeholder="2,4-6"
                             onblur={workspace.applyCodeLineHighlights}
                             onkeydown={(event) => {
-                                if (event.key === "Enter") {
+                                if (event.key === "Enter" && !isComposingKeyEvent(event)) {
                                     workspace.applyCodeLineHighlights();
                                 }
                             }}
@@ -585,7 +587,7 @@
                             placeholder="2,4-6"
                             onblur={workspace.applyCodeAdditionLines}
                             onkeydown={(event) => {
-                                if (event.key === "Enter") {
+                                if (event.key === "Enter" && !isComposingKeyEvent(event)) {
                                     workspace.applyCodeAdditionLines();
                                 }
                             }}
@@ -604,7 +606,7 @@
                             placeholder="2,4-6"
                             onblur={workspace.applyCodeDeletionLines}
                             onkeydown={(event) => {
-                                if (event.key === "Enter") {
+                                if (event.key === "Enter" && !isComposingKeyEvent(event)) {
                                     workspace.applyCodeDeletionLines();
                                 }
                             }}

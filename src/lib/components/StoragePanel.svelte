@@ -2,6 +2,7 @@
     import { History, Pencil, Save, Trash2, X } from "lucide-svelte";
     import type { DraftHistorySnapshot } from "$lib/editor/draft-storage";
     import type { PresetSnapshot } from "$lib/editor/preset-storage";
+    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
     type RenameTarget =
         | { kind: "preset"; id: string }
@@ -73,6 +74,10 @@
     }
 
     function handleRenameKeydown(event: KeyboardEvent, save: () => void) {
+        if (isComposingKeyEvent(event)) {
+            return;
+        }
+
         if (event.key === "Enter") {
             event.preventDefault();
             save();
@@ -86,6 +91,10 @@
     }
 
     function handlePresetNameKeydown(event: KeyboardEvent) {
+        if (isComposingKeyEvent(event)) {
+            return;
+        }
+
         if (event.key === "Enter") {
             event.preventDefault();
             onSavePreset();
