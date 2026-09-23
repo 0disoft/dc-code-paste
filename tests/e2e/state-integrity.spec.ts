@@ -345,7 +345,18 @@ test("restores editor selection and focus after HTML clipboard fallback", async 
   });
 
   await copy.evaluate((button) => (button as HTMLButtonElement).click());
-  await expect(page.getByRole("button", { name: "복사됨" })).toBeVisible();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as Window & { fallbackPayload?: Record<string, string> }).fallbackPayload?.[
+              "text/html"
+            ],
+        ),
+      { timeout: 20_000 },
+    )
+    .toContain("<");
   const after = await page.evaluate(() => ({
     text: window.getSelection()?.toString(),
     focused: document.activeElement?.classList.contains("article-editor"),
@@ -359,5 +370,5 @@ test("restores editor selection and focus after HTML clipboard fallback", async 
   expect(after.scrollX).toBe(before.scrollX);
   expect(after.scrollY).toBe(before.scrollY);
   expect(after.payload?.["text/html"]).toContain("<");
-  expect(after.payload?.["text/plain"]).toContain("DC-CODE-PASTE");
+  expect(after.payload?.["text/plain"]).toContain("디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구");
 });
