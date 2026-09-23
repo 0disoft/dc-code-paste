@@ -17,6 +17,7 @@ import {
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 import type { DcExportOptions, DcDocumentTheme } from "./types";
+import { createBlockRenderCache, type BlockRenderCache } from "./block-cache";
 
 // Includes child nodes rendered through their parent block serializer.
 export const dcExportSupportedNodeTypes = new Set([
@@ -2177,11 +2178,18 @@ async function renderBlockAsync(
   node: JSONContent,
   options: DcExportOptions,
   context: RenderContext = {},
+  cache?: BlockRenderCache,
 ): Promise<string> {
   switch (node.type) {
     case "doc": {
       const children = await Promise.all(
-        childrenOf(node).map((child) => renderBlockAsync(child, options, context)),
+        childrenOf(node).map((child) =>
+          cache
+            ? cache.render(JSON.stringify([child, options, context]), () =>
+                renderBlockAsync(child, options, context),
+              )
+            : renderBlockAsync(child, options, context),
+        ),
       );
       return children.join("");
     }
@@ -2236,16 +2244,17 @@ async function renderBlockAsync(
   }
 }
 
-export async function exportDocumentToDcHtml(
+async function exportDocumentWithBlockCache(
   document: JSONContent,
   options: DcExportOptions,
+  cache?: BlockRenderCache,
 ): Promise<string> {
   if (!hasRenderableDocumentContent(document)) {
     return "";
   }
 
   const palette = documentPalette(options);
-  const body = await renderBlockAsync(document, options, { proseTableSafe: true });
+  const body = await renderBlockAsync(document, options, { proseTableSafe: true }, cache);
   const bodyWithAttribution = options.includeAttribution
     ? `${body}${renderAttributionFooter(options)}`
     : body;
@@ -2272,4 +2281,21 @@ export async function exportDocumentToDcHtml(
     `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${bodyWithAttribution}</td></tr></tbody></table>`,
     options,
   );
+}
+
+export async function exportDocumentToDcHtml(
+  document: JSONContent,
+  options: DcExportOptions,
+): Promise<string> {
+  return exportDocumentWithBlockCache(document, options);
+}
+
+export function createDcExportSession() {
+  const cache = createBlockRenderCache();
+  return {
+    exportDocument(document: JSONContent, options: DcExportOptions) {
+      return exportDocumentWithBlockCache(document, options, cache);
+    },
+    dispose: cache.dispose,
+  };
 }

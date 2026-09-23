@@ -15,6 +15,7 @@ import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
 
 import {
   defaultDcExportStructure,
+  createDcExportSession,
   type DcDocumentTheme,
   type DcExportOptions,
 } from "$lib/dc/export-document";
@@ -396,8 +397,10 @@ export function createWorkspaceState() {
 
   const llmGenerationTimeoutMs = 90_000;
 
+  const exportSession = createDcExportSession();
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
+    renderDocument: exportSession.exportDocument,
     setHtml(value) {
       html = value;
     },
@@ -2963,6 +2966,7 @@ export function createWorkspaceState() {
     await copyDcPreview({
       document: currentDocument,
       exportOptions: currentOptions,
+      renderDocument: exportSession.exportDocument,
       plainText: editor?.getText() ?? "",
       isCurrent,
       setManualHtml(value) {
@@ -3089,6 +3093,7 @@ export function createWorkspaceState() {
     copyTurn += 1;
     cancelLlmGeneration();
     clearScheduledPreviewRender();
+    exportSession.dispose();
     flushScheduledDraftPersist();
   });
 

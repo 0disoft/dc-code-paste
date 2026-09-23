@@ -3,10 +3,13 @@ import type { JSONContent } from "@tiptap/core";
 import { copyDcHtmlWhenReady, copyPlainText } from "$lib/dc/clipboard";
 import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
 
+type RenderDocument = (document: JSONContent, options: DcExportOptions) => Promise<string>;
+
 export type WorkspaceCopyState = "idle" | "copied" | "error";
 
 type PreviewRendererOptions = {
   debounceMs: number;
+  renderDocument?: RenderDocument;
   setHtml: (html: string) => void;
   setIsRendering: (isRendering: boolean) => void;
   setError: (error: string) => void;
@@ -20,6 +23,7 @@ type CopyStateOptions = {
 type CopyDcPreviewOptions = CopyStateOptions & {
   document: JSONContent;
   exportOptions: DcExportOptions;
+  renderDocument?: RenderDocument;
   plainText: string;
   isCurrent: () => boolean;
   setManualHtml: (html: string) => void;
@@ -46,6 +50,7 @@ function scheduleCopiedStateReset({
 
 export function createWorkspacePreviewRenderer({
   debounceMs,
+  renderDocument = exportDocumentToDcHtml,
   setHtml,
   setIsRendering,
   setError,
@@ -69,7 +74,7 @@ export function createWorkspacePreviewRenderer({
     setIsRendering(true);
 
     try {
-      const nextHtml = await exportDocumentToDcHtml(document, options);
+      const nextHtml = await renderDocument(document, options);
 
       if (turn === renderTurn) {
         setHtml(nextHtml);
@@ -117,6 +122,7 @@ export function createWorkspacePreviewRenderer({
 export async function copyDcPreview({
   document,
   exportOptions,
+  renderDocument = exportDocumentToDcHtml,
   plainText,
   isCurrent,
   setManualHtml,
@@ -127,7 +133,7 @@ export async function copyDcPreview({
   setManualHtml("");
   let completedHtml = "";
   const copyHtmlPromise = Promise.resolve().then(async () => {
-    const html = await exportDocumentToDcHtml(document, {
+    const html = await renderDocument(document, {
       ...exportOptions,
       includeAttribution: true,
     });
