@@ -750,13 +750,13 @@
         min-width: 118px;
     }
 
-    .panel-chevron,
-    .disclosure-chevron {
+    .tool-panel-tabs :global(.panel-chevron),
+    .tool-disclosure :global(.disclosure-chevron) {
         transition: transform 0.16s ease;
     }
 
-    .tool-panel-tabs button.active .panel-chevron,
-    .tool-disclosure[open] .disclosure-chevron {
+    .tool-panel-tabs button.active :global(.panel-chevron),
+    .tool-disclosure[open] :global(.disclosure-chevron) {
         transform: rotate(180deg);
     }
 
@@ -1175,8 +1175,8 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .panel-chevron,
-        .disclosure-chevron {
+        .tool-panel-tabs :global(.panel-chevron),
+        .tool-disclosure :global(.disclosure-chevron) {
             transition: none;
         }
     }

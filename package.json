@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "typecheck:go": "svelte-kit sync && tsgo --noEmit -p tsconfig.json --checkers 2",
     "test": "vitest",
     "test:e2e": "playwright test",
