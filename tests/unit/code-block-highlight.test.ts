@@ -49,6 +49,37 @@ describe("editor code block highlighting", () => {
     expect(plugin.getState(state)?.find()).toHaveLength(0);
   });
 
+  it("retokenizes only one changed block in a document with 100 code blocks", () => {
+    const schema = new Schema({
+      nodes: {
+        doc: { content: "block+" },
+        paragraph: { content: "text*", group: "block" },
+        codeBlock: { content: "text*", group: "block", attrs: { language: { default: "go" } } },
+        text: {},
+      },
+    });
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("intro")]),
+      ...Array.from({ length: 100 }, (_, index) =>
+        schema.node("codeBlock", { language: "go" }, [schema.text(`code ${index}`)]),
+      ),
+    ]);
+    const tokenize = vi.fn<(code: string, language: unknown) => EditorCodeToken[]>(() => [
+      { from: 0, to: 4, kind: "keyword" },
+    ]);
+    const plugin = createCodeBlockHighlightPlugin(tokenize);
+    let state = EditorState.create({ doc, plugins: [plugin] });
+    expect(tokenize).toHaveBeenCalledTimes(100);
+
+    state = state.apply(state.tr.insertText("edited ", 1));
+    expect(tokenize).toHaveBeenCalledTimes(100);
+
+    const firstCodeStart = state.doc.child(0).nodeSize + 1;
+    state = state.apply(state.tr.insertText("x", firstCodeStart));
+    expect(tokenize).toHaveBeenCalledTimes(101);
+    expect(plugin.getState(state)?.find()).toHaveLength(100);
+  });
+
   it("keeps the token cache within its byte budget after large edits", () => {
     const code = "x".repeat(80_000);
     for (let index = 0; index < 20; index += 1) {
