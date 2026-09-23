@@ -302,3 +302,61 @@ test("keeps one LLM request in flight when its inputs change", async ({ page }) 
   await expect(page.getByLabel("Markdown 원문")).not.toBeVisible();
   expect(requestCount).toBe(1);
 });
+
+test("restores editor selection and focus after HTML clipboard fallback", async ({ page }) => {
+  await page.goto("/");
+  await waitForEditor(page);
+  const before = await page.evaluate(() => {
+    const editor = document.querySelector<HTMLElement>(".article-editor");
+    const paragraph = editor?.querySelector("p");
+    if (!editor || !paragraph) throw new Error("Editor paragraph missing");
+    editor.focus();
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: async () => {
+          throw new Error("permission denied");
+        },
+      },
+    });
+    const payload: Record<string, string> = {};
+    (window as Window & { fallbackPayload?: Record<string, string> }).fallbackPayload = payload;
+    document.execCommand = (command) => {
+      if (command !== "copy") return false;
+      const event = new Event("copy", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", {
+        value: {
+          setData: (type: string, value: string) => {
+            payload[type] = value;
+          },
+        },
+      });
+      document.dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    return { text: selection?.toString(), scrollX: window.scrollX, scrollY: window.scrollY };
+  });
+
+  const copy = page.getByRole("button", { name: "디씨 복사" });
+  await copy.evaluate((button) => (button as HTMLButtonElement).click());
+  await expect(page.getByRole("button", { name: "복사됨" })).toBeVisible();
+  const after = await page.evaluate(() => ({
+    text: window.getSelection()?.toString(),
+    focused: document.activeElement?.classList.contains("article-editor"),
+    scrollX: window.scrollX,
+    scrollY: window.scrollY,
+    payload: (window as Window & { fallbackPayload?: Record<string, string> }).fallbackPayload,
+  }));
+
+  expect(after.text).toBe(before.text);
+  expect(after.focused).toBe(true);
+  expect(after.scrollX).toBe(before.scrollX);
+  expect(after.scrollY).toBe(before.scrollY);
+  expect(after.payload?.["text/html"]).toContain("<");
+  expect(after.payload?.["text/plain"]).toContain("DC-CODE-PASTE");
+});
