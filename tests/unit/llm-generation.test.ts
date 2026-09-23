@@ -232,6 +232,37 @@ describe("llm-generation", () => {
     );
   });
 
+  it("passes request cancellation to the provider fetch", async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn<MockFetch>(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+            once: true,
+          });
+        }),
+    );
+
+    const request = requestLlmMarkdown(
+      {
+        provider: "openrouter",
+        apiKey: "sk-or-v1-test",
+        model: "test/model",
+        userPrompt: "글 작성",
+        authoringPrompt: "가이드",
+        signal: controller.signal,
+      },
+      fetcher,
+    );
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/chat/completions",
+      expect.objectContaining({ signal: controller.signal }),
+    );
+
+    controller.abort();
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+  });
+
   it("preserves the HTTP status for a non-JSON provider error", async () => {
     const fetcher = vi.fn<MockFetch>(
       async () =>

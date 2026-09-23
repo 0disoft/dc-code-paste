@@ -147,16 +147,15 @@
             onBlurModelInput={workspace.closeLlmModelAutocompleteSoon}
             onSetOpenRouterTopWeeklyOnly={workspace.setOpenRouterTopWeeklyOnly}
             onRefreshModels={workspace.refreshOpenRouterModels}
-            onInputApiKey={() => (workspace.llmGenerationState = "idle")}
+            onInputApiKey={workspace.markLlmInputChanged}
             onChangeApiKey={() => {
-                workspace.llmGenerationState = "idle";
                 if (workspace.llmProvider === "openrouter") {
                     void workspace.refreshOpenRouterModels();
                 }
             }}
-            onInputPrompt={() => (workspace.llmGenerationState = "idle")}
+            onInputPrompt={workspace.markLlmInputChanged}
             onGenerate={workspace.generateMarkdownWithLlm}
-            onClose={() => (workspace.isLlmPanelOpen = false)}
+            onClose={workspace.closeLlmPanel}
         />
     {/if}
 

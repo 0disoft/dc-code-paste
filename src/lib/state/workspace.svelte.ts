@@ -324,7 +324,9 @@ export function createWorkspaceState() {
 
   let openRouterModelError = $state("");
 
-  let llmGenerationState = $state<"idle" | "loading" | "ready" | "error">("idle");
+  let llmGenerationState = $state<"idle" | "loading" | "stale" | "ready" | "error">("idle");
+
+  let llmGenerationInFlight = $state(false);
 
   let llmGenerationError = $state("");
 
@@ -373,6 +375,10 @@ export function createWorkspaceState() {
   let openRouterModelLoadTurn = 0;
 
   let llmGenerationTurn = 0;
+
+  let llmGenerationController: AbortController | undefined;
+
+  const llmGenerationTimeoutMs = 90_000;
 
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
@@ -474,15 +480,17 @@ export function createWorkspaceState() {
   const llmGenerationStateLabel = $derived(
     llmGenerationState === "loading"
       ? "생성 중"
-      : llmGenerationState === "ready"
-        ? "Markdown에 넣음"
-        : llmGenerationState === "error"
-          ? llmGenerationError || "요청 실패"
-          : "대기",
+      : llmGenerationState === "stale"
+        ? "이전 요청 응답 대기"
+        : llmGenerationState === "ready"
+          ? "Markdown에 넣음"
+          : llmGenerationState === "error"
+            ? llmGenerationError || "요청 실패"
+            : "대기",
   );
 
   const isLlmGenerateDisabled = $derived(
-    llmGenerationState === "loading" ||
+    llmGenerationInFlight ||
       !isActiveLlmBrowserGenerationSupported ||
       (isActiveLlmApiKeyRequired && !llmApiKey.trim()) ||
       !llmModel.trim() ||
@@ -784,12 +792,34 @@ export function createWorkspaceState() {
     }
   }
 
+  function closeLlmPanel() {
+    cancelLlmGeneration();
+    isLlmPanelOpen = false;
+  }
+
   function cancelLlmGeneration() {
     llmGenerationTurn += 1;
+    llmGenerationController?.abort();
     llmGenerationState = "idle";
+    llmGenerationError = "";
+  }
+
+  function markLlmInputChanged() {
+    llmGenerationTurn += 1;
+    llmGenerationError = "";
+    llmGenerationState = llmGenerationInFlight ? "stale" : "idle";
+  }
+
+  function finishLlmGeneration() {
+    llmGenerationController = undefined;
+    llmGenerationInFlight = false;
+    if (llmGenerationState === "stale") {
+      llmGenerationState = "idle";
+    }
   }
 
   function selectLlmProvider(value: string) {
+    markLlmInputChanged();
     const nextProviderDefinition = llmProviders.find(
       (provider) => provider.id === value && provider.supportsBrowserGeneration !== false,
     );
@@ -797,8 +827,6 @@ export function createWorkspaceState() {
 
     llmProvider = nextProvider;
     llmModel = "";
-    llmGenerationState = "idle";
-    llmGenerationError = "";
     isLlmModelAutocompleteOpen = true;
 
     if (nextProvider === "openrouter") {
@@ -808,13 +836,13 @@ export function createWorkspaceState() {
 
   function updateLlmModel(value: string) {
     llmModel = value;
-    llmGenerationState = "idle";
+    markLlmInputChanged();
     isLlmModelAutocompleteOpen = true;
   }
 
   function selectLlmModel(value: string) {
     llmModel = value;
-    llmGenerationState = "idle";
+    markLlmInputChanged();
     isLlmModelAutocompleteOpen = false;
   }
 
@@ -2784,8 +2812,15 @@ export function createWorkspaceState() {
 
     const turn = ++llmGenerationTurn;
     const markdownAtRequestStart = markdownDraft;
+    const controller = new AbortController();
+    llmGenerationController = controller;
+    llmGenerationInFlight = true;
     llmGenerationState = "loading";
     llmGenerationError = "";
+    const timeoutId = setTimeout(
+      () => controller.abort(new DOMException("LLM request timed out", "TimeoutError")),
+      llmGenerationTimeoutMs,
+    );
 
     try {
       const markdown = await requestLlmMarkdown({
@@ -2796,9 +2831,14 @@ export function createWorkspaceState() {
         authoringPrompt: llmAuthoringPrompt,
         siteUrl: "https://0disoft.github.io/dc-code-paste/",
         appTitle: "dc-code-paste",
+        signal: controller.signal,
       });
 
-      if (turn !== llmGenerationTurn || markdownDraft !== markdownAtRequestStart) {
+      if (
+        turn !== llmGenerationTurn ||
+        controller.signal.aborted ||
+        markdownDraft !== markdownAtRequestStart
+      ) {
         if (turn === llmGenerationTurn) {
           llmGenerationState = "idle";
         }
@@ -2816,15 +2856,33 @@ export function createWorkspaceState() {
         return;
       }
 
+      if (
+        controller.signal.aborted &&
+        controller.signal.reason instanceof Error &&
+        controller.signal.reason.name === "TimeoutError"
+      ) {
+        llmGenerationError = "요청 시간이 초과됐습니다. 다시 시도해 주세요.";
+        llmGenerationState = "error";
+        return;
+      }
+
+      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
+        llmGenerationState = "idle";
+        return;
+      }
+
       llmGenerationError =
-        llmProvider === "opencode-go" && error instanceof TypeError
-          ? "OpenCode Go 직접 호출이 브라우저에서 막혔습니다."
-          : error instanceof TypeError
-            ? "브라우저 직접 호출이 막혔습니다."
-            : error instanceof Error
-              ? error.message
-              : "브라우저 직접 호출이 막혔거나 응답을 읽지 못했습니다.";
+        error instanceof TypeError
+          ? "네트워크 연결이나 브라우저 요청을 확인해 주세요."
+          : error instanceof Error
+            ? error.message
+            : "응답을 읽지 못했습니다. 다시 시도해 주세요.";
       llmGenerationState = "error";
+    } finally {
+      clearTimeout(timeoutId);
+      if (llmGenerationController === controller) {
+        finishLlmGeneration();
+      }
     }
   }
 
@@ -3511,6 +3569,8 @@ export function createWorkspaceState() {
     toggleMarkdownPanel,
     toggleStoragePanel,
     toggleLlmPanel,
+    closeLlmPanel,
+    markLlmInputChanged,
     selectLlmProvider,
     updateLlmModel,
     selectLlmModel,

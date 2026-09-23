@@ -22,7 +22,7 @@
         openRouterModelStateLabel: string;
         openCodeGoModelStateLabel: string;
         activeLlmProvider: { apiKeyPlaceholder: string };
-        llmGenerationState: "idle" | "loading" | "ready" | "error";
+        llmGenerationState: "idle" | "loading" | "stale" | "ready" | "error";
         llmGenerationError: string;
         llmGenerationStateLabel: string;
         isLlmGenerateDisabled: boolean;
@@ -220,13 +220,13 @@
             class="markdown-import-button"
             type="button"
             aria-label="AI 글 생성하기"
-            aria-busy={llmGenerationState === "loading"}
+            aria-busy={llmGenerationState === "loading" || llmGenerationState === "stale"}
             disabled={isLlmGenerateDisabled}
             onclick={onGenerate}
         >
-            {#if llmGenerationState === "loading"}
+            {#if llmGenerationState === "loading" || llmGenerationState === "stale"}
                 <span class="spin-icon"><Loader2 size={16} /></span>
-                <span>생성 중</span>
+                <span>{llmGenerationState === "stale" ? "이전 요청 대기 중" : "생성 중"}</span>
             {:else}
                 <Sparkles size={16} />
                 <span>생성하기</span>

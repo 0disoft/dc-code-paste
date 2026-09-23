@@ -30,6 +30,7 @@ export type LlmRequestInput = {
   authoringPrompt: string;
   siteUrl?: string;
   appTitle?: string;
+  signal?: AbortSignal;
 };
 
 export type OpenRouterModelOption = {
@@ -402,6 +403,7 @@ async function requestOpenRouter(
 ) {
   const response = await fetcher("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${input.apiKey.trim()}`,
@@ -433,6 +435,7 @@ async function requestOpenCodeGo(
 
   const response = await fetcher("https://opencode.ai/zen/go/v1/chat/completions", {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${input.apiKey.trim()}`,
@@ -460,6 +463,7 @@ async function requestOpenCodeGoMessages(
 ) {
   const response = await fetcher("https://opencode.ai/zen/go/v1/messages", {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${input.apiKey.trim()}`,
@@ -510,6 +514,7 @@ async function requestOpenAiCompatibleResponses(
 ) {
   const response = await fetcher(endpoint, {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       ...authorizationHeader(input.apiKey),
@@ -591,6 +596,7 @@ async function requestOpenAiCompatibleChat(
 
   const response = await fetcher(options.endpoint, {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${input.apiKey.trim()}`,
@@ -610,6 +616,7 @@ async function requestAnthropic(
 ) {
   const response = await fetcher("https://api.anthropic.com/v1/messages", {
     method: "POST",
+    signal: input.signal,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": input.apiKey.trim(),
@@ -641,6 +648,7 @@ async function requestGemini(
     )}:generateContent?key=${encodeURIComponent(input.apiKey.trim())}`,
     {
       method: "POST",
+      signal: input.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: {

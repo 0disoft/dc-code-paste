@@ -93,3 +93,46 @@ test("ignores a late LLM response after the user edits Markdown", async ({ page 
 
   await expect(page.getByLabel("Markdown 원문")).toHaveValue("# MANUAL_MARKDOWN");
 });
+
+test("keeps one LLM request in flight when its inputs change", async ({ page }) => {
+  let releaseResponse!: () => void;
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  let requestCount = 0;
+
+  await page.route("**/api/v1/models**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: '{"data":[]}' }),
+  );
+  await page.route("https://openrouter.ai/api/v1/chat/completions", async (route) => {
+    requestCount += 1;
+    await responseGate;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: '{"choices":[{"message":{"content":"# OBSOLETE_RESPONSE"}}]}',
+    });
+  });
+
+  await page.goto("/");
+  await waitForEditor(page);
+  await page.getByRole("button", { name: "AI 작성" }).click();
+  await page.getByLabel("API 키").fill("sk-or-v1-test");
+  await page.getByRole("combobox", { name: "모델" }).fill("test/old-model");
+  await page.getByRole("textbox", { name: "요청" }).fill("첫 요청");
+  const generate = page.getByRole("button", { name: "AI 글 생성하기" });
+  await generate.click();
+  await expect.poll(() => requestCount).toBe(1);
+
+  await page.getByLabel("API 키").fill("sk-or-v1-next");
+  await page.getByRole("combobox", { name: "모델" }).fill("test/new-model");
+  await page.getByRole("textbox", { name: "요청" }).fill("새 요청");
+  await expect(generate).toBeDisabled();
+  await expect(page.getByText("이전 요청 응답 대기")).toBeVisible();
+  expect(requestCount).toBe(1);
+
+  releaseResponse();
+  await expect(generate).toBeEnabled();
+  await expect(page.getByLabel("Markdown 원문")).not.toBeVisible();
+  expect(requestCount).toBe(1);
+});
