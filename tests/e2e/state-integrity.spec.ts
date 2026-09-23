@@ -307,7 +307,6 @@ test("restores editor selection and focus after HTML clipboard fallback", async 
   await page.goto("/");
   await waitForEditor(page);
   const copy = page.getByRole("button", { name: "디씨 복사" });
-  await expect(copy).toBeEnabled();
   const before = await page.evaluate(() => {
     const editor = document.querySelector<HTMLElement>(".article-editor");
     const paragraph = editor?.querySelector("p");
@@ -344,7 +343,12 @@ test("restores editor selection and focus after HTML clipboard fallback", async 
     return { text: selection?.toString(), scrollX: window.scrollX, scrollY: window.scrollY };
   });
 
-  await copy.evaluate((button) => (button as HTMLButtonElement).click());
+  await expect(copy).toBeEnabled();
+  await copy.evaluate((button) => {
+    const copyButton = button as HTMLButtonElement;
+    if (copyButton.disabled) throw new Error("Copy button became disabled before activation");
+    copyButton.click();
+  });
   await expect
     .poll(
       () =>
