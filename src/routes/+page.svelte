@@ -107,18 +107,13 @@
             onClose={() => (workspace.isStoragePanelOpen = false)}
             onPresetNameInput={() => (workspace.presetState = "idle")}
             onSavePreset={workspace.saveCurrentPreset}
-            onApplyPreset={(preset, event) =>
-                workspace.scheduleCardApply(() => workspace.applyPreset(preset), event)}
+            onApplyPreset={workspace.applyPreset}
             onBeginPresetRename={workspace.beginPresetRename}
             onSavePresetRename={workspace.savePresetRename}
             onDeletePreset={workspace.deletePreset}
             onSaveDraftHistory={() =>
                 workspace.saveDraftHistorySnapshot({ automatic: false })}
-            onRestoreDraftHistory={(snapshot, event) =>
-                workspace.scheduleCardApply(
-                    () => workspace.restoreDraftHistorySnapshot(snapshot),
-                    event,
-                )}
+            onRestoreDraftHistory={workspace.restoreDraftHistorySnapshot}
             onBeginDraftHistoryRename={workspace.beginDraftHistoryRename}
             onSaveDraftHistoryRename={workspace.saveDraftHistoryRename}
             onDeleteDraftHistory={workspace.deleteDraftHistory}

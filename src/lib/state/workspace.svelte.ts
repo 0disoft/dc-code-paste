@@ -379,8 +379,6 @@ export function createWorkspaceState() {
 
   let lastDraftHistorySavedAt = 0;
 
-  let cardApplyTimer: ReturnType<typeof setTimeout> | undefined;
-
   let draftPersistTimer: ReturnType<typeof setTimeout> | undefined;
 
   let openRouterModelLoadTurn = 0;
@@ -742,13 +740,6 @@ export function createWorkspaceState() {
     return renameTarget?.kind === kind && renameTarget.id === id;
   }
 
-  function clearPendingCardApply() {
-    if (cardApplyTimer) {
-      clearTimeout(cardApplyTimer);
-      cardApplyTimer = undefined;
-    }
-  }
-
   function clearScheduledPreviewRender() {
     previewRenderer.clearScheduledPreviewRender();
   }
@@ -973,26 +964,14 @@ export function createWorkspaceState() {
       error instanceof Error ? error.message : "OpenRouter 모델 목록을 불러오지 못했습니다.";
   }
 
-  function scheduleCardApply(callback: () => void, event: MouseEvent) {
-    if (event.detail > 1) {
-      clearPendingCardApply();
-      return;
-    }
-
-    clearPendingCardApply();
-    callback();
-  }
-
   function beginPresetRename(preset: PresetSnapshot, event: MouseEvent) {
     event.preventDefault();
-    clearPendingCardApply();
     renameTarget = { kind: "preset", id: preset.id };
     renameDraft = preset.name;
   }
 
   function beginDraftHistoryRename(snapshot: DraftHistorySnapshot, event: MouseEvent) {
     event.preventDefault();
-    clearPendingCardApply();
     renameTarget = { kind: "draft", id: snapshot.id };
     renameDraft = draftHistoryName(snapshot);
   }
@@ -3074,7 +3053,6 @@ export function createWorkspaceState() {
 
   onDestroy(() => {
     cancelLlmGeneration();
-    clearPendingCardApply();
     clearScheduledPreviewRender();
     flushScheduledDraftPersist();
   });
@@ -3795,7 +3773,6 @@ export function createWorkspaceState() {
     defaultDraftHistoryName,
     draftHistoryName,
     isRenaming,
-    clearPendingCardApply,
     clearScheduledPreviewRender,
     clearScheduledDraftPersist,
     isLineRangeInputInvalid,
@@ -3813,7 +3790,6 @@ export function createWorkspaceState() {
     setOpenRouterTopWeeklyOnly,
     applyOpenRouterModels,
     applyOpenRouterModelError,
-    scheduleCardApply,
     beginPresetRename,
     beginDraftHistoryRename,
     cancelRename,
@@ -3956,7 +3932,6 @@ export function createWorkspaceState() {
     lineRangeHelp,
     lastDraftHistoryFingerprint,
     lastDraftHistorySavedAt,
-    cardApplyTimer,
     get previewRenderTimer() {
       return previewRenderer.previewRenderTimer;
     },

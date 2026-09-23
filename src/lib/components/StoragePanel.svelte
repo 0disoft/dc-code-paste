@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { History, Save, Trash2, X } from "lucide-svelte";
+    import { History, Pencil, Save, Trash2, X } from "lucide-svelte";
     import type { DraftHistorySnapshot } from "$lib/editor/draft-storage";
     import type { PresetSnapshot } from "$lib/editor/preset-storage";
 
@@ -20,12 +20,12 @@
         onClose: () => void;
         onPresetNameInput: () => void;
         onSavePreset: () => void;
-        onApplyPreset: (preset: PresetSnapshot, event: MouseEvent) => void;
+        onApplyPreset: (preset: PresetSnapshot) => void;
         onBeginPresetRename: (preset: PresetSnapshot, event: MouseEvent) => void;
         onSavePresetRename: (id: string) => void;
         onDeletePreset: (id: string) => void;
         onSaveDraftHistory: () => void;
-        onRestoreDraftHistory: (snapshot: DraftHistorySnapshot, event: MouseEvent) => void;
+        onRestoreDraftHistory: (snapshot: DraftHistorySnapshot) => void;
         onBeginDraftHistoryRename: (snapshot: DraftHistorySnapshot, event: MouseEvent) => void;
         onSaveDraftHistoryRename: (id: string) => void;
         onDeleteDraftHistory: (id: string) => void;
@@ -151,9 +151,8 @@
                             <button
                                 type="button"
                                 class="preset-apply"
-                                title="더블클릭해서 제목 변경"
-                                onclick={(event) => onApplyPreset(preset, event)}
-                                ondblclick={(event) => onBeginPresetRename(preset, event)}
+                                title="프리셋 적용"
+                                onclick={() => onApplyPreset(preset)}
                             >
                                 <span>{preset.name}</span>
                                 <small>
@@ -163,6 +162,15 @@
                                 </small>
                             </button>
                         {/if}
+                        <button
+                            type="button"
+                            class="item-rename"
+                            aria-label={`${preset.name} 이름 변경`}
+                            title="이름 변경"
+                            onclick={(event) => onBeginPresetRename(preset, event)}
+                        >
+                            <Pencil size={15} />
+                        </button>
                         <button
                             type="button"
                             class="preset-delete"
@@ -226,14 +234,22 @@
                             <button
                                 type="button"
                                 class="draft-history-apply"
-                                title="더블클릭해서 제목 변경"
-                                onclick={(event) => onRestoreDraftHistory(snapshot, event)}
-                                ondblclick={(event) => onBeginDraftHistoryRename(snapshot, event)}
+                                title="초안 복원"
+                                onclick={() => onRestoreDraftHistory(snapshot)}
                             >
                                 <span>{draftHistoryName(snapshot)}</span>
                                 <small>{draftHistorySummary(snapshot)}</small>
                             </button>
                         {/if}
+                        <button
+                            type="button"
+                            class="item-rename"
+                            aria-label={`${draftHistoryName(snapshot)} 이름 변경`}
+                            title="이름 변경"
+                            onclick={(event) => onBeginDraftHistoryRename(snapshot, event)}
+                        >
+                            <Pencil size={15} />
+                        </button>
                         <button
                             type="button"
                             class="draft-history-delete"
@@ -437,6 +453,7 @@
         font-weight: 750;
     }
 
+    .item-rename,
     .preset-delete,
     .draft-history-delete {
         display: inline-flex;
@@ -447,6 +464,10 @@
         background: transparent;
         color: var(--muted);
         cursor: pointer;
+    }
+
+    .item-rename:hover {
+        color: var(--accent);
     }
 
     .preset-delete:hover,

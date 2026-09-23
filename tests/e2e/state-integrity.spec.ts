@@ -130,6 +130,28 @@ test("checkpoints the current draft before applying a preset", async ({ page }) 
     .toContain(sentinel);
 });
 
+test("renames a saved preset without applying it on double click", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await waitForEditor(page);
+  await page.getByRole("button", { name: "저장함" }).click();
+  await page.getByLabel("프리셋 이름").fill("SAVED_PRESET");
+  await page.getByRole("button", { name: "프리셋 저장" }).click();
+  await page.getByRole("button", { name: "닫기" }).click();
+  await openMarkdown(page, "# CURRENT_DRAFT");
+  const historyBefore = await page.evaluate((key) => localStorage.getItem(key), historyKey);
+
+  await page.getByRole("button", { name: "저장함" }).click();
+  await page.getByRole("button", { name: "SAVED_PRESET 이름 변경" }).dblclick();
+  await page.getByLabel("프리셋 제목 변경").fill("RENAMED_PRESET");
+  await page.getByLabel("프리셋 제목 변경").press("Enter");
+
+  await expect(page.locator(".article-editor")).toContainText("CURRENT_DRAFT");
+  expect(await page.evaluate((key) => localStorage.getItem(key), historyKey)).toBe(historyBefore);
+  await expect(page.getByRole("button", { name: "RENAMED_PRESET 이름 변경" })).toBeVisible();
+});
+
 test("ignores a late LLM response after the user edits Markdown", async ({ page }) => {
   let releaseResponse!: () => void;
   const responseGate = new Promise<void>((resolve) => {
