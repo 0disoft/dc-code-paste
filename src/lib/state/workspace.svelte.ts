@@ -1,4 +1,5 @@
 import { onDestroy, onMount, tick, untrack } from "svelte";
+import { createEditorMountController } from "$lib/state/editor-mount";
 
 import type { Editor, JSONContent } from "@tiptap/core";
 
@@ -3092,7 +3093,6 @@ export function createWorkspaceState() {
   });
 
   onMount(() => {
-    let disposed = false;
     let mountedEditor: Editor | undefined;
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
@@ -3174,7 +3174,7 @@ export function createWorkspaceState() {
         import("$lib/editor/extensions"),
       ]);
 
-      if (disposed || !editorHost) {
+      if (editorMountController.isDisposed || !editorHost) {
         return;
       }
 
@@ -3307,25 +3307,21 @@ export function createWorkspaceState() {
       });
     }
 
-    async function attemptMountEditor() {
-      if (editorMountState === "loading" || editorMountState === "ready" || disposed) return;
-      editorMountState = "loading";
-      try {
-        await mountEditor();
-        if (!disposed && mountedEditor) editorMountState = "ready";
-      } catch {
-        if (!disposed) {
-          canPersistDraft = false;
-          editorMountState = "error";
-        }
-      }
-    }
-
-    retryEditorMount = attemptMountEditor;
-    void attemptMountEditor();
+    const editorMountController = createEditorMountController({
+      mount: mountEditor,
+      isReady: () => Boolean(mountedEditor),
+      setState(value) {
+        editorMountState = value;
+      },
+      onFailure() {
+        canPersistDraft = false;
+      },
+    });
+    retryEditorMount = editorMountController.attempt;
+    void editorMountController.attempt();
 
     return () => {
-      disposed = true;
+      editorMountController.dispose();
       retryEditorMount = undefined;
       window.removeEventListener("resize", closeFloatingMenus);
       window.removeEventListener("scroll", closeFloatingMenus, true);
