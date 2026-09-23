@@ -306,6 +306,8 @@ test("keeps one LLM request in flight when its inputs change", async ({ page }) 
 test("restores editor selection and focus after HTML clipboard fallback", async ({ page }) => {
   await page.goto("/");
   await waitForEditor(page);
+  const copy = page.getByRole("button", { name: "디씨 복사" });
+  await expect(copy).toBeEnabled();
   const before = await page.evaluate(() => {
     const editor = document.querySelector<HTMLElement>(".article-editor");
     const paragraph = editor?.querySelector("p");
@@ -342,7 +344,6 @@ test("restores editor selection and focus after HTML clipboard fallback", async 
     return { text: selection?.toString(), scrollX: window.scrollX, scrollY: window.scrollY };
   });
 
-  const copy = page.getByRole("button", { name: "디씨 복사" });
   await copy.evaluate((button) => (button as HTMLButtonElement).click());
   await expect(page.getByRole("button", { name: "복사됨" })).toBeVisible();
   const after = await page.evaluate(() => ({

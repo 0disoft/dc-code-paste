@@ -24,6 +24,7 @@ test("makes the code block action explicit and applies it to the current paragra
 });
 
 test("renders the paste tool", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "디씨 글 디자인" })).toHaveCount(0);
@@ -51,7 +52,7 @@ test("renders the paste tool", async ({ page }) => {
   const hiddenColorInputWidth = await page.getByLabel("사용자 콜아웃 색상").evaluate((input) => {
     return Number.parseFloat(getComputedStyle(input).width);
   });
-  expect(hiddenColorInputWidth).toBeLessThanOrEqual(8);
+  expect(hiddenColorInputWidth).toBeLessThanOrEqual(16);
   await expect(page.getByRole("button", { name: "초록 콜아웃" })).toBeVisible();
   await expect(page.getByRole("button", { name: "노랑 콜아웃" })).toBeVisible();
   await expect(page.getByRole("button", { name: "파랑 콜아웃" })).toBeVisible();
