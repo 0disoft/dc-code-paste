@@ -6,6 +6,60 @@ import {
 } from "../../src/lib/editor/markdown-import";
 
 describe("markdown import", () => {
+  it("keeps literal underscores and escaped delimiters while parsing nested emphasis", () => {
+    expect(parseMarkdownInline("foo_bar_baz \\*literal\\*")).toEqual([
+      { type: "text", text: "foo_bar_baz *literal*" },
+    ]);
+    expect(parseMarkdownInline("**strong *nested***")).toEqual([
+      { type: "text", text: "strong ", marks: [{ type: "bold" }] },
+      { type: "text", text: "nested", marks: [{ type: "bold" }, { type: "italic" }] },
+    ]);
+    expect(parseMarkdownInline("*italic **strong***")).toEqual([
+      { type: "text", text: "italic ", marks: [{ type: "italic" }] },
+      { type: "text", text: "strong", marks: [{ type: "italic" }, { type: "bold" }] },
+    ]);
+    expect(parseMarkdownInline("__strong__ and _emphasis_")?.map((node) => node.marks)).toEqual([
+      [{ type: "bold" }],
+      undefined,
+      [{ type: "italic" }],
+    ]);
+  });
+
+  it("keeps balanced parentheses inside inline link destinations", () => {
+    const nodes = parseMarkdownInline("[docs](https://example.com/a_(b))");
+    expect(nodes?.[0]?.text).toBe("docs");
+    expect(nodes?.[0]?.marks?.[0]?.attrs?.href).toBe("https://example.com/a_(b)");
+  });
+  it("keeps escaped table pipes, empty cells, and overflow columns", () => {
+    const table = parseMarkdownToDocument(
+      ["| A\\|B | C |", "| --- | --- |", "| x\\|y | |", "| 1 | 2 | 3 |"].join("\n"),
+    ).content?.[0];
+
+    expect(table?.type).toBe("dcDataTable");
+    expect(table?.content?.map((row) => row.content?.length)).toEqual([3, 3, 3]);
+    expect(table?.content?.[0]?.content?.[0]?.content?.[0]?.text).toBe("A|B");
+    expect(table?.content?.[1]?.content?.[0]?.content?.[0]?.text).toBe("x|y");
+    expect(table?.content?.[1]?.content?.[1]?.content).toBeUndefined();
+    expect(table?.content?.[2]?.content?.[2]?.content?.[0]?.text).toBe("3");
+  });
+
+  it("recognizes tilde and long fences without consuming shorter inner fences", () => {
+    const content = parseMarkdownToDocument(
+      ["~~~~javascript", "```", ":::", "~~~~", "````python", "```", "````", "## 다음"].join("\n"),
+    ).content;
+
+    expect(content?.map((node) => node.type)).toEqual(["codeBlock", "codeBlock", "sectionHeading"]);
+    expect(content?.[0]?.content?.[0]?.text).toBe("```\n:::");
+    expect(content?.[1]?.content?.[0]?.text).toBe("```");
+  });
+
+  it("does not close a custom block on markers inside its code fence", () => {
+    const markdown = [":::tip", "~~~javascript", ":::", "~~~", "본문 내용", ":::"].join("\n");
+    expect(hasUnclosedCustomBlock(markdown)).toBe(false);
+    const callout = parseMarkdownToDocument(markdown).content?.[0];
+    expect(callout?.content?.map((node) => node.type)).toEqual(["codeBlock", "paragraph"]);
+    expect(callout?.content?.[0]?.content?.[0]?.text).toBe(":::");
+  });
   it("turns markdown headings, inline code, and links into editor JSON", () => {
     expect(
       parseMarkdownToDocument(
@@ -524,7 +578,7 @@ describe("markdown import", () => {
     ]);
   });
 
-  it("flattens nested markdown quote markers instead of leaking them into text", () => {
+  it("keeps nested quotes as nested blocks", () => {
     expect(
       parseMarkdownToDocument(["> 바깥 인용", ">> 안쪽 인용"].join("\n")).content?.[0],
     ).toEqual({
@@ -532,10 +586,27 @@ describe("markdown import", () => {
       content: [
         {
           type: "paragraph",
-          content: [{ type: "text", text: "바깥 인용 안쪽 인용" }],
+          content: [{ type: "text", text: "바깥 인용" }],
+        },
+        {
+          type: "blockquote",
+          content: [{ type: "paragraph", content: [{ type: "text", text: "안쪽 인용" }] }],
         },
       ],
     });
+  });
+
+  it("keeps nested lists and the ordered starting number", () => {
+    const list = parseMarkdownToDocument(
+      ["7. 먼저", "   - 하위 항목", "   - 다음 하위 항목", "8. 다음"].join("\n"),
+    ).content?.[0];
+    expect(list?.type).toBe("orderedList");
+    expect(list?.attrs).toEqual({ start: 7 });
+    expect(list?.content).toHaveLength(2);
+    expect(list?.content?.[0]?.content?.[1]?.type).toBe("bulletList");
+    expect(list?.content?.[0]?.content?.[1]?.content?.[1]?.content?.[0]?.content?.[0]?.text).toBe(
+      "다음 하위 항목",
+    );
   });
 
   it("does not absorb the rest of the document when a custom block is not closed", () => {

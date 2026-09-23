@@ -18,7 +18,10 @@ import { defaultLanguage, isSupportedLanguage, type DcLanguageId } from "$lib/hi
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { highlightedLineIndexes, normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 
-type ParsedListItem = {
+type ListMarker = {
+  indent: number;
+  type: "bulletList" | "orderedList";
+  start: number;
   text: string;
 };
 
@@ -30,6 +33,7 @@ type ParsedMarkdownTable = {
 type MarkdownImportOptions = {
   defaultLanguage?: DcLanguageId;
   sanitizeCodeHighlightLines?: boolean;
+  nestingDepth?: number;
 };
 
 type CustomBlockMetadata = {
@@ -42,10 +46,25 @@ type CustomBlockParts = {
   body: string;
 };
 
-const fencePattern = /^```([^\s`]*)?(?:\s+(.+))?\s*$/i;
+type CodeFence = { marker: "`" | "~"; length: number; language?: string; info?: string };
+
+function codeFenceOpen(line: string): CodeFence | undefined {
+  const match = /^(`{3,}|~{3,})(.*)$/.exec(line.trim());
+  if (!match) return undefined;
+  const marker = match[1]?.[0] as "`" | "~";
+  const info = match[2]?.trim() ?? "";
+  if (marker === "`" && info.includes("`")) return undefined;
+  const [language, ...metadata] = info.split(/\s+/);
+  return { marker, length: match[1]?.length ?? 3, language, info: metadata.join(" ") };
+}
+
+function isCodeFenceClose(line: string, fence: CodeFence): boolean {
+  const trimmed = line.trim();
+  return trimmed.length >= fence.length && [...trimmed].every((char) => char === fence.marker);
+}
 const headingPattern = /^(#{1,6})\s+(.+)$/;
 const unorderedListPattern = /^[-*+]\s+(.+)$/;
-const orderedListPattern = /^\d+[.)]\s+(.+)$/;
+const orderedListPattern = /^(\d+)[.)]\s+(.+)$/;
 const horizontalRulePattern = /^(?:[-*_]\s*){3,}$/;
 const standaloneMarkdownLinkPattern = /^\[([^\]]+)]\(([^)]+)\)$/;
 const linkBoxLabelPattern = /^(?:linkbox|link box|링크박스|link|링크)$/i;
@@ -198,9 +217,24 @@ function paragraphNode(text: string): JSONContent {
 
 function splitMarkdownTableCells(line: string): string[] {
   const trimmed = line.trim();
-  const withoutOuterPipes = trimmed.replace(/^\|/, "").replace(/\|$/, "");
-
-  return withoutOuterPipes.split("|").map((cell) => cell.trim());
+  const source = trimmed.startsWith("|") ? trimmed.slice(1) : trimmed;
+  const cells: string[] = [];
+  let cell = "";
+  for (const char of source) {
+    if (char === "|") {
+      const backslashes = /\\+$/.exec(cell)?.[0].length ?? 0;
+      if (backslashes % 2 === 1) {
+        cell = `${cell.slice(0, -1)}|`;
+      } else {
+        cells.push(cell.trim());
+        cell = "";
+      }
+    } else {
+      cell += char;
+    }
+  }
+  if (cell || !source.endsWith("|")) cells.push(cell.trim());
+  return cells;
 }
 
 function isMarkdownTableLine(line: string): boolean {
@@ -245,10 +279,7 @@ function parseMarkdownTable(lines: string[], start: number): ParsedMarkdownTable
   }
 
   const headerCells = splitMarkdownTableCells(headerLine);
-  const columnCount = headerCells.length;
-  const rows: JSONContent[] = [
-    dataTableRowNode(normalizeMarkdownTableRowCells(headerCells, columnCount), true),
-  ];
+  const dataRows: string[][] = [];
   let index = start + 2;
 
   while (index < lines.length && isMarkdownTableLine(lines[index] ?? "")) {
@@ -258,14 +289,17 @@ function parseMarkdownTable(lines: string[], start: number): ParsedMarkdownTable
       break;
     }
 
-    rows.push(
-      dataTableRowNode(
-        normalizeMarkdownTableRowCells(splitMarkdownTableCells(rowLine), columnCount),
-        false,
-      ),
-    );
+    dataRows.push(splitMarkdownTableCells(rowLine));
     index += 1;
   }
+
+  const columnCount = Math.max(headerCells.length, ...dataRows.map((cells) => cells.length));
+  const rows: JSONContent[] = [
+    dataTableRowNode(normalizeMarkdownTableRowCells(headerCells, columnCount), true),
+    ...dataRows.map((cells) =>
+      dataTableRowNode(normalizeMarkdownTableRowCells(cells, columnCount), false),
+    ),
+  ];
 
   return rows.length > 1
     ? {
@@ -349,12 +383,18 @@ function collectCustomBlock(
   }
 
   const body: string[] = [];
+  let fence: CodeFence | undefined;
   let index = start + 1;
 
   while (index < lines.length) {
     const line = lines[index] ?? "";
 
-    if (customBlockEndPattern.test(line.trim())) {
+    if (fence && isCodeFenceClose(line, fence)) {
+      fence = undefined;
+    } else if (!fence) {
+      fence = codeFenceOpen(line);
+    }
+    if (!fence && customBlockEndPattern.test(line.trim())) {
       return { body: body.join("\n"), nextIndex: index + 1 };
     }
 
@@ -367,20 +407,19 @@ function collectCustomBlock(
 
 export function hasUnclosedCustomBlock(markdown: string): boolean {
   const lines = markdown.replace(/\r\n?/g, "\n").split("\n");
-  let isInCodeFence = false;
+  let fence: CodeFence | undefined;
   let isInCustomBlock = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (!isInCustomBlock && fencePattern.test(trimmed)) {
-      isInCodeFence = !isInCodeFence;
+    if (fence && isCodeFenceClose(trimmed, fence)) {
+      fence = undefined;
       continue;
     }
-
-    if (isInCodeFence) {
-      continue;
-    }
+    if (fence) continue;
+    fence = codeFenceOpen(trimmed);
+    if (fence) continue;
 
     if (isInCustomBlock) {
       if (customBlockEndPattern.test(trimmed)) {
@@ -580,13 +619,64 @@ function standaloneLinkBoxNode(line: string): JSONContent | undefined {
   return normalizedHref ? linkBoxNode(normalizedHref, normalizedHref) : undefined;
 }
 
-function listNode(type: "bulletList" | "orderedList", items: ParsedListItem[]): JSONContent {
+function listMarker(line: string): ListMarker | undefined {
+  const match = /^(\s*)([-*+]|\d+[.)])\s+(.+)$/.exec(line);
+  if (!match) return undefined;
+  const ordered = /^\d/.test(match[2] ?? "");
+  const start = ordered ? Number.parseInt(match[2] ?? "1", 10) : 1;
+  if (!Number.isSafeInteger(start) || start < 0 || start > 1_000_000) return undefined;
   return {
-    type,
-    content: items.map((item) => ({
-      type: "listItem",
-      content: [paragraphNode(item.text)],
-    })),
+    indent: (match[1] ?? "").replace(/\t/g, "    ").length,
+    type: ordered ? "orderedList" : "bulletList",
+    start,
+    text: match[3] ?? "",
+  };
+}
+
+function collectList(
+  lines: string[],
+  startIndex: number,
+  first: ListMarker,
+): { node: JSONContent; nextIndex: number } {
+  const items: JSONContent[] = [];
+  let index = startIndex;
+
+  while (index < lines.length) {
+    const marker = listMarker(lines[index] ?? "");
+    if (!marker || marker.indent !== first.indent || marker.type !== first.type) break;
+    index += 1;
+    let itemText = marker.text;
+    const nested: JSONContent[] = [];
+
+    while (index < lines.length) {
+      const line = lines[index] ?? "";
+      const nextMarker = listMarker(line);
+      if (nextMarker) {
+        if (nextMarker.indent <= first.indent) break;
+        const child = collectList(lines, index, nextMarker);
+        nested.push(child.node);
+        index = child.nextIndex;
+        continue;
+      }
+      if (!line.trim()) break;
+      const indent = /^(\s*)/.exec(line)?.[1]?.replace(/\t/g, "    ").length ?? 0;
+      if (indent <= first.indent || isBlockStarter(line)) break;
+      itemText += ` ${line.trim()}`;
+      index += 1;
+    }
+
+    items.push({ type: "listItem", content: [paragraphNode(itemText), ...nested] });
+  }
+
+  return {
+    node: {
+      type: first.type,
+      ...(first.type === "orderedList" && first.start !== 1
+        ? { attrs: { start: first.start } }
+        : {}),
+      content: items,
+    },
+    nextIndex: index,
   };
 }
 
@@ -595,7 +685,7 @@ function isBlockStarter(line: string): boolean {
 
   return (
     !trimmed ||
-    fencePattern.test(trimmed) ||
+    Boolean(codeFenceOpen(trimmed)) ||
     headingPattern.test(trimmed) ||
     horizontalRulePattern.test(trimmed) ||
     Boolean(customBlockStart(trimmed)) ||
@@ -647,12 +737,12 @@ export function parseMarkdownToDocument(
       continue;
     }
 
-    const fence = fencePattern.exec(trimmed);
+    const fence = codeFenceOpen(trimmed);
     if (fence) {
       const codeLines: string[] = [];
-      const language = normalizeLanguage(fence[1], fallbackLanguage);
-      const parsedHighlightLines = parseFenceHighlightLines(fence[2]);
-      const additionLines = parseFenceLineRange(fence[2], [
+      const language = normalizeLanguage(fence.language, fallbackLanguage);
+      const parsedHighlightLines = parseFenceHighlightLines(fence.info);
+      const additionLines = parseFenceLineRange(fence.info, [
         "add",
         "adds",
         "added",
@@ -660,7 +750,7 @@ export function parseMarkdownToDocument(
         "additionLines",
         "plus",
       ]);
-      const deletionLines = parseFenceLineRange(fence[2], [
+      const deletionLines = parseFenceLineRange(fence.info, [
         "delete",
         "deletes",
         "deleted",
@@ -670,10 +760,10 @@ export function parseMarkdownToDocument(
         "removed",
         "minus",
       ]);
-      const filename = parseFenceFilename(fence[2]);
+      const filename = parseFenceFilename(fence.info);
       index += 1;
 
-      while (index < lines.length && !fencePattern.test(lines[index]?.trim() ?? "")) {
+      while (index < lines.length && !isCodeFenceClose(lines[index] ?? "", fence)) {
         codeLines.push(lines[index] ?? "");
         index += 1;
       }
@@ -764,39 +854,11 @@ export function parseMarkdownToDocument(
       continue;
     }
 
-    const unordered = unorderedListPattern.exec(trimmed);
-    if (unordered) {
-      const items: ParsedListItem[] = [];
-
-      while (index < lines.length) {
-        const match = unorderedListPattern.exec(lines[index]?.trim() ?? "");
-        if (!match) {
-          break;
-        }
-
-        items.push({ text: match[1] ?? "" });
-        index += 1;
-      }
-
-      content.push(listNode("bulletList", items));
-      continue;
-    }
-
-    const ordered = orderedListPattern.exec(trimmed);
-    if (ordered) {
-      const items: ParsedListItem[] = [];
-
-      while (index < lines.length) {
-        const match = orderedListPattern.exec(lines[index]?.trim() ?? "");
-        if (!match) {
-          break;
-        }
-
-        items.push({ text: match[1] ?? "" });
-        index += 1;
-      }
-
-      content.push(listNode("orderedList", items));
+    const marker = listMarker(line);
+    if (marker) {
+      const list = collectList(lines, index, marker);
+      content.push(list.node);
+      index = list.nextIndex;
       continue;
     }
 
@@ -804,11 +866,23 @@ export function parseMarkdownToDocument(
       const quoteLines: string[] = [];
 
       while (index < lines.length && lines[index]?.trim().startsWith(">")) {
-        quoteLines.push((lines[index] ?? "").trim().replace(/^>+\s?/, ""));
+        quoteLines.push((lines[index] ?? "").trim().replace(/^>\s?/, ""));
         index += 1;
       }
 
-      content.push({ type: "blockquote", content: [paragraphNode(quoteLines.join(" "))] });
+      const depth = options.nestingDepth ?? 0;
+      content.push({
+        type: "blockquote",
+        content:
+          depth < 16
+            ? contentOrEmptyParagraph(
+                parseMarkdownToDocument(quoteLines.join("\n"), {
+                  ...options,
+                  nestingDepth: depth + 1,
+                }),
+              )
+            : [paragraphNode(quoteLines.join("\n"))],
+      });
       continue;
     }
 
