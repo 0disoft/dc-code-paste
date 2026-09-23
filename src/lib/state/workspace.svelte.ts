@@ -366,6 +366,9 @@ export function createWorkspaceState() {
   let editorSignal = $state(0);
 
   let canPersistDraft = $state(false);
+  let draftSaveState = $state<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
+  let draftLastSavedAt = $state("");
+  let lastSavedDraftFingerprint = "";
   let invalidDraftRaw = $state("");
   let invalidDraftBackupKey = $state("");
   let invalidDraftDownloaded = $state(false);
@@ -1244,18 +1247,35 @@ export function createWorkspaceState() {
   function persistCurrentDraftSnapshot(nextDocument: JSONContent, preferences: DraftPreferences) {
     const storage = draftStorage();
     if (!storage) {
-      return;
+      draftSaveState = "error";
+      return false;
     }
 
-    writeDraftSnapshot(
-      storage,
-      createDraftSnapshot(cloneDocumentContent(nextDocument), cloneDraftPreferences(preferences)),
+    const snapshot = createDraftSnapshot(
+      cloneDocumentContent(nextDocument),
+      cloneDraftPreferences(preferences),
     );
+    draftSaveState = "saving";
+    if (!writeDraftSnapshot(storage, snapshot)) {
+      draftSaveState = "error";
+      return false;
+    }
+
+    lastSavedDraftFingerprint = draftHistoryFingerprint(snapshot.document, snapshot.preferences);
+    draftLastSavedAt = snapshot.updatedAt;
+    draftSaveState = "saved";
     maybeSaveAutomaticDraftHistory();
+    return true;
   }
 
   function scheduleDraftPersist(nextDocument: JSONContent, preferences: DraftPreferences) {
     clearScheduledDraftPersist();
+    if (draftHistoryFingerprint(nextDocument, preferences) === lastSavedDraftFingerprint) {
+      draftSaveState = "saved";
+      return;
+    }
+
+    draftSaveState = "dirty";
     draftPersistTimer = setTimeout(() => {
       draftPersistTimer = undefined;
       persistCurrentDraftSnapshot(nextDocument, preferences);
@@ -1265,6 +1285,12 @@ export function createWorkspaceState() {
   function flushScheduledDraftPersist() {
     clearScheduledDraftPersist();
 
+    if (canPersistDraft && (draftSaveState === "dirty" || draftSaveState === "error")) {
+      persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
+    }
+  }
+
+  function retryDraftSave() {
     if (canPersistDraft) {
       persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
     }
@@ -3052,6 +3078,12 @@ export function createWorkspaceState() {
       if (draftRead.snapshot) {
         documentJson = cloneDocumentContent(draftRead.snapshot.document);
         applyDraftPreferences(cloneDraftPreferences(draftRead.snapshot.preferences));
+        lastSavedDraftFingerprint = draftHistoryFingerprint(
+          draftRead.snapshot.document,
+          draftRead.snapshot.preferences,
+        );
+        draftLastSavedAt = draftRead.snapshot.updatedAt;
+        draftSaveState = "saved";
       }
 
       mountedEditor = new Editor({
@@ -3182,6 +3214,13 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get draftSaveState() {
+      return draftSaveState;
+    },
+    get draftLastSavedAt() {
+      return draftLastSavedAt;
+    },
+    retryDraftSave,
     get invalidDraftRaw() {
       return invalidDraftRaw;
     },

@@ -35,6 +35,23 @@ test("preserves an invalid saved draft before starting a new one", async ({ page
   await expect(page.getByRole("alert")).not.toBeVisible();
 });
 
+test("reports a failed autosave while keeping the editor usable", async ({ page }) => {
+  await page.addInitScript(() => {
+    Storage.prototype.setItem = function () {
+      throw new DOMException("Storage full", "QuotaExceededError");
+    };
+  });
+  await page.goto("/");
+  await waitForEditor(page);
+
+  await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
+  await page.locator(".article-editor").click();
+  await page.keyboard.insertText("UNSAVED_TEXT");
+  await expect(page.locator(".article-editor")).toContainText("UNSAVED_TEXT");
+  await page.getByRole("button", { name: "다시 저장" }).click();
+  await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
+});
+
 async function waitForEditor(page: Page) {
   await expect(page.locator(".article-editor")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");

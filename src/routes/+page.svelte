@@ -76,6 +76,14 @@
     const workspace = createWorkspaceState();
     let activeWorkspaceView = $state<WorkspaceView>("editor");
     const formattedHtmlSource = $derived(formatHtmlSource(workspace.html));
+    const draftSavedAtLabel = $derived(
+        workspace.draftLastSavedAt && !Number.isNaN(Date.parse(workspace.draftLastSavedAt))
+            ? new Date(workspace.draftLastSavedAt).toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+              })
+            : "",
+    );
 
     setContext(WORKSPACE_CONTEXT_KEY, workspace);
 </script>
@@ -219,6 +227,22 @@
                     <Type size={18} />
                     <span>글쓰기</span>
                 </div>
+                <div class="draft-save-status" role="status">
+                    <span>
+                        {workspace.draftSaveState === "dirty"
+                            ? "저장 대기 중"
+                            : workspace.draftSaveState === "saving"
+                              ? "저장 중"
+                              : workspace.draftSaveState === "saved"
+                                ? `저장됨${draftSavedAtLabel ? ` · ${draftSavedAtLabel}` : ""}`
+                                : workspace.draftSaveState === "error"
+                                  ? "저장 실패 · 이 탭의 내용을 복사해 보관하세요"
+                                  : "저장 준비 중"}
+                    </span>
+                    {#if workspace.draftSaveState === "error"}
+                        <button type="button" onclick={workspace.retryDraftSave}>다시 저장</button>
+                    {/if}
+                </div>
                 <span class="counter"
                     >{workspace.editor?.getText().length.toLocaleString() ?? 0}자</span
                 >
@@ -357,6 +381,22 @@
 </main>
 
 <style>
+    .draft-save-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+    }
+
+    .draft-save-status button {
+        padding: 3px 7px;
+        border: 1px solid currentColor;
+        border-radius: 5px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+    }
+
     .draft-recovery-banner {
         display: flex;
         flex-wrap: wrap;
