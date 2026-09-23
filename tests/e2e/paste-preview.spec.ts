@@ -258,21 +258,16 @@ test("renders the paste tool", async ({ page }) => {
   ).toBeVisible();
   await page
     .getByLabel("저장된 초안")
-    .getByRole("button")
-    .filter({ hasText: /초안/ })
+    .getByRole("button", { name: /초안 .* 이름 변경/ })
     .first()
-    .dblclick();
+    .click();
   await page.getByLabel("초안 제목 변경").fill("첫 풀이 초안");
   await page.getByLabel("초안 제목 변경").press("Enter");
   await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
   await page.getByLabel("프리셋 이름").fill("강의글 구조");
   await page.getByRole("button", { name: "프리셋 저장" }).click();
   await expect(page.getByLabel("저장된 프리셋").getByText("강의글 구조")).toBeVisible();
-  await page
-    .getByLabel("저장된 프리셋")
-    .locator(".preset-apply")
-    .filter({ hasText: "강의글 구조" })
-    .dblclick();
+  await page.getByRole("button", { name: "강의글 구조 이름 변경" }).click();
   await page.getByLabel("프리셋 제목 변경").fill("풀이 템플릿");
   await page.getByLabel("프리셋 제목 변경").press("Enter");
   await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();

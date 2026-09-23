@@ -1,4 +1,4 @@
-import { onDestroy, onMount, tick } from "svelte";
+import { onDestroy, onMount, tick, untrack } from "svelte";
 
 import type { Editor, JSONContent } from "@tiptap/core";
 
@@ -3335,7 +3335,9 @@ export function createWorkspaceState() {
       return;
     }
 
-    scheduleDraftPersist(documentJson, currentDraftPreferences());
+    const nextDocument = documentJson;
+    const preferences = currentDraftPreferences();
+    untrack(() => scheduleDraftPersist(nextDocument, preferences));
     return clearScheduledDraftPersist;
   });
   return {

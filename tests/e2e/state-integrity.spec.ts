@@ -63,15 +63,11 @@ test("stops a stale tab from overwriting another tab's draft", async ({ page, co
   await otherTab.goto("/");
   await waitForEditor(otherTab);
   await openMarkdown(otherTab, "# OTHER_TAB_DRAFT");
-  await expect
-    .poll(() => otherTab.evaluate((key) => localStorage.getItem(key), draftKey))
-    .toContain("OTHER_TAB_DRAFT");
+  await expect.poll(() => storedDraftText(otherTab)).toContain("OTHER_TAB_DRAFT");
 
   await expect(page.getByText("다른 탭에서 초안이 변경됐습니다 · 자동 저장 중지")).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
-  expect(await page.evaluate((key) => localStorage.getItem(key), draftKey)).toContain(
-    "OTHER_TAB_DRAFT",
-  );
+  expect(await storedDraftText(page)).toContain("OTHER_TAB_DRAFT");
   await page.getByRole("button", { name: "다른 탭 초안 불러오기" }).click();
   await expect(page.locator(".article-editor")).toContainText("OTHER_TAB_DRAFT");
   await otherTab.close();
@@ -80,6 +76,21 @@ test("stops a stale tab from overwriting another tab's draft", async ({ page, co
 async function waitForEditor(page: Page) {
   await expect(page.locator(".article-editor")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+}
+
+async function storedDraftText(page: Page): Promise<string> {
+  return page.evaluate((key) => {
+    const raw = localStorage.getItem(key);
+    if (!raw) return "";
+    const snapshot = JSON.parse(raw) as {
+      document?: { content?: { content?: { text?: string }[] }[] };
+    };
+    return (
+      snapshot.document?.content
+        ?.flatMap((node) => node.content?.map((child) => child.text ?? "") ?? [])
+        .join("") ?? ""
+    );
+  }, draftKey);
 }
 
 async function openMarkdown(page: Page, markdown: string) {
