@@ -14,6 +14,7 @@ import {
 } from "$lib/highlighter/catalog";
 
 export const draftStorageKey = "dc-code-paste:draft:v1";
+export const invalidDraftBackupKey = "dc-code-paste:draft-invalid-backup:v1";
 export const draftHistoryStorageKey = "dc-code-paste:draft-history:v1";
 export const maxDraftHistoryCount = 10;
 
@@ -45,20 +46,81 @@ export type DraftHistorySnapshot = DraftSnapshot & {
 
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
+const maxDraftChars = 2_000_000;
+const maxDraftNodes = 20_000;
+const draftNodeTypes = new Set([
+  "doc",
+  "text",
+  "paragraph",
+  "heading",
+  "blockquote",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "codeBlock",
+  "horizontalRule",
+  "hardBreak",
+  "sectionHeading",
+  "heroBlock",
+  "summaryBox",
+  "summaryItem",
+  "tutorialBlock",
+  "tutorialStep",
+  "comparisonBlock",
+  "comparisonColumn",
+  "referenceList",
+  "referenceItem",
+  "ctaGroup",
+  "ctaButton",
+  "linkBox",
+  "dcDataTable",
+  "dcDataTableRow",
+  "dcDataTableCell",
+  "tipBox",
+  "warningBox",
+  "successBox",
+  "failureBox",
+  "experimentBox",
+  "emphasisBox",
+  "rebuttalBox",
+  "conclusionBox",
+  "referenceBox",
+  "calloutBox",
+]);
+const draftMarkTypes = new Set([
+  "bold",
+  "italic",
+  "strike",
+  "underline",
+  "code",
+  "link",
+  "textStyle",
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isJsonContent(value: unknown, depth = 0): value is JSONContent {
-  if (!isRecord(value) || depth > 80) {
+function isJsonContent(
+  value: unknown,
+  depth = 0,
+  budget = { remaining: maxDraftNodes },
+): value is JSONContent {
+  if (!isRecord(value) || depth > 80 || --budget.remaining < 0) {
     return false;
   }
 
-  if ("type" in value && typeof value.type !== "string") {
+  if (typeof value.type !== "string" || !draftNodeTypes.has(value.type)) {
     return false;
   }
 
   if ("text" in value && typeof value.text !== "string") {
+    return false;
+  }
+  if (value.type === "text" && (typeof value.text !== "string" || "content" in value)) {
+    return false;
+  }
+  if (value.type !== "text" && "text" in value) {
     return false;
   }
 
@@ -72,7 +134,7 @@ function isJsonContent(value: unknown, depth = 0): value is JSONContent {
     }
 
     for (const mark of value.marks) {
-      if (!isRecord(mark) || typeof mark.type !== "string") {
+      if (!isRecord(mark) || typeof mark.type !== "string" || !draftMarkTypes.has(mark.type)) {
         return false;
       }
 
@@ -87,10 +149,10 @@ function isJsonContent(value: unknown, depth = 0): value is JSONContent {
       return false;
     }
 
-    return value.content.every((child) => isJsonContent(child, depth + 1));
+    return value.content.every((child) => isJsonContent(child, depth + 1, budget));
   }
 
-  return typeof value.type === "string" || typeof value.text === "string";
+  return value.type !== "doc" || Array.isArray(value.content);
 }
 
 function isDocumentTheme(value: unknown): value is DcDocumentTheme {
@@ -352,7 +414,11 @@ export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefine
     return undefined;
   }
 
-  if (!isJsonContent(value.document)) {
+  if (
+    !isRecord(value.document) ||
+    value.document.type !== "doc" ||
+    !isJsonContent(value.document)
+  ) {
     return undefined;
   }
 
@@ -420,6 +486,9 @@ export function createDraftHistorySnapshot(
 }
 
 export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
+  if (value.length > maxDraftChars) {
+    return undefined;
+  }
   let parsed: unknown;
 
   try {
@@ -429,6 +498,50 @@ export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
   }
 
   return normalizeDraftSnapshot(parsed);
+}
+
+export type DraftReadResult = {
+  snapshot?: DraftSnapshot;
+  invalidRaw?: string;
+  backupKey?: string;
+};
+
+export function readDraftSnapshotWithRecovery(
+  storage: DraftStorage,
+  validate: (snapshot: DraftSnapshot) => boolean = () => true,
+): DraftReadResult {
+  let raw: string | null;
+  try {
+    raw = storage.getItem(draftStorageKey);
+  } catch {
+    return {};
+  }
+
+  if (!raw) {
+    return {};
+  }
+
+  const snapshot = parseDraftSnapshot(raw);
+  if (snapshot && validate(snapshot)) {
+    return { snapshot };
+  }
+
+  try {
+    const previous = storage.getItem(invalidDraftBackupKey);
+    const backupKey =
+      previous && previous !== raw
+        ? `${invalidDraftBackupKey}:${createSnapshotId()}`
+        : invalidDraftBackupKey;
+    storage.setItem(backupKey, raw);
+    if (storage.getItem(backupKey) === raw) {
+      storage.removeItem(draftStorageKey);
+      return { invalidRaw: raw, backupKey };
+    }
+  } catch {
+    // Keep the original key and disable autosave until the user exports it.
+  }
+
+  return { invalidRaw: raw };
 }
 
 export function parseDraftHistorySnapshots(value: string): DraftHistorySnapshot[] {

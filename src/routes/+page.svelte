@@ -172,6 +172,23 @@
     {/if}
     </div>
 
+    {#if workspace.invalidDraftRaw}
+        <div class="draft-recovery-banner" role="alert">
+            <span>
+                저장된 초안을 읽지 못했습니다.
+                {workspace.invalidDraftBackupKey
+                    ? "원본을 브라우저 저장소에 별도로 보관했습니다."
+                    : "원본을 보존하기 위해 자동 저장을 중단했습니다."}
+            </span>
+            <button type="button" onclick={workspace.downloadInvalidDraft}>원본 내려받기</button>
+            <button
+                type="button"
+                disabled={!workspace.invalidDraftBackupKey && !workspace.invalidDraftDownloaded}
+                onclick={workspace.resumeDraftSaving}>새 초안 저장 시작</button
+            >
+        </div>
+    {/if}
+
     <section class="workbench" aria-label="글쓰기 작업 영역">
         <div class="workbench-controls">
             <div class="mode-switch view-switch" role="group" aria-label="작업 모드">
@@ -340,6 +357,33 @@
 </main>
 
 <style>
+    .draft-recovery-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        border: 1px solid #b7791f;
+        border-radius: 8px;
+        background: #fff7e6;
+        color: #51310b;
+    }
+
+    .draft-recovery-banner button {
+        padding: 6px 10px;
+        border: 1px solid currentColor;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    .draft-recovery-banner button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     .workspace {
         width: min(1560px, calc(100vw - 28px));
         min-height: 100vh;

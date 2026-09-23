@@ -60,9 +60,11 @@ import {
   createDraftHistorySnapshot,
   createDraftSnapshot,
   deleteDraftHistorySnapshot,
+  draftStorageKey,
   maxDraftHistoryCount,
   readDraftHistorySnapshots,
   readDraftSnapshot,
+  readDraftSnapshotWithRecovery,
   renameDraftHistorySnapshot,
   writeDraftSnapshot,
   type DraftHistorySnapshot,
@@ -364,6 +366,9 @@ export function createWorkspaceState() {
   let editorSignal = $state(0);
 
   let canPersistDraft = $state(false);
+  let invalidDraftRaw = $state("");
+  let invalidDraftBackupKey = $state("");
+  let invalidDraftDownloaded = $state(false);
 
   let lastDraftHistoryFingerprint = "";
 
@@ -535,6 +540,42 @@ export function createWorkspaceState() {
       return typeof window === "undefined" ? undefined : window.localStorage;
     } catch {
       return undefined;
+    }
+  }
+
+  function downloadInvalidDraft() {
+    if (!invalidDraftRaw) {
+      return;
+    }
+
+    const url = URL.createObjectURL(new Blob([invalidDraftRaw], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "dc-code-paste-invalid-draft.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    invalidDraftDownloaded = true;
+  }
+
+  function resumeDraftSaving() {
+    if (!invalidDraftRaw || (!invalidDraftBackupKey && !invalidDraftDownloaded)) {
+      return;
+    }
+
+    const storage = draftStorage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      if (!invalidDraftBackupKey) {
+        storage.removeItem(draftStorageKey);
+      }
+      invalidDraftRaw = "";
+      canPersistDraft = true;
+      scheduleDraftPersist(documentJson, currentDraftPreferences());
+    } catch {
+      // Keep the original draft and the warning visible when storage remains blocked.
     }
   }
 
@@ -2915,8 +2956,6 @@ export function createWorkspaceState() {
   onMount(() => {
     let disposed = false;
     let mountedEditor: Editor | undefined;
-    const storage = draftStorage();
-    const savedDraft = storage ? readDraftSnapshot(storage) : undefined;
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
     const flushDraftWhenHidden = () => {
@@ -2977,11 +3016,6 @@ export function createWorkspaceState() {
     refreshPresetSnapshots();
     refreshDraftHistorySnapshots();
 
-    if (savedDraft) {
-      documentJson = cloneDocumentContent(savedDraft.document);
-      applyDraftPreferences(cloneDraftPreferences(savedDraft.preferences));
-    }
-
     lastDraftHistoryFingerprint = draftHistory[0]
       ? draftHistoryFingerprint(
           cloneDocumentContent(draftHistory[0].document),
@@ -2991,7 +3025,7 @@ export function createWorkspaceState() {
     lastDraftHistorySavedAt = Date.now();
 
     async function mountEditor() {
-      const [{ Editor }, { createEditorExtensions }] = await Promise.all([
+      const [{ Editor, getSchema }, { createEditorExtensions }] = await Promise.all([
         import("@tiptap/core"),
         import("$lib/editor/extensions"),
       ]);
@@ -3000,9 +3034,29 @@ export function createWorkspaceState() {
         return;
       }
 
+      const extensions = createEditorExtensions();
+      const schema = getSchema(extensions);
+      const storage = draftStorage();
+      const draftRead = storage
+        ? readDraftSnapshotWithRecovery(storage, (snapshot) => {
+            try {
+              schema.nodeFromJSON(snapshot.document).check();
+              return true;
+            } catch {
+              return false;
+            }
+          })
+        : {};
+      invalidDraftRaw = draftRead.invalidRaw ?? "";
+      invalidDraftBackupKey = draftRead.backupKey ?? "";
+      if (draftRead.snapshot) {
+        documentJson = cloneDocumentContent(draftRead.snapshot.document);
+        applyDraftPreferences(cloneDraftPreferences(draftRead.snapshot.preferences));
+      }
+
       mountedEditor = new Editor({
         element: editorHost,
-        extensions: createEditorExtensions(),
+        extensions,
         content: documentJson,
         editorProps: {
           attributes: {
@@ -3052,7 +3106,7 @@ export function createWorkspaceState() {
         onCreate: ({ editor: current }) => {
           editor = current;
           refreshEditorState(current);
-          canPersistDraft = true;
+          canPersistDraft = !invalidDraftRaw || Boolean(invalidDraftBackupKey);
         },
         onUpdate: ({ editor: current }) => {
           refreshEditorState(current);
@@ -3128,6 +3182,17 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get invalidDraftRaw() {
+      return invalidDraftRaw;
+    },
+    get invalidDraftBackupKey() {
+      return invalidDraftBackupKey;
+    },
+    get invalidDraftDownloaded() {
+      return invalidDraftDownloaded;
+    },
+    downloadInvalidDraft,
+    resumeDraftSaving,
     get editorHost() {
       return editorHost;
     },

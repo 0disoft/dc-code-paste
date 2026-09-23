@@ -19,6 +19,22 @@ test("opens the editor when browser storage access is blocked", async ({ page })
   await expect(page.locator(".article-editor")).toContainText("STORAGE_BLOCKED_EDIT");
 });
 
+test("preserves an invalid saved draft before starting a new one", async ({ page }) => {
+  const raw = '{"version":1,"document":{"type":"unknownNode"}}';
+  await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [draftKey, raw]);
+  await page.goto("/");
+
+  await waitForEditor(page);
+  await expect(page.getByRole("alert")).toContainText(
+    "원본을 브라우저 저장소에 별도로 보관했습니다",
+  );
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("dc-code-paste:draft-invalid-backup:v1")))
+    .toBe(raw);
+  await page.getByRole("button", { name: "새 초안 저장 시작" }).click();
+  await expect(page.getByRole("alert")).not.toBeVisible();
+});
+
 async function waitForEditor(page: Page) {
   await expect(page.locator(".article-editor")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");

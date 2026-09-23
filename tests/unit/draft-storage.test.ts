@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { getSchema } from "@tiptap/core";
+import { createEditorExtensions } from "../../src/lib/editor/extensions";
 import { sampleDocument } from "../../src/lib/editor/sample-document";
 import {
   appendDraftHistorySnapshot,
@@ -9,11 +11,13 @@ import {
   deleteDraftHistorySnapshot,
   draftHistoryStorageKey,
   draftStorageKey,
+  invalidDraftBackupKey,
   maxDraftHistoryCount,
   parseDraftHistorySnapshots,
   parseDraftSnapshot,
   readDraftHistorySnapshots,
   readDraftSnapshot,
+  readDraftSnapshotWithRecovery,
   renameDraftHistorySnapshot,
   writeDraftHistorySnapshots,
   writeDraftSnapshot,
@@ -115,6 +119,72 @@ describe("draft storage", () => {
         }),
       ),
     ).toBeUndefined();
+    for (const document of [
+      { content: [] },
+      { type: "doc", content: [{ type: "unknownNode" }] },
+      { type: "doc", content: [{ type: "paragraph", content: [{ type: "text" }] }] },
+      {
+        type: "doc",
+        content: [{ type: "text", text: "test", marks: [{ type: "unknownMark" }] }],
+      },
+    ]) {
+      expect(
+        parseDraftSnapshot(JSON.stringify({ version: 1, updatedAt: "now", document, preferences })),
+      ).toBeUndefined();
+    }
+  });
+
+  it("backs up an invalid draft before freeing its active storage key", () => {
+    const storage = new MemoryStorage();
+    const raw = '{"version":1,"document":{"type":"unknownNode"}}';
+    storage.setItem(draftStorageKey, raw);
+
+    expect(readDraftSnapshotWithRecovery(storage)).toEqual({
+      invalidRaw: raw,
+      backupKey: invalidDraftBackupKey,
+    });
+    expect(storage.getItem(draftStorageKey)).toBeNull();
+    expect(storage.getItem(invalidDraftBackupKey)).toBe(raw);
+  });
+
+  it("keeps the invalid draft in place if backup storage fails", () => {
+    const storage = new MemoryStorage();
+    const raw = "invalid draft";
+    storage.setItem(draftStorageKey, raw);
+    const failingBackup = {
+      getItem: storage.getItem.bind(storage),
+      removeItem: storage.removeItem.bind(storage),
+      setItem() {
+        throw new Error("quota exceeded");
+      },
+    };
+
+    expect(readDraftSnapshotWithRecovery(failingBackup)).toEqual({ invalidRaw: raw });
+    expect(storage.getItem(draftStorageKey)).toBe(raw);
+  });
+
+  it("quarantines a structurally invalid document under the actual editor schema", () => {
+    const storage = new MemoryStorage();
+    const raw = JSON.stringify({
+      version: 1,
+      updatedAt: "now",
+      document: { type: "doc", content: [{ type: "text", text: "orphan" }] },
+      preferences,
+    });
+    storage.setItem(draftStorageKey, raw);
+    const schema = getSchema(createEditorExtensions());
+
+    const result = readDraftSnapshotWithRecovery(storage, (snapshot) => {
+      try {
+        schema.nodeFromJSON(snapshot.document).check();
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    expect(result).toEqual({ invalidRaw: raw, backupKey: invalidDraftBackupKey });
+    expect(storage.getItem(invalidDraftBackupKey)).toBe(raw);
   });
 
   it("restores legacy v1 drafts without a saved document theme", () => {
