@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { Schema } from "@tiptap/pm/model";
+import { EditorState } from "@tiptap/pm/state";
 import {
   codeLineDecorations,
+  createCodeBlockHighlightPlugin,
+  editorCodeTokenCacheUsage,
   highlightCodeTokens,
+  type EditorCodeToken,
 } from "../../src/lib/editor/code-block-highlight";
 
 function tokenTexts(code: string, kind: string, language: unknown = "go"): string[] {
@@ -11,6 +16,48 @@ function tokenTexts(code: string, kind: string, language: unknown = "go"): strin
 }
 
 describe("editor code block highlighting", () => {
+  it("maps untouched code decorations when a normal paragraph changes", () => {
+    const schema = new Schema({
+      nodes: {
+        doc: { content: "block+" },
+        paragraph: { content: "text*", group: "block" },
+        codeBlock: { content: "text*", group: "block", attrs: { language: { default: "go" } } },
+        text: {},
+      },
+    });
+    const doc = schema.node("doc", null, [
+      schema.node("paragraph", null, [schema.text("intro")]),
+      schema.node("codeBlock", { language: "go" }, [schema.text("func main()")]),
+    ]);
+    const tokenize = vi.fn<(code: string, language: unknown) => EditorCodeToken[]>(() => [
+      { from: 0, to: 4, kind: "keyword" },
+    ]);
+    const plugin = createCodeBlockHighlightPlugin(tokenize);
+    let state = EditorState.create({ doc, plugins: [plugin] });
+    expect(tokenize).toHaveBeenCalledOnce();
+
+    state = state.apply(state.tr.insertText("new ", 1));
+    expect(tokenize).toHaveBeenCalledOnce();
+    expect(plugin.getState(state)?.find()).toHaveLength(1);
+
+    const codeStart = state.doc.child(0).nodeSize + 1;
+    state = state.apply(state.tr.insertText("x", codeStart));
+    expect(tokenize).toHaveBeenCalledTimes(2);
+
+    const codePos = state.doc.child(0).nodeSize;
+    state = state.apply(state.tr.delete(codePos, codePos + state.doc.child(1).nodeSize));
+    expect(plugin.getState(state)?.find()).toHaveLength(0);
+  });
+
+  it("keeps the token cache within its byte budget after large edits", () => {
+    const code = "x".repeat(80_000);
+    for (let index = 0; index < 20; index += 1) {
+      highlightCodeTokens(`${index}\n${code}`, "javascript");
+    }
+    const usage = editorCodeTokenCacheUsage();
+    expect(usage.bytes).toBeLessThanOrEqual(usage.maxBytes);
+    expect(usage.entries).toBeLessThan(20);
+  });
   it("highlights common Go tokens without touching comment contents", () => {
     const code = [
       "package main",

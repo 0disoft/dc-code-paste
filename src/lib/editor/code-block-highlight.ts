@@ -1,4 +1,5 @@
-import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
+import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
 import { highlightedLineIndexes } from "$lib/highlighter/highlight-lines";
@@ -523,8 +524,11 @@ type ProtectedRange = {
 };
 
 const codeBlockHighlightPluginKey = new PluginKey<DecorationSet>("dcCodeBlockHighlight");
-const tokenCache = new Map<string, readonly EditorCodeToken[]>();
+type TokenCacheEntry = { tokens: readonly EditorCodeToken[]; bytes: number };
+const tokenCache = new Map<string, TokenCacheEntry>();
 const maxTokenCacheEntries = 100;
+const maxTokenCacheBytes = 2 * 1024 * 1024;
+let tokenCacheBytes = 0;
 
 function normalizeEditorCodeLanguage(value: unknown): DcLanguageId {
   return typeof value === "string" && isSupportedLanguage(value) ? value : "cpp";
@@ -535,17 +539,26 @@ function cachedTokenKey(code: string, language: DcLanguageId): string {
 }
 
 function rememberTokens(key: string, tokens: readonly EditorCodeToken[]): void {
-  tokenCache.delete(key);
-  tokenCache.set(key, tokens);
-
-  if (tokenCache.size <= maxTokenCacheEntries) {
-    return;
+  const previous = tokenCache.get(key);
+  if (previous) {
+    tokenCacheBytes -= previous.bytes;
+    tokenCache.delete(key);
   }
+  const bytes = key.length * 2 + tokens.length * 24;
+  if (bytes > maxTokenCacheBytes) return;
+  tokenCache.set(key, { tokens, bytes });
+  tokenCacheBytes += bytes;
 
-  const oldestKey = tokenCache.keys().next().value;
-  if (oldestKey) {
+  while (tokenCache.size > maxTokenCacheEntries || tokenCacheBytes > maxTokenCacheBytes) {
+    const oldestKey = tokenCache.keys().next().value;
+    if (!oldestKey) break;
+    tokenCacheBytes -= tokenCache.get(oldestKey)?.bytes ?? 0;
     tokenCache.delete(oldestKey);
   }
+}
+
+export function editorCodeTokenCacheUsage() {
+  return { entries: tokenCache.size, bytes: tokenCacheBytes, maxBytes: maxTokenCacheBytes };
 }
 
 function cloneTokens(tokens: readonly EditorCodeToken[]): EditorCodeToken[] {
@@ -775,10 +788,10 @@ function scanFunctionTokens(
 export function highlightCodeTokens(code: string, language: unknown): EditorCodeToken[] {
   const normalizedLanguage = normalizeEditorCodeLanguage(language);
   const cacheKey = cachedTokenKey(code, normalizedLanguage);
-  const cachedTokens = tokenCache.get(cacheKey);
-  if (cachedTokens) {
-    rememberTokens(cacheKey, cachedTokens);
-    return cloneTokens(cachedTokens);
+  const cached = tokenCache.get(cacheKey);
+  if (cached) {
+    rememberTokens(cacheKey, cached.tokens);
+    return cloneTokens(cached.tokens);
   }
 
   const tokens: EditorCodeToken[] = [];
@@ -863,44 +876,102 @@ function codeLineDecorationElement(kind: EditorCodeLineDecorationKind): HTMLElem
   return marker;
 }
 
-function codeBlockDecorations(state: EditorState): DecorationSet {
+type CodeTokenizer = (code: string, language: unknown) => EditorCodeToken[];
+
+function decorationsForCodeBlock(
+  node: ProseMirrorNode,
+  pos: number,
+  tokenize: CodeTokenizer,
+): Decoration[] {
   const decorations: Decoration[] = [];
+  for (const lineDecoration of codeLineDecorations(node.textContent, node.attrs)) {
+    decorations.push(
+      Decoration.widget(
+        pos + 1 + lineDecoration.from,
+        () => codeLineDecorationElement(lineDecoration.kind),
+        { side: -1 },
+      ),
+    );
+  }
 
+  for (const token of tokenize(node.textContent, node.attrs.language)) {
+    decorations.push(
+      Decoration.inline(pos + 1 + token.from, pos + 1 + token.to, {
+        class: `dc-code-token dc-code-token-${token.kind}`,
+      }),
+    );
+  }
+  return decorations;
+}
+
+function codeBlockDecorations(state: EditorState, tokenize: CodeTokenizer): DecorationSet {
+  const decorations: Decoration[] = [];
   state.doc.descendants((node, pos) => {
-    if (node.type.name !== "codeBlock") {
-      return;
-    }
-
-    for (const lineDecoration of codeLineDecorations(node.textContent, node.attrs)) {
-      decorations.push(
-        Decoration.widget(
-          pos + 1 + lineDecoration.from,
-          () => codeLineDecorationElement(lineDecoration.kind),
-          { side: -1 },
-        ),
-      );
-    }
-
-    for (const token of highlightCodeTokens(node.textContent, node.attrs.language)) {
-      decorations.push(
-        Decoration.inline(pos + 1 + token.from, pos + 1 + token.to, {
-          class: `dc-code-token dc-code-token-${token.kind}`,
-        }),
-      );
-    }
+    if (node.type.name !== "codeBlock") return;
+    decorations.push(...decorationsForCodeBlock(node, pos, tokenize));
+    return false;
   });
-
   return DecorationSet.create(state.doc, decorations);
 }
 
-export function createCodeBlockHighlightPlugin(): Plugin<DecorationSet> {
+function codeBlocksWithin(doc: ProseMirrorNode, from: number, to: number) {
+  const blocks = new Map<number, ProseMirrorNode>();
+  const start = Math.max(0, Math.min(from, doc.content.size));
+  const end = Math.max(start, Math.min(to, doc.content.size));
+  doc.nodesBetween(start, end, (node, pos) => {
+    if (node.type.name !== "codeBlock") return;
+    blocks.set(pos, node);
+    return false;
+  });
+  for (const edge of [start, end]) {
+    const resolved = doc.resolve(edge);
+    for (let depth = resolved.depth; depth > 0; depth -= 1) {
+      const node = resolved.node(depth);
+      if (node.type.name === "codeBlock") blocks.set(resolved.before(depth), node);
+    }
+  }
+  return blocks;
+}
+
+function updateCodeBlockDecorations(
+  transaction: Transaction,
+  current: DecorationSet,
+  oldState: EditorState,
+  newState: EditorState,
+  tokenize: CodeTokenizer,
+): DecorationSet {
+  if (transaction.mapping.maps.length !== 1) return codeBlockDecorations(newState, tokenize);
+  const mapped = current.map(transaction.mapping, newState.doc);
+  const affected = new Map<number, ProseMirrorNode>();
+  let removedCodeBlock = false;
+  transaction.mapping.maps[0].forEach((oldFrom, oldTo, newFrom, newTo) => {
+    const before = codeBlocksWithin(oldState.doc, oldFrom, oldTo);
+    const after = codeBlocksWithin(newState.doc, newFrom, newTo);
+    if (before.size > 0 && after.size === 0) removedCodeBlock = true;
+    for (const [pos, node] of after) affected.set(pos, node);
+  });
+  if (removedCodeBlock) return codeBlockDecorations(newState, tokenize);
+  if (affected.size === 0) return mapped;
+
+  const obsolete: Decoration[] = [];
+  const added: Decoration[] = [];
+  for (const [pos, node] of affected) {
+    obsolete.push(...mapped.find(pos + 1, pos + node.nodeSize - 1));
+    added.push(...decorationsForCodeBlock(node, pos, tokenize));
+  }
+  return mapped.remove(obsolete).add(newState.doc, added);
+}
+
+export function createCodeBlockHighlightPlugin(
+  tokenize: CodeTokenizer = highlightCodeTokens,
+): Plugin<DecorationSet> {
   return new Plugin<DecorationSet>({
     key: codeBlockHighlightPluginKey,
     state: {
-      init: (_, state) => codeBlockDecorations(state),
-      apply: (transaction, decorationSet, _oldState, newState) =>
+      init: (_, state) => codeBlockDecorations(state, tokenize),
+      apply: (transaction, decorationSet, oldState, newState) =>
         transaction.docChanged
-          ? codeBlockDecorations(newState)
+          ? updateCodeBlockDecorations(transaction, decorationSet, oldState, newState, tokenize)
           : decorationSet.map(transaction.mapping, transaction.doc),
     },
     props: {
