@@ -292,7 +292,7 @@ test("renders the paste tool", async ({ page }) => {
   await expect(page.getByRole("button", { name: "HTML" })).toBeVisible();
   await page.getByRole("button", { name: "HTML" }).click();
   await expect(page.getByRole("button", { name: /원문 복사/ })).toBeVisible();
-  const htmlSource = page.getByLabel("보기 좋게 정리된 HTML 원문");
+  const htmlSource = page.getByLabel("복사용 HTML 원문");
   await expect(htmlSource).toBeVisible();
   await expect(htmlSource).toHaveValue(/<table width="100%"/);
   await expect(htmlSource).toHaveValue(/bgcolor="#ffffff"/);
@@ -304,6 +304,20 @@ test("renders the paste tool", async ({ page }) => {
   await expect(htmlSource).not.toHaveValue(/Created with dc-code-paste/);
   await expect(htmlSource).toHaveValue(/line-height:18px;vertical-align:middle/);
   await expect(htmlSource).not.toHaveValue(/<pre/);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (value: string) => {
+          Object.assign(window, { copiedHtmlSource: value });
+        },
+      },
+    });
+  });
+  await page.getByRole("button", { name: /원문 복사/ }).click();
+  expect(
+    await page.evaluate(() => (window as Window & { copiedHtmlSource?: string }).copiedHtmlSource),
+  ).toBe(await htmlSource.inputValue());
 
   await page.getByRole("button", { name: "Markdown" }).click();
   await page

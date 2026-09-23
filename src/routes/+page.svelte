@@ -10,72 +10,9 @@
 
     type WorkspaceView = "editor" | "preview";
 
-    const voidHtmlTags = new Set([
-        "area",
-        "base",
-        "br",
-        "col",
-        "embed",
-        "hr",
-        "img",
-        "input",
-        "link",
-        "meta",
-        "param",
-        "source",
-        "track",
-        "wbr",
-    ]);
-
-    function formatHtmlSource(html: string) {
-        const trimmedHtml = html.trim();
-
-        if (!trimmedHtml) {
-            return "";
-        }
-
-        let indentLevel = 0;
-
-        return trimmedHtml
-            .replace(/>\s*</g, ">\n<")
-            .split("\n")
-            .map((line) => {
-                const trimmedLine = line.trim();
-                const tagMatch = /^<\/?([a-zA-Z][\w:-]*)/.exec(trimmedLine);
-                const tagName = tagMatch?.[1]?.toLowerCase();
-                const isClosingTag = /^<\//.test(trimmedLine);
-                const isDoctypeOrComment = /^<!(?:--)?/.test(trimmedLine);
-                const isSelfClosingTag = /\/>$/.test(trimmedLine);
-                const isVoidTag = tagName ? voidHtmlTags.has(tagName) : false;
-                const isSingleLinePair = /^<([a-zA-Z][\w:-]*)\b[^>]*>.*<\/\1>$/.test(
-                    trimmedLine,
-                );
-
-                if (isClosingTag) {
-                    indentLevel = Math.max(indentLevel - 1, 0);
-                }
-
-                const formattedLine = `${"  ".repeat(indentLevel)}${trimmedLine}`;
-
-                if (
-                    tagName &&
-                    !isClosingTag &&
-                    !isDoctypeOrComment &&
-                    !isSelfClosingTag &&
-                    !isVoidTag &&
-                    !isSingleLinePair
-                ) {
-                    indentLevel += 1;
-                }
-
-                return formattedLine;
-            })
-            .join("\n");
-    }
 
     const workspace = createWorkspaceState();
     let activeWorkspaceView = $state<WorkspaceView>("editor");
-    const formattedHtmlSource = $derived(formatHtmlSource(workspace.html));
     const draftSavedAtLabel = $derived(
         workspace.draftLastSavedAt && !Number.isNaN(Date.parse(workspace.draftLastSavedAt))
             ? new Date(workspace.draftLastSavedAt).toLocaleTimeString("ko-KR", {
@@ -352,8 +289,8 @@
                     class="html-source"
                     readonly
                     spellcheck="false"
-                    aria-label="보기 좋게 정리된 HTML 원문"
-                    value={formattedHtmlSource}
+                    aria-label="복사용 HTML 원문"
+                    value={workspace.html}
                 ></textarea>
             {/if}
         </aside>
