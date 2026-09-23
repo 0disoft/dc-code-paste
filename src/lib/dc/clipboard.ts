@@ -4,8 +4,8 @@ export type DcClipboardPayload = {
 };
 
 type ClipboardItemConstructor = new (items: {
-  "text/html": Blob;
-  "text/plain": Blob;
+  "text/html": Blob | Promise<Blob>;
+  "text/plain": Blob | Promise<Blob>;
 }) => ClipboardItem;
 
 export function createDcClipboardPayload(html: string, plainText: string): DcClipboardPayload {
@@ -62,19 +62,7 @@ function preserveBrowserSelection() {
   };
 }
 
-export async function copyDcHtml(html: string, plainText: string): Promise<void> {
-  const ClipboardItemCtor = getClipboardItemConstructor();
-
-  if (ClipboardItemCtor && typeof navigator !== "undefined" && navigator.clipboard?.write) {
-    try {
-      const item = new ClipboardItemCtor(createDcClipboardPayload(html, plainText));
-      await navigator.clipboard.write([item]);
-      return;
-    } catch {
-      // An exposed async API can still reject; try the existing browser fallback.
-    }
-  }
-
+async function copyDcHtmlFallback(html: string, plainText: string): Promise<void> {
   if (typeof window === "undefined" || typeof document === "undefined") {
     throw new Error("Clipboard is available only in the browser.");
   }
@@ -109,6 +97,46 @@ export async function copyDcHtml(html: string, plainText: string): Promise<void>
     target.remove();
     restore();
   }
+}
+
+export async function copyDcHtml(html: string, plainText: string): Promise<void> {
+  const ClipboardItemCtor = getClipboardItemConstructor();
+
+  if (ClipboardItemCtor && typeof navigator !== "undefined" && navigator.clipboard?.write) {
+    try {
+      const item = new ClipboardItemCtor(createDcClipboardPayload(html, plainText));
+      await navigator.clipboard.write([item]);
+      return;
+    } catch {
+      // An exposed async API can still reject; try the browser fallback.
+    }
+  }
+
+  await copyDcHtmlFallback(html, plainText);
+}
+
+export async function copyDcHtmlWhenReady(
+  htmlPromise: Promise<string>,
+  plainText: string,
+): Promise<void> {
+  const ClipboardItemCtor = getClipboardItemConstructor();
+  if (ClipboardItemCtor && typeof navigator !== "undefined" && navigator.clipboard?.write) {
+    const htmlBlobPromise = htmlPromise.then((html) => new Blob([html], { type: "text/html" }));
+    void htmlBlobPromise.catch(() => undefined);
+    try {
+      const item = new ClipboardItemCtor({
+        "text/html": htmlBlobPromise,
+        "text/plain": new Blob([plainText], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([item]);
+      await htmlPromise;
+      return;
+    } catch {
+      // A rejected async write may still have a synchronous fallback.
+    }
+  }
+
+  await copyDcHtmlFallback(await htmlPromise, plainText);
 }
 
 export async function copyPlainText(text: string): Promise<void> {

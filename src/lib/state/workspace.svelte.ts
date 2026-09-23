@@ -292,6 +292,8 @@ export function createWorkspaceState() {
   let previewMode = $state<"rendered" | "source">("rendered");
 
   let copyState = $state<"idle" | "copied" | "error">("idle");
+  let manualCopyHtml = $state("");
+  let copyTurn = 0;
 
   let sourceCopyState = $state<"idle" | "copied" | "error">("idle");
 
@@ -2949,12 +2951,24 @@ export function createWorkspaceState() {
   }
 
   async function copyPreview() {
+    const turn = ++copyTurn;
+    const currentDocument = documentJson;
+    const currentOptions = exportOptions();
+    const optionsFingerprint = JSON.stringify(currentOptions);
+    const isCurrent = () =>
+      turn === copyTurn &&
+      documentJson === currentDocument &&
+      JSON.stringify(exportOptions()) === optionsFingerprint;
     await copyDcPreview({
-      document: documentJson,
-      exportOptions: exportOptions(),
+      document: currentDocument,
+      exportOptions: currentOptions,
       plainText: editor?.getText() ?? "",
+      isCurrent,
+      setManualHtml(value) {
+        if (turn === copyTurn) manualCopyHtml = value;
+      },
       setState(value) {
-        copyState = value;
+        if (turn === copyTurn) copyState = value;
       },
     });
   }
@@ -3071,6 +3085,7 @@ export function createWorkspaceState() {
   }
 
   onDestroy(() => {
+    copyTurn += 1;
     cancelLlmGeneration();
     clearScheduledPreviewRender();
     flushScheduledDraftPersist();
@@ -3513,6 +3528,9 @@ export function createWorkspaceState() {
     },
     get copyState() {
       return copyState;
+    },
+    get manualCopyHtml() {
+      return manualCopyHtml;
     },
     set copyState(value) {
       copyState = value;

@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JSONContent } from "@tiptap/core";
 import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
-import { createWorkspacePreviewRenderer } from "$lib/state/workspace-export";
+import { copyDcHtmlWhenReady } from "$lib/dc/clipboard";
+import { copyDcPreview, createWorkspacePreviewRenderer } from "$lib/state/workspace-export";
 
 vi.mock("$lib/dc/export-document", () => ({
   exportDocumentToDcHtml: vi.fn<typeof exportDocumentToDcHtml>(),
 }));
 vi.mock("$lib/dc/clipboard", () => ({
   copyDcHtml: vi.fn<(html: string, plainText: string) => Promise<void>>(),
+  copyDcHtmlWhenReady: vi.fn<(htmlPromise: Promise<string>, plainText: string) => Promise<void>>(),
   copyPlainText: vi.fn<(text: string) => Promise<void>>(),
 }));
 
@@ -53,6 +55,7 @@ describe("workspace preview render lifecycle", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(exportDocumentToDcHtml).mockReset();
+    vi.mocked(copyDcHtmlWhenReady).mockReset();
   });
 
   afterEach(() => {
@@ -174,5 +177,52 @@ describe("workspace preview render lifecycle", () => {
     await renderer.renderPreview(document("retry"), options);
     expect(setHtml).toHaveBeenCalledExactlyOnceWith("recovered-html");
     expect(setError).toHaveBeenLastCalledWith("");
+  });
+
+  it("starts clipboard write before export and rejects a stale document", async () => {
+    const html = deferred();
+    vi.mocked(exportDocumentToDcHtml).mockReturnValue(html.promise);
+    vi.mocked(copyDcHtmlWhenReady).mockImplementation(async (pendingHtml) => {
+      await pendingHtml;
+    });
+    const setState = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const setManualHtml = vi.fn<(html: string) => void>();
+    let current = true;
+
+    const copy = copyDcPreview({
+      document: document("first"),
+      exportOptions: options,
+      plainText: "first",
+      isCurrent: () => current,
+      setManualHtml,
+      setState,
+    });
+    expect(copyDcHtmlWhenReady).toHaveBeenCalledOnce();
+    current = false;
+    html.resolve("stale-html");
+    await copy;
+    expect(setState).toHaveBeenCalledExactlyOnceWith("idle");
+    expect(setManualHtml).toHaveBeenCalledExactlyOnceWith("");
+  });
+
+  it("offers current HTML for manual copy when every clipboard path fails", async () => {
+    vi.mocked(exportDocumentToDcHtml).mockResolvedValue("current-html");
+    vi.mocked(copyDcHtmlWhenReady).mockImplementation(async (pendingHtml) => {
+      await pendingHtml;
+      throw new Error("clipboard denied");
+    });
+    const setState = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const setManualHtml = vi.fn<(html: string) => void>();
+
+    await copyDcPreview({
+      document: document("current"),
+      exportOptions: options,
+      plainText: "current",
+      isCurrent: () => true,
+      setManualHtml,
+      setState,
+    });
+    expect(setManualHtml).toHaveBeenLastCalledWith("current-html");
+    expect(setState).toHaveBeenLastCalledWith("error");
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { copyDcHtml, copyPlainText } from "../../src/lib/dc/clipboard";
+import { copyDcHtml, copyDcHtmlWhenReady, copyPlainText } from "../../src/lib/dc/clipboard";
 
 class MockClipboardItem {}
 
@@ -181,5 +181,36 @@ describe("clipboard fallback after async API failure", () => {
     expect(target.remove).toHaveBeenCalledOnce();
     expect(activeElement.focus).toHaveBeenCalledOnce();
     expect(selection.addRange).toHaveBeenLastCalledWith(originalRange);
+  });
+
+  it("starts a promise-backed clipboard write before slow HTML finishes", async () => {
+    let finishHtml!: (html: string) => void;
+    const htmlPromise = new Promise<string>((resolve) => {
+      finishHtml = resolve;
+    });
+    class PendingClipboardItem {
+      constructor(readonly items: Record<string, Blob | Promise<Blob>>) {}
+    }
+    const write = vi
+      .fn<(items: PendingClipboardItem[]) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    vi.stubGlobal("ClipboardItem", PendingClipboardItem);
+    vi.stubGlobal("navigator", { clipboard: { write } });
+
+    const copy = copyDcHtmlWhenReady(htmlPromise, "plain text");
+    expect(write).toHaveBeenCalledOnce();
+    const item = write.mock.calls[0]?.[0]?.[0];
+    expect(item).toBeDefined();
+    finishHtml("<p>later</p>");
+    await copy;
+    expect(await (await item?.items["text/html"])?.text()).toBe("<p>later</p>");
+    expect(await (await item?.items["text/plain"])?.text()).toBe("plain text");
+  });
+
+  it("falls back with the resolved HTML and the same plain text after async denial", async () => {
+    const { copyData } = mockBrowser();
+    await copyDcHtmlWhenReady(Promise.resolve("<p>later</p>"), "same plain text");
+    expect(copyData.setData).toHaveBeenCalledWith("text/html", "<p>later</p>");
+    expect(copyData.setData).toHaveBeenCalledWith("text/plain", "same plain text");
   });
 });

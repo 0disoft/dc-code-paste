@@ -317,7 +317,18 @@
     </section>
 
     {#if workspace.copyState === "error"}
-        <p class="copy-error">복사가 막혔어. 브라우저 권한을 확인해줘.</p>
+        <div class="copy-error" role="alert">
+            자동 복사가 실패했습니다. 브라우저 권한을 확인해 주세요.
+            {#if workspace.manualCopyHtml}
+                <p>아래 원문을 복사해 DCInside HTML 모드에 붙여넣으세요.</p>
+                <textarea
+                    class="html-source"
+                    readonly
+                    aria-label="수동 복사용 HTML 원문"
+                    value={workspace.manualCopyHtml}
+                ></textarea>
+            {/if}
+        </div>
     {/if}
 
     {#if workspace.sourceCopyState === "error"}

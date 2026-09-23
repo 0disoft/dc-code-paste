@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 
-import { copyDcHtml, copyPlainText } from "$lib/dc/clipboard";
+import { copyDcHtmlWhenReady, copyPlainText } from "$lib/dc/clipboard";
 import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
 
 export type WorkspaceCopyState = "idle" | "copied" | "error";
@@ -21,6 +21,8 @@ type CopyDcPreviewOptions = CopyStateOptions & {
   document: JSONContent;
   exportOptions: DcExportOptions;
   plainText: string;
+  isCurrent: () => boolean;
+  setManualHtml: (html: string) => void;
 };
 
 type CopySourceHtmlOptions = CopyStateOptions & {
@@ -116,22 +118,35 @@ export async function copyDcPreview({
   document,
   exportOptions,
   plainText,
+  isCurrent,
+  setManualHtml,
   setState,
   resetDelayMs,
 }: CopyDcPreviewOptions) {
   setState("idle");
-
-  try {
-    const copyHtml = await exportDocumentToDcHtml(document, {
+  setManualHtml("");
+  let completedHtml = "";
+  const copyHtmlPromise = Promise.resolve().then(async () => {
+    const html = await exportDocumentToDcHtml(document, {
       ...exportOptions,
       includeAttribution: true,
     });
+    if (!isCurrent()) throw new Error("Copy source changed during export.");
+    completedHtml = html;
+    return html;
+  });
 
-    await copyDcHtml(copyHtml, plainText);
-    setState("copied");
-    scheduleCopiedStateReset({ setState, resetDelayMs });
+  try {
+    await copyDcHtmlWhenReady(copyHtmlPromise, plainText);
+    if (isCurrent()) {
+      setState("copied");
+      scheduleCopiedStateReset({ setState, resetDelayMs });
+    }
   } catch {
-    setState("error");
+    if (isCurrent()) {
+      setManualHtml(completedHtml);
+      setState("error");
+    }
   }
 }
 
