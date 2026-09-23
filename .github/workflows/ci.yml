@@ -68,8 +68,8 @@ jobs:
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install Chromium and system dependencies
-        run: bunx --no-install playwright install --with-deps chromium
+      - name: Install browser engines and system dependencies
+        run: bunx --no-install playwright install --with-deps chromium firefox webkit
 
       - name: Browser tests
         run: bun run test:e2e
