@@ -4,6 +4,7 @@ import {
   buildLlmAuthoringMessages,
   llmProviders,
   normalizeGeneratedMarkdown,
+  openRouterMaxCompletionTokens,
   openCodeGoModelIds,
   openRouterTopWeeklyModelLimit,
   requestLlmMarkdown,
@@ -201,7 +202,8 @@ describe("llm-generation", () => {
   it("requests OpenRouter through the OpenAI-compatible endpoint", async () => {
     const fetcher = vi.fn<MockFetch>(async () =>
       jsonResponse({
-        choices: [{ message: { content: ":::hero\n제목\n:::" } }],
+        choices: [{ finish_reason: "stop", message: { content: ":::hero\n제목\n:::" } }],
+        usage: { prompt_tokens: 10, completion_tokens: 12, total_tokens: 22 },
       }),
     );
 
@@ -218,7 +220,12 @@ describe("llm-generation", () => {
       fetcher,
     );
 
-    expect(markdown).toBe(":::hero\n제목\n:::");
+    expect(markdown).toEqual({
+      markdown: ":::hero\n제목\n:::",
+      completionState: "complete",
+      finishReason: "stop",
+      usage: { promptTokens: 10, completionTokens: 12, totalTokens: 22 },
+    });
     expect(fetcher).toHaveBeenCalledWith(
       "https://openrouter.ai/api/v1/chat/completions",
       expect.objectContaining({
@@ -230,6 +237,49 @@ describe("llm-generation", () => {
         }),
       }),
     );
+    const requestBody = JSON.parse(String(fetcher.mock.calls[0][1]?.body));
+    expect(requestBody.max_completion_tokens).toBe(openRouterMaxCompletionTokens);
+  });
+
+  it.each([
+    ["length", "incomplete"],
+    ["content_filter", "blocked"],
+    ["error", "blocked"],
+    ["tool_calls", "incomplete"],
+  ] as const)("preserves partial text for %s responses", async (finishReason, completionState) => {
+    const result = await requestLlmMarkdown(
+      {
+        provider: "openrouter",
+        apiKey: "test-key",
+        model: "test/model",
+        userPrompt: "글 작성",
+        authoringPrompt: "가이드",
+      },
+      async () =>
+        jsonResponse({
+          choices: [{ finish_reason: finishReason, message: { content: "# 부분 결과" } }],
+        }),
+    );
+
+    expect(result).toMatchObject({ markdown: "# 부분 결과", completionState, finishReason });
+  });
+
+  it("rejects an empty or malformed response instead of treating it as complete", async () => {
+    const input = {
+      provider: "openrouter" as const,
+      apiKey: "test-key",
+      model: "test/model",
+      userPrompt: "글 작성",
+      authoringPrompt: "가이드",
+    };
+    await expect(
+      requestLlmMarkdown(input, async () => jsonResponse({ choices: [] })),
+    ).rejects.toThrow("OpenRouter 응답 형식을 읽을 수 없습니다.");
+    await expect(
+      requestLlmMarkdown(input, async () =>
+        jsonResponse({ choices: [{ finish_reason: "length", message: { content: "" } }] }),
+      ),
+    ).rejects.toThrow("length 사유로 중단");
   });
 
   it("passes request cancellation to the provider fetch", async () => {

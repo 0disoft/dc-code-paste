@@ -324,7 +324,8 @@ export function createWorkspaceState() {
 
   let openRouterModelError = $state("");
 
-  let llmGenerationState = $state<"idle" | "loading" | "stale" | "ready" | "error">("idle");
+  type LlmGenerationState = "idle" | "loading" | "stale" | "ready" | "incomplete" | "error";
+  let llmGenerationState = $state<LlmGenerationState>("idle");
 
   let llmGenerationInFlight = $state(false);
 
@@ -484,9 +485,11 @@ export function createWorkspaceState() {
         ? "이전 요청 응답 대기"
         : llmGenerationState === "ready"
           ? "Markdown에 넣음"
-          : llmGenerationState === "error"
-            ? llmGenerationError || "요청 실패"
-            : "대기",
+          : llmGenerationState === "incomplete"
+            ? llmGenerationError
+            : llmGenerationState === "error"
+              ? llmGenerationError || "요청 실패"
+              : "대기",
   );
 
   const isLlmGenerateDisabled = $derived(
@@ -2823,7 +2826,7 @@ export function createWorkspaceState() {
     );
 
     try {
-      const markdown = await requestLlmMarkdown({
+      const result = await requestLlmMarkdown({
         provider: llmProvider,
         apiKey: llmApiKey,
         model: llmModel,
@@ -2845,12 +2848,20 @@ export function createWorkspaceState() {
         return;
       }
 
-      markdownDraft = markdown;
+      markdownDraft = result.markdown;
       resetMarkdownImportState();
-      isLlmPanelOpen = false;
       isMarkdownPanelOpen = true;
       isStoragePanelOpen = false;
-      llmGenerationState = "ready";
+      if (result.completionState === "complete") {
+        isLlmPanelOpen = false;
+        llmGenerationState = "ready";
+      } else {
+        llmGenerationError =
+          result.completionState === "blocked"
+            ? `응답이 ${result.finishReason} 사유로 중단됐습니다. 생성된 글을 확인해 주세요.`
+            : `응답이 ${result.finishReason} 사유로 끝나 글이 미완성일 수 있습니다. 생성된 글을 확인해 주세요.`;
+        llmGenerationState = "incomplete";
+      }
     } catch (error) {
       if (turn !== llmGenerationTurn) {
         return;

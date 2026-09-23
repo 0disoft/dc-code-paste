@@ -22,7 +22,7 @@
         openRouterModelStateLabel: string;
         openCodeGoModelStateLabel: string;
         activeLlmProvider: { apiKeyPlaceholder: string };
-        llmGenerationState: "idle" | "loading" | "stale" | "ready" | "error";
+        llmGenerationState: "idle" | "loading" | "stale" | "ready" | "incomplete" | "error";
         llmGenerationError: string;
         llmGenerationStateLabel: string;
         isLlmGenerateDisabled: boolean;
@@ -242,9 +242,10 @@
             <span>닫기</span>
         </button>
         <span
-            class:error={llmGenerationState === "error"}
+            role="status"
+            class:error={llmGenerationState === "error" || llmGenerationState === "incomplete"}
             class="markdown-status llm-status"
-            title={llmGenerationState === "error"
+            title={llmGenerationState === "error" || llmGenerationState === "incomplete"
                 ? llmGenerationError
                 : ""}>{llmGenerationStateLabel}</span
         >

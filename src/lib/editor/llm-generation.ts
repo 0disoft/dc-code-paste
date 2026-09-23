@@ -33,6 +33,21 @@ export type LlmRequestInput = {
   signal?: AbortSignal;
 };
 
+export type LlmMarkdownResult = {
+  markdown: string;
+  completionState: "complete" | "incomplete" | "blocked";
+  finishReason: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
+};
+
+export const openRouterMaxCompletionTokens = 4500;
+const maxLlmPromptChars = 20_000;
+const maxLlmResponseChars = 1_000_000;
+
 export type OpenRouterModelOption = {
   id: string;
   name: string;
@@ -278,6 +293,10 @@ export async function requestLlmMarkdown(
     );
   }
 
+  if (userPrompt.length > maxLlmPromptChars) {
+    throw new Error(`요청은 ${maxLlmPromptChars.toLocaleString()}자 이내로 입력해 주세요.`);
+  }
+
   const messages = buildLlmAuthoringMessages(input.authoringPrompt, userPrompt);
 
   const raw =
@@ -295,13 +314,24 @@ export async function requestLlmMarkdown(
                 ? await requestOpenRouter(input, messages, fetcher)
                 : await requestOpenAiCompatibleChat(input, messages, fetcher);
 
-  const markdown = normalizeGeneratedMarkdown(raw);
+  const result: LlmMarkdownResult =
+    typeof raw === "string"
+      ? {
+          markdown: normalizeGeneratedMarkdown(raw),
+          completionState: "complete",
+          finishReason: "stop",
+        }
+      : { ...raw, markdown: normalizeGeneratedMarkdown(raw.markdown) };
 
-  if (!markdown) {
-    throw new Error("LLM 응답이 비어 있습니다.");
+  if (!result.markdown) {
+    throw new Error(
+      result.completionState === "complete"
+        ? "LLM 응답이 비어 있습니다."
+        : `LLM 응답이 ${result.finishReason} 사유로 중단됐고 생성된 글이 없습니다.`,
+    );
   }
 
-  return markdown;
+  return result;
 }
 
 export async function requestOpenRouterModels(
@@ -413,6 +443,7 @@ async function requestOpenRouter(
     body: JSON.stringify({
       model: input.model.trim(),
       temperature: 0.7,
+      max_completion_tokens: openRouterMaxCompletionTokens,
       messages: [
         { role: "system", content: messages.system },
         { role: "user", content: messages.user },
@@ -420,8 +451,8 @@ async function requestOpenRouter(
     }),
   });
 
-  const payload = await readJsonResponse(response);
-  return extractOpenAiCompatibleText(payload);
+  const payload = await readJsonResponse(response, maxLlmResponseChars);
+  return extractOpenRouterCompletion(payload);
 }
 
 async function requestOpenCodeGo(
@@ -671,8 +702,11 @@ async function requestGemini(
   return extractGeminiText(payload);
 }
 
-async function readJsonResponse(response: Response) {
+async function readJsonResponse(response: Response, maxChars?: number) {
   const text = await response.text();
+  if (maxChars && text.length > maxChars) {
+    throw new Error("LLM 응답이 허용 크기를 초과했습니다.");
+  }
   let payload: unknown = {};
 
   if (text) {
@@ -747,6 +781,39 @@ function extractOpenAiCompatibleText(payload: unknown) {
   }
 
   throw new Error("LLM 응답 본문이 비어 있습니다.");
+}
+
+function extractOpenRouterCompletion(payload: unknown): LlmMarkdownResult {
+  if (!isRecord(payload) || !Array.isArray(payload.choices) || !isRecord(payload.choices[0])) {
+    throw new Error("OpenRouter 응답 형식을 읽을 수 없습니다.");
+  }
+
+  const choice = payload.choices[0];
+  const finishReason = typeof choice.finish_reason === "string" ? choice.finish_reason : "unknown";
+  const completionState =
+    finishReason === "stop"
+      ? "complete"
+      : finishReason === "content_filter" || finishReason === "error"
+        ? "blocked"
+        : "incomplete";
+  const usage = isRecord(payload.usage) ? payload.usage : null;
+  const positiveCount = (value: unknown) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+
+  return {
+    markdown: extractOpenAiCompatibleText(payload),
+    completionState,
+    finishReason,
+    ...(usage
+      ? {
+          usage: {
+            promptTokens: positiveCount(usage.prompt_tokens),
+            completionTokens: positiveCount(usage.completion_tokens),
+            totalTokens: positiveCount(usage.total_tokens),
+          },
+        }
+      : {}),
+  };
 }
 
 function extractOpenAiResponseText(payload: unknown) {
