@@ -531,7 +531,11 @@ export function createWorkspaceState() {
   });
 
   function draftStorage() {
-    return typeof window === "undefined" ? undefined : window.localStorage;
+    try {
+      return typeof window === "undefined" ? undefined : window.localStorage;
+    } catch {
+      return undefined;
+    }
   }
 
   function defaultDraftPreferences(): DraftPreferences {
@@ -2911,7 +2915,8 @@ export function createWorkspaceState() {
   onMount(() => {
     let disposed = false;
     let mountedEditor: Editor | undefined;
-    const savedDraft = readDraftSnapshot(window.localStorage);
+    const storage = draftStorage();
+    const savedDraft = storage ? readDraftSnapshot(storage) : undefined;
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
     const flushDraftWhenHidden = () => {

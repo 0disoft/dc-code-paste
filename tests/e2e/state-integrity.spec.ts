@@ -3,6 +3,22 @@ import { expect, test, type Page } from "@playwright/test";
 const draftKey = "dc-code-paste:draft:v1";
 const historyKey = "dc-code-paste:draft-history:v1";
 
+test("opens the editor when browser storage access is blocked", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", {
+      get() {
+        throw new DOMException("Storage blocked", "SecurityError");
+      },
+    });
+  });
+
+  await page.goto("/");
+  await waitForEditor(page);
+  await page.locator(".article-editor").click();
+  await page.keyboard.insertText("STORAGE_BLOCKED_EDIT");
+  await expect(page.locator(".article-editor")).toContainText("STORAGE_BLOCKED_EDIT");
+});
+
 async function waitForEditor(page: Page) {
   await expect(page.locator(".article-editor")).toBeVisible({ timeout: 15_000 });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
