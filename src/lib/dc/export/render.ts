@@ -18,6 +18,55 @@ import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
 import type { DcExportOptions, DcDocumentTheme } from "./types";
 
+// Includes child nodes rendered through their parent block serializer.
+export const dcExportSupportedNodeTypes = new Set([
+  "doc",
+  "text",
+  "hardBreak",
+  "paragraph",
+  "heading",
+  "blockquote",
+  "bulletList",
+  "orderedList",
+  "listItem",
+  "codeBlock",
+  "horizontalRule",
+  "sectionHeading",
+  "heroBlock",
+  "summaryBox",
+  "summaryItem",
+  "tutorialBlock",
+  "tutorialStep",
+  "comparisonBlock",
+  "comparisonColumn",
+  "referenceList",
+  "referenceItem",
+  "ctaGroup",
+  "ctaButton",
+  "linkBox",
+  "dcDataTable",
+  "dcDataTableRow",
+  "dcDataTableCell",
+  "tipBox",
+  "warningBox",
+  "referenceBox",
+  "emphasisBox",
+  "successBox",
+  "failureBox",
+  "experimentBox",
+  "conclusionBox",
+  "rebuttalBox",
+]);
+export const dcExportSupportedMarkTypes = new Set([
+  "bold",
+  "italic",
+  "strike",
+  "underline",
+  "code",
+  "link",
+  "textStyle",
+]);
+
 const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
 const linkColor = "oklch(56.77% 0.154 252.96)";
 const articleBackground = "oklch(98.38% 0.01 97.33)";
@@ -661,6 +710,16 @@ function applyMarks(
       continue;
     }
 
+    if (mark.type === "strike") {
+      html = `<span style="text-decoration:line-through">${html}</span>`;
+      continue;
+    }
+
+    if (mark.type === "underline") {
+      html = `<span style="text-decoration:underline">${html}</span>`;
+      continue;
+    }
+
     if (mark.type === "code") {
       const style = joinStyle({
         "background-color": context.inlineCodeBackground ?? palette.inlineCodeBackground,
@@ -831,9 +890,18 @@ async function renderList(
     "font-size": bodyFontSize,
     "line-height": 1.7,
   });
+  const rawStart = node.attrs?.start;
+  const start =
+    ordered &&
+    typeof rawStart === "number" &&
+    Number.isSafeInteger(rawStart) &&
+    rawStart >= 0 &&
+    rawStart <= 1_000_000
+      ? rawStart
+      : 1;
   const rows = await Promise.all(
     childrenOf(node).map(async (item, index) => {
-      const marker = ordered ? `${index + 1}.` : "&bull;";
+      const marker = ordered ? `${start + index}.` : "&bull;";
       const body = await renderListItemBody(item, options, listItemContext, bodyTextStyle);
 
       return `<tr><td width="22" style="${markerCellStyle}"><span style="${markerTextStyle}">${marker}</span></td><td style="${bodyCellStyle}">${body}</td></tr>`;

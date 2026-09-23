@@ -1,4 +1,4 @@
-import type { JSONContent } from "@tiptap/core";
+import { getSchema, type JSONContent } from "@tiptap/core";
 import { describe, expect, it } from "vitest";
 import {
   defaultDcExportStructure,
@@ -12,6 +12,11 @@ import {
   safeDcProseFontFamily,
 } from "../../src/lib/dc/font-stacks";
 import { parseMarkdownToDocument } from "../../src/lib/editor/markdown-import";
+import { createEditorExtensions } from "../../src/lib/editor/extensions";
+import {
+  dcExportSupportedMarkTypes,
+  dcExportSupportedNodeTypes,
+} from "../../src/lib/dc/export/render";
 
 const expectedDefaultDcProseFontFamily = safeDcProseFontFamily(defaultProseFontFamily);
 const expectedDefaultDcProseLabelFontFamily =
@@ -24,6 +29,18 @@ const exportOptions = {
   codeFontSize: "15px",
   showLineNumbers: false,
 } as const;
+
+it("covers every active editor node and mark in the DC export contract", () => {
+  const schema = getSchema(createEditorExtensions());
+  const missingNodes = Object.keys(schema.nodes).filter(
+    (name) => !dcExportSupportedNodeTypes.has(name),
+  );
+  const missingMarks = Object.keys(schema.marks).filter(
+    (name) => !dcExportSupportedMarkTypes.has(name),
+  );
+  expect(missingNodes).toEqual([]);
+  expect(missingMarks).toEqual([]);
+});
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -71,6 +88,107 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).toContain("본문 내용");
     expect(html).not.toContain("Created with dc-code-paste");
     expect(html).not.toContain('href="https://0disoft.github.io/dc-code-paste/"');
+  });
+
+  it("keeps underline and strike alongside bold and link marks", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "marked",
+              marks: [
+                { type: "bold" },
+                { type: "strike" },
+                { type: "underline" },
+                { type: "link", attrs: { href: "https://example.com" } },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain("text-decoration:line-through");
+    expect(html).toContain("text-decoration:underline");
+    expect(html).toContain("font-weight:700");
+    expect(html).toContain('href="https://example.com"');
+    expect(html).toContain("marked");
+  });
+
+  it.each([
+    [undefined, "1.", "2."],
+    [5, "5.", "6."],
+    [0, "0.", "1."],
+    [-1, "1.", "2."],
+    [1.5, "1.", "2."],
+    ["invalid", "1.", "2."],
+  ])("uses a safe ordered-list start of %s", async (start, first, second) => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "orderedList",
+          attrs: { start },
+          content: [
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "first" }] }],
+            },
+            {
+              type: "listItem",
+              content: [{ type: "paragraph", content: [{ type: "text", text: "second" }] }],
+            },
+          ],
+        },
+      ],
+    };
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain(`>${first}</span>`);
+    expect(html).toContain(`>${second}</span>`);
+    expect(html).toContain("first");
+    expect(html).toContain("second");
+  });
+
+  it("keeps independent numbering inside nested ordered lists", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "orderedList",
+          attrs: { start: 5 },
+          content: [
+            {
+              type: "listItem",
+              content: [
+                { type: "paragraph", content: [{ type: "text", text: "outer" }] },
+                {
+                  type: "orderedList",
+                  attrs: { start: 2 },
+                  content: [
+                    {
+                      type: "listItem",
+                      content: [{ type: "paragraph", content: [{ type: "text", text: "inner" }] }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+
+    expect(html).toContain(">5.</span>");
+    expect(html).toContain(">2.</span>");
+    expect(html).toContain("outer");
+    expect(html).toContain("inner");
   });
 
   it("exports markdown-authored data tables as paste-safe tables", async () => {
