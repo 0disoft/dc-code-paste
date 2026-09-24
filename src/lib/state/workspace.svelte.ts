@@ -98,7 +98,6 @@ import {
   llmProviders,
   openRouterTopWeeklyModelLimit,
   providerDefinition,
-  requestLlmMarkdown,
   requestOpenRouterModels,
   type OpenRouterModelOption,
   type LlmProviderId,
@@ -155,6 +154,7 @@ import {
   createCopyFeedbackController,
   createWorkspacePreviewRenderer,
 } from "$lib/state/workspace-export";
+import { createLlmRequestController, type LlmGenerationState } from "$lib/state/llm-request";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -335,7 +335,6 @@ export function createWorkspaceState() {
 
   let openRouterModelError = $state("");
 
-  type LlmGenerationState = "idle" | "loading" | "stale" | "ready" | "incomplete" | "error";
   let llmGenerationState = $state<LlmGenerationState>("idle");
 
   let llmGenerationInFlight = $state(false);
@@ -391,14 +390,27 @@ export function createWorkspaceState() {
 
   let openRouterModelLoadTurn = 0;
 
-  let llmGenerationTurn = 0;
-
-  let llmGenerationController: AbortController | undefined;
-
-  const llmGenerationTimeoutMs = 90_000;
-
   const exportSession = createDcExportSession();
   const copyFeedback = createCopyFeedbackController();
+  const llmRequest = createLlmRequestController({
+    getDraft: () => markdownDraft,
+    applyResult(result) {
+      markdownDraft = result.markdown;
+      resetMarkdownImportState();
+      isMarkdownPanelOpen = true;
+      isStoragePanelOpen = false;
+      if (result.completionState === "complete") isLlmPanelOpen = false;
+    },
+    setState(value) {
+      llmGenerationState = value;
+    },
+    setError(value) {
+      llmGenerationError = value;
+    },
+    setInFlight(value) {
+      llmGenerationInFlight = value;
+    },
+  });
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
     renderDocument: exportSession.exportDocument,
@@ -803,8 +815,6 @@ export function createWorkspaceState() {
     isStoragePanelOpen = false;
     activeToolPanel = null;
     resetMarkdownImportState();
-    llmGenerationError = "";
-    llmGenerationState = "idle";
   }
 
   function resetMarkdownImportState() {
@@ -836,7 +846,7 @@ export function createWorkspaceState() {
 
   function toggleLlmPanel() {
     isLlmPanelOpen = !isLlmPanelOpen;
-    llmGenerationError = "";
+    llmRequest.clearError();
 
     if (isLlmPanelOpen) {
       isMarkdownPanelOpen = false;
@@ -856,24 +866,11 @@ export function createWorkspaceState() {
   }
 
   function cancelLlmGeneration() {
-    llmGenerationTurn += 1;
-    llmGenerationController?.abort();
-    llmGenerationState = "idle";
-    llmGenerationError = "";
+    llmRequest.cancel();
   }
 
   function markLlmInputChanged() {
-    llmGenerationTurn += 1;
-    llmGenerationError = "";
-    llmGenerationState = llmGenerationInFlight ? "stale" : "idle";
-  }
-
-  function finishLlmGeneration() {
-    llmGenerationController = undefined;
-    llmGenerationInFlight = false;
-    if (llmGenerationState === "stale") {
-      llmGenerationState = "idle";
-    }
+    llmRequest.markInputChanged();
   }
 
   function selectLlmProvider(value: string) {
@@ -3006,92 +3003,16 @@ export function createWorkspaceState() {
   }
 
   async function generateMarkdownWithLlm() {
-    if (isLlmGenerateDisabled) {
-      return;
-    }
-
-    const turn = ++llmGenerationTurn;
-    const markdownAtRequestStart = markdownDraft;
-    const controller = new AbortController();
-    llmGenerationController = controller;
-    llmGenerationInFlight = true;
-    llmGenerationState = "loading";
-    llmGenerationError = "";
-    const timeoutId = setTimeout(
-      () => controller.abort(new DOMException("LLM request timed out", "TimeoutError")),
-      llmGenerationTimeoutMs,
-    );
-
-    try {
-      const result = await requestLlmMarkdown({
-        provider: llmProvider,
-        apiKey: llmApiKey,
-        model: llmModel,
-        userPrompt: llmUserPrompt,
-        authoringPrompt: llmAuthoringPrompt,
-        siteUrl: "https://0disoft.github.io/dc-code-paste/",
-        appTitle: "dc-code-paste",
-        signal: controller.signal,
-      });
-
-      if (
-        turn !== llmGenerationTurn ||
-        controller.signal.aborted ||
-        markdownDraft !== markdownAtRequestStart
-      ) {
-        if (turn === llmGenerationTurn) {
-          llmGenerationState = "idle";
-        }
-        return;
-      }
-
-      markdownDraft = result.markdown;
-      resetMarkdownImportState();
-      isMarkdownPanelOpen = true;
-      isStoragePanelOpen = false;
-      if (result.completionState === "complete") {
-        isLlmPanelOpen = false;
-        llmGenerationState = "ready";
-      } else {
-        llmGenerationError =
-          result.completionState === "blocked"
-            ? `응답이 ${result.finishReason} 사유로 중단됐습니다. 생성된 글을 확인해 주세요.`
-            : `응답이 ${result.finishReason} 사유로 끝나 글이 미완성일 수 있습니다. 생성된 글을 확인해 주세요.`;
-        llmGenerationState = "incomplete";
-      }
-    } catch (error) {
-      if (turn !== llmGenerationTurn) {
-        return;
-      }
-
-      if (
-        controller.signal.aborted &&
-        controller.signal.reason instanceof Error &&
-        controller.signal.reason.name === "TimeoutError"
-      ) {
-        llmGenerationError = "요청 시간이 초과됐습니다. 다시 시도해 주세요.";
-        llmGenerationState = "error";
-        return;
-      }
-
-      if (controller.signal.aborted || (error instanceof Error && error.name === "AbortError")) {
-        llmGenerationState = "idle";
-        return;
-      }
-
-      llmGenerationError =
-        error instanceof TypeError
-          ? "네트워크 연결이나 브라우저 요청을 확인해 주세요."
-          : error instanceof Error
-            ? error.message
-            : "응답을 읽지 못했습니다. 다시 시도해 주세요.";
-      llmGenerationState = "error";
-    } finally {
-      clearTimeout(timeoutId);
-      if (llmGenerationController === controller) {
-        finishLlmGeneration();
-      }
-    }
+    if (isLlmGenerateDisabled) return;
+    await llmRequest.generate({
+      provider: llmProvider,
+      apiKey: llmApiKey,
+      model: llmModel,
+      userPrompt: llmUserPrompt,
+      authoringPrompt: llmAuthoringPrompt,
+      siteUrl: "https://0disoft.github.io/dc-code-paste/",
+      appTitle: "dc-code-paste",
+    });
   }
 
   function toggleToolPanel(panel: ToolPanelId) {
@@ -3100,7 +3021,7 @@ export function createWorkspaceState() {
 
   onDestroy(() => {
     copyFeedback.dispose();
-    cancelLlmGeneration();
+    llmRequest.dispose();
     clearScheduledPreviewRender();
     exportSession.dispose();
     flushScheduledDraftPersist();
@@ -3653,14 +3574,8 @@ export function createWorkspaceState() {
     get llmGenerationState() {
       return llmGenerationState;
     },
-    set llmGenerationState(value) {
-      llmGenerationState = value;
-    },
     get llmGenerationError() {
       return llmGenerationError;
-    },
-    set llmGenerationError(value) {
-      llmGenerationError = value;
     },
     get isStoragePanelOpen() {
       return isStoragePanelOpen;
@@ -4065,7 +3980,6 @@ export function createWorkspaceState() {
     llmProviders,
     openRouterTopWeeklyModelLimit,
     providerDefinition,
-    requestLlmMarkdown,
     requestOpenRouterModels,
     parseMarkdownToDocument,
     codeLineRangeContains,
