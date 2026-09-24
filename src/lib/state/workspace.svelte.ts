@@ -48,13 +48,8 @@ import {
   normalizeCalloutToneColor,
 } from "$lib/editor/callout-palette";
 
-import {
-  selectedInlineRangeToCalloutCommand,
-  selectedInlineRangeToCodeBlockCommand,
-  selectedInlineRangeToCtaButtonCommand,
-  selectedInlineRangeToSectionHeadingCommand,
-  selectedInlineRangeToLinkBoxCommand,
-} from "$lib/editor/selection-commands";
+import { selectedInlineRangeToCalloutCommand } from "$lib/editor/selection-commands";
+import { createEditorCommandAdapter } from "$lib/editor/command-adapter";
 import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
 import {
@@ -432,6 +427,10 @@ export function createWorkspaceState() {
     setState(value) {
       draftHistoryState = value;
     },
+  });
+  const editorCommands = createEditorCommandAdapter({
+    getEditor: () => editor,
+    onCommand: refreshEditorState,
   });
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
@@ -1451,12 +1450,7 @@ export function createWorkspaceState() {
   }
 
   function runEditorCommand(command: (current: Editor) => boolean) {
-    if (!editor) {
-      return;
-    }
-
-    command(editor);
-    refreshEditorState(editor);
+    editorCommands.run(command);
   }
 
   function blockLabelPlaceholder() {
@@ -1524,40 +1518,12 @@ export function createWorkspaceState() {
     });
     codeFilename = filename;
 
-    runEditorCommand((current) => {
-      if (current.isActive("codeBlock")) {
-        return current.chain().focus().toggleCodeBlock({ language }).run();
-      }
-
-      if (
-        current
-          .chain()
-          .focus()
-          .command(
-            selectedInlineRangeToCodeBlockCommand(
-              language,
-              highlightLines,
-              filename,
-              additionLines,
-              deletionLines,
-            ),
-          )
-          .run()
-      ) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .setCodeBlock({ language })
-        .updateAttributes("codeBlock", {
-          highlightLines,
-          filename,
-          additionLines,
-          deletionLines,
-        })
-        .run();
+    editorCommands.applyCodeBlock({
+      language,
+      highlightLines,
+      filename,
+      additionLines,
+      deletionLines,
     });
   }
 
@@ -2409,38 +2375,7 @@ export function createWorkspaceState() {
   }
 
   function selectedText() {
-    if (!editor || editor.state.selection.empty) {
-      return "";
-    }
-
-    const { from, to } = editor.state.selection;
-    return editor.state.doc.textBetween(from, to, "\n").trim();
-  }
-
-  function retargetActiveLinkBox(current: Editor, href: string) {
-    const linkBoxType = current.schema.nodes.linkBox;
-
-    if (!linkBoxType) {
-      return false;
-    }
-
-    const selectionFrom = current.state.selection.$from;
-
-    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
-      const node = selectionFrom.node(depth);
-
-      if (node.type.name === "linkBox") {
-        current.commands.focus();
-        current.view.dispatch(
-          current.state.tr
-            .setNodeMarkup(selectionFrom.before(depth), node.type, { ...node.attrs, href })
-            .scrollIntoView(),
-        );
-        return true;
-      }
-    }
-
-    return false;
+    return editorCommands.selectedText();
   }
 
   function applyLinkBox() {
@@ -2454,47 +2389,11 @@ export function createWorkspaceState() {
 
     linkError = false;
     linkDraft = href;
-    runEditorCommand((current) => {
-      if (retargetActiveLinkBox(current, href)) {
-        return true;
-      }
-
-      if (current.chain().focus().command(selectedInlineRangeToLinkBoxCommand(href)).run()) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .insertContent({
-          type: "linkBox",
-          attrs: { href },
-          content: [
-            {
-              type: "paragraph",
-              content: [{ type: "text", text: href }],
-            },
-          ],
-        })
-        .run();
-    });
+    editorCommands.applyLinkBox(href);
   }
 
   function applySectionHeading() {
-    runEditorCommand((current) => {
-      if (current.chain().focus().command(selectedInlineRangeToSectionHeadingCommand()).run()) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .insertContent({
-          type: "sectionHeading",
-          content: [{ type: "text", text: "새 섹션" }],
-        })
-        .run();
-    });
+    editorCommands.applySectionHeading();
   }
 
   function applyQuote() {
@@ -2538,32 +2437,6 @@ export function createWorkspaceState() {
     });
   }
 
-  function retargetActiveCtaButton(current: Editor, href: string) {
-    const ctaButtonType = current.schema.nodes.ctaButton;
-
-    if (!ctaButtonType) {
-      return false;
-    }
-
-    const selectionFrom = current.state.selection.$from;
-
-    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
-      const node = selectionFrom.node(depth);
-
-      if (node.type.name === "ctaButton") {
-        current.commands.focus();
-        current.view.dispatch(
-          current.state.tr
-            .setNodeMarkup(selectionFrom.before(depth), node.type, { ...node.attrs, href })
-            .scrollIntoView(),
-        );
-        return true;
-      }
-    }
-
-    return false;
-  }
-
   function applyCtaButton() {
     const selection = selectedText();
     const href = normalizeEditableLinkHref(linkDraft) ?? normalizeEditableLinkHref(selection);
@@ -2580,25 +2453,7 @@ export function createWorkspaceState() {
 
     linkError = false;
     linkDraft = href;
-    runEditorCommand((current) => {
-      if (retargetActiveCtaButton(current, href)) {
-        return true;
-      }
-
-      if (current.chain().focus().command(selectedInlineRangeToCtaButtonCommand(href)).run()) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .insertContent({
-          type: "ctaButton",
-          attrs: { href },
-          content: [{ type: "text", text: fallbackLabel }],
-        })
-        .run();
-    });
+    editorCommands.applyCtaButton(href, fallbackLabel);
   }
 
   function applyCtaGroup() {
@@ -3729,12 +3584,10 @@ export function createWorkspaceState() {
     updateCalloutPickerColor,
     openCalloutColorPicker,
     selectedText,
-    retargetActiveLinkBox,
     applyLinkBox,
     applySectionHeading,
     applyQuote,
     updateActiveQuoteStyle,
-    retargetActiveCtaButton,
     applyCtaButton,
     applyCtaGroup,
     updateActiveCtaGroupLayout,
@@ -3804,10 +3657,6 @@ export function createWorkspaceState() {
     defaultCalloutToneColors,
     normalizeCalloutToneColor,
     selectedInlineRangeToCalloutCommand,
-    selectedInlineRangeToCodeBlockCommand,
-    selectedInlineRangeToCtaButtonCommand,
-    selectedInlineRangeToSectionHeadingCommand,
-    selectedInlineRangeToLinkBoxCommand,
     clearDraftSnapshot,
     maxDraftHistoryCount,
     readDraftSnapshot,
