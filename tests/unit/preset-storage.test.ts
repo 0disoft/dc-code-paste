@@ -104,8 +104,9 @@ describe("preset storage", () => {
 
     const nextPresets = deletePresetSnapshot(storage, first.id);
 
-    expect(nextPresets).toHaveLength(1);
-    expect(nextPresets[0]?.id).toBe(second.id);
+    expect(nextPresets.saved).toBe(true);
+    expect(nextPresets.snapshots).toHaveLength(1);
+    expect(nextPresets.snapshots[0]?.id).toBe(second.id);
 
     const writeFailingStorage = {
       getItem: storage.getItem.bind(storage),
@@ -117,8 +118,9 @@ describe("preset storage", () => {
 
     const preservedPresets = deletePresetSnapshot(writeFailingStorage, second.id);
 
-    expect(preservedPresets).toHaveLength(1);
-    expect(preservedPresets[0]?.id).toBe(second.id);
+    expect(preservedPresets.saved).toBe(false);
+    expect(preservedPresets.snapshots).toHaveLength(1);
+    expect(preservedPresets.snapshots[0]?.id).toBe(second.id);
   });
 
   it("renames presets without changing their saved content", () => {
@@ -129,11 +131,12 @@ describe("preset storage", () => {
 
     const renamed = renamePresetSnapshot(storage, preset.id, "  풀이   템플릿  ");
 
-    expect(renamed).toHaveLength(1);
-    expect(renamed[0]?.name).toBe("풀이 템플릿");
-    expect(renamed[0]?.document).toEqual(sampleDocument);
-    expect(renamed[0]?.preferences).toEqual(preferences);
-    expect(renamed[0]?.updatedAt).toBe(preset.updatedAt);
+    expect(renamed.saved).toBe(true);
+    expect(renamed.snapshots).toHaveLength(1);
+    expect(renamed.snapshots[0]?.name).toBe("풀이 템플릿");
+    expect(renamed.snapshots[0]?.document).toEqual(sampleDocument);
+    expect(renamed.snapshots[0]?.preferences).toEqual(preferences);
+    expect(renamed.snapshots[0]?.updatedAt).toBe(preset.updatedAt);
     expect(readPresetSnapshots(storage)[0]?.name).toBe("풀이 템플릿");
   });
 
@@ -144,7 +147,10 @@ describe("preset storage", () => {
     expect(parsePresetSnapshots(JSON.stringify({ version: 2, presets: [preset] }))).toEqual([]);
     expect(readPresetSnapshots(throwingStorage)).toEqual([]);
     expect(writePresetSnapshots(throwingStorage, [preset])).toBe(false);
-    expect(renamePresetSnapshot(throwingStorage, preset.id, "새 이름")).toEqual([]);
+    expect(renamePresetSnapshot(throwingStorage, preset.id, "새 이름")).toEqual({
+      snapshots: [],
+      saved: false,
+    });
     expect(clearPresetSnapshots(throwingStorage)).toBe(false);
   });
 });

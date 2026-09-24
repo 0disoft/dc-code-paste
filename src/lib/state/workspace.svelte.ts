@@ -1015,11 +1015,10 @@ export function createWorkspaceState() {
   }
 
   function deleteDraftHistory(id: string) {
+    if (!draftHistoryController.remove(id)) return;
     if (isRenaming("draft", id)) {
       cancelRename();
     }
-
-    draftHistoryController.remove(id);
   }
 
   function importMarkdownDraft() {

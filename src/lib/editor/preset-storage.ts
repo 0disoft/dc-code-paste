@@ -140,20 +140,27 @@ export function renamePresetSnapshot(
   storage: PresetStorage,
   id: string,
   name: string,
-): PresetSnapshot[] {
+): { snapshots: PresetSnapshot[]; saved: boolean } {
   const current = readPresetSnapshots(storage);
   const nextName = normalizePresetName(name);
   const nextPresets = current.map((preset) =>
     preset.id === id ? { ...preset, name: nextName } : preset,
   );
 
-  return writePresetSnapshots(storage, nextPresets) ? nextPresets : current;
+  return writePresetSnapshots(storage, nextPresets)
+    ? { snapshots: nextPresets, saved: true }
+    : { snapshots: current, saved: false };
 }
 
-export function deletePresetSnapshot(storage: PresetStorage, id: string): PresetSnapshot[] {
+export function deletePresetSnapshot(
+  storage: PresetStorage,
+  id: string,
+): { snapshots: PresetSnapshot[]; saved: boolean } {
   const current = readPresetSnapshots(storage);
   const nextPresets = current.filter((preset) => preset.id !== id);
-  return writePresetSnapshots(storage, nextPresets) ? nextPresets : current;
+  return writePresetSnapshots(storage, nextPresets)
+    ? { snapshots: nextPresets, saved: true }
+    : { snapshots: current, saved: false };
 }
 
 export function clearPresetSnapshots(storage: PresetStorage): boolean {

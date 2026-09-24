@@ -76,6 +76,35 @@ describe("preset controller", () => {
     expect(states.at(-1)).toBe("idle");
   });
 
+  it("keeps rename and delete open when storage rejects the write", () => {
+    const storage = new MemoryStorage();
+    const states: string[] = [];
+    let presets: PresetSnapshot[] = [];
+    const controller = createPresetController({
+      getStorage: () => storage,
+      getName: () => "예시",
+      getCurrent: () => ({ document: sampleDocument, preferences }),
+      cloneDocument: structuredClone,
+      clonePreferences: structuredClone,
+      checkpointBeforeReplacement: () => true,
+      applySnapshot: () => {},
+      setPresets: (value) => (presets = value),
+      setState: (value) => states.push(value),
+      clearName: () => {},
+    });
+    expect(controller.save()).toBe(true);
+    const id = presets[0]!.id;
+    vi.spyOn(storage, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    expect(controller.rename(id, "새 이름")).toBe(false);
+    expect(controller.remove(id)).toBe(false);
+    expect(presets[0]?.name).toBe("예시");
+    expect(states.at(-1)).toBe("error");
+    controller.dispose();
+  });
+
   it("cancels saved feedback when cleared or disposed", () => {
     const states: string[] = [];
     const controller = createPresetController({

@@ -368,9 +368,9 @@ describe("draft storage", () => {
       second.id,
       first.id,
     ]);
-    expect(deleteDraftHistorySnapshot(storage, second.id).map((item) => item.id)).toEqual([
-      first.id,
-    ]);
+    const deleted = deleteDraftHistorySnapshot(storage, second.id);
+    expect(deleted.saved).toBe(true);
+    expect(deleted.snapshots.map((item) => item.id)).toEqual([first.id]);
   });
 
   it("renames draft history snapshots while preserving unnamed legacy snapshots", () => {
@@ -385,16 +385,17 @@ describe("draft storage", () => {
 
     const renamed = renameDraftHistorySnapshot(storage, first.id, "  풀이   초안  ");
 
-    expect(renamed[0]?.id).toBe(first.id);
-    expect(renamed[0]?.name).toBe("풀이 초안");
-    expect(renamed[0]?.document).toEqual(sampleDocument);
-    expect(renamed[0]?.updatedAt).toBe(first.updatedAt);
-    expect(renamed[1]?.name).toBeUndefined();
+    expect(renamed.saved).toBe(true);
+    expect(renamed.snapshots[0]?.id).toBe(first.id);
+    expect(renamed.snapshots[0]?.name).toBe("풀이 초안");
+    expect(renamed.snapshots[0]?.document).toEqual(sampleDocument);
+    expect(renamed.snapshots[0]?.updatedAt).toBe(first.updatedAt);
+    expect(renamed.snapshots[1]?.name).toBeUndefined();
     expect(readDraftHistorySnapshots(storage)[0]?.name).toBe("풀이 초안");
 
     const cleared = renameDraftHistorySnapshot(storage, first.id, " ");
 
-    expect(cleared[0]?.name).toBeUndefined();
+    expect(cleared.snapshots[0]?.name).toBeUndefined();
   });
 
   it("treats draft history storage failures as non-fatal", () => {
@@ -403,8 +404,14 @@ describe("draft storage", () => {
     expect(readDraftHistorySnapshots(throwingStorage)).toEqual([]);
     expect(writeDraftHistorySnapshots(throwingStorage, [snapshot])).toBe(false);
     expect(appendDraftHistorySnapshot(throwingStorage, snapshot)).toEqual([]);
-    expect(deleteDraftHistorySnapshot(throwingStorage, snapshot.id)).toEqual([]);
-    expect(renameDraftHistorySnapshot(throwingStorage, snapshot.id, "새 이름")).toEqual([]);
+    expect(deleteDraftHistorySnapshot(throwingStorage, snapshot.id)).toEqual({
+      snapshots: [],
+      saved: false,
+    });
+    expect(renameDraftHistorySnapshot(throwingStorage, snapshot.id, "새 이름")).toEqual({
+      snapshots: [],
+      saved: false,
+    });
     expect(clearDraftHistorySnapshots(throwingStorage)).toBe(false);
   });
 });

@@ -144,7 +144,12 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       setState("error");
       return false;
     }
-    options.setHistory(renameDraftHistorySnapshot(storage, id, name));
+    const result = renameDraftHistorySnapshot(storage, id, name);
+    if (!result.saved) {
+      setState("error");
+      return false;
+    }
+    options.setHistory(result.snapshots);
     return true;
   }
 
@@ -155,7 +160,12 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       setState("error");
       return false;
     }
-    options.setHistory(deleteDraftHistorySnapshot(storage, id));
+    const result = deleteDraftHistorySnapshot(storage, id);
+    if (!result.saved) {
+      setState("error");
+      return false;
+    }
+    options.setHistory(result.snapshots);
     return true;
   }
 

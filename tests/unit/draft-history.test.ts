@@ -129,4 +129,20 @@ describe("draft history lifecycle", () => {
     expect(controller.remove(id)).toBe(false);
     expect(JSON.parse(storage.getItem(draftHistoryStorageKey) ?? "")).toHaveLength(1);
   });
+
+  it("reports failed rename and delete writes without changing history", () => {
+    const { controller, history, storage, states } = harness();
+    expect(controller.save({ automatic: false })).toBe(true);
+    const id = history()[0]!.id;
+    vi.spyOn(storage, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    expect(controller.rename(id, "새 이름")).toBe(false);
+    expect(controller.remove(id)).toBe(false);
+    expect(history()[0]?.id).toBe(id);
+    expect(history()[0]?.name).toBeUndefined();
+    expect(states.at(-1)).toBe("error");
+    controller.dispose();
+  });
 });

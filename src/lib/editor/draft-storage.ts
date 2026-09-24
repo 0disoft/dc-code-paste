@@ -453,18 +453,20 @@ export function appendDraftHistorySnapshot(
 export function deleteDraftHistorySnapshot(
   storage: DraftStorage,
   id: string,
-): DraftHistorySnapshot[] {
+): { snapshots: DraftHistorySnapshot[]; saved: boolean } {
   const current = readDraftHistorySnapshots(storage);
   const next = current.filter((item) => item.id !== id);
 
-  return writeDraftHistorySnapshots(storage, next) ? next : current;
+  return writeDraftHistorySnapshots(storage, next)
+    ? { snapshots: next, saved: true }
+    : { snapshots: current, saved: false };
 }
 
 export function renameDraftHistorySnapshot(
   storage: DraftStorage,
   id: string,
   name: string,
-): DraftHistorySnapshot[] {
+): { snapshots: DraftHistorySnapshot[]; saved: boolean } {
   const current = readDraftHistorySnapshots(storage);
   const nextName = normalizeSnapshotName(name);
   const next = current.map((snapshot) => {
@@ -476,7 +478,9 @@ export function renameDraftHistorySnapshot(
     return nextName ? { ...snapshotWithoutName, name: nextName } : snapshotWithoutName;
   });
 
-  return writeDraftHistorySnapshots(storage, next) ? next : current;
+  return writeDraftHistorySnapshots(storage, next)
+    ? { snapshots: next, saved: true }
+    : { snapshots: current, saved: false };
 }
 
 export function clearDraftSnapshot(storage: DraftStorage): boolean {

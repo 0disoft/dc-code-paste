@@ -89,7 +89,12 @@ export function createPresetController(options: PresetOptions) {
       setState("error");
       return false;
     }
-    options.setPresets(renamePresetSnapshot(storage, id, name));
+    const result = renamePresetSnapshot(storage, id, name);
+    if (!result.saved) {
+      setState("error");
+      return false;
+    }
+    options.setPresets(result.snapshots);
     return true;
   }
 
@@ -100,7 +105,12 @@ export function createPresetController(options: PresetOptions) {
       setState("error");
       return false;
     }
-    options.setPresets(deletePresetSnapshot(storage, id));
+    const result = deletePresetSnapshot(storage, id);
+    if (!result.saved) {
+      setState("error");
+      return false;
+    }
+    options.setPresets(result.snapshots);
     return true;
   }
 
