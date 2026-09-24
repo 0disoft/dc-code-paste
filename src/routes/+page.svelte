@@ -320,7 +320,12 @@
         </aside>
     </section>
 
-    {#if workspace.copyState === "error"}
+    {#if workspace.copyState === "render-error"}
+        <div class="copy-error" role="alert">
+            HTML 생성에 실패했습니다. 다시 시도해 주세요.
+            <button type="button" onclick={workspace.copyPreview}>다시 시도</button>
+        </div>
+    {:else if workspace.copyState === "error"}
         <div class="copy-error" role="alert">
             자동 복사가 실패했습니다. 브라우저 권한을 확인해 주세요.
             {#if workspace.manualCopyHtml}

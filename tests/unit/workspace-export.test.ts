@@ -6,6 +6,7 @@ import {
   copyDcPreview,
   createCopyFeedbackController,
   createWorkspacePreviewRenderer,
+  type WorkspaceCopyState,
 } from "$lib/state/workspace-export";
 
 vi.mock("$lib/dc/export-document", () => ({
@@ -189,7 +190,7 @@ describe("workspace preview render lifecycle", () => {
     vi.mocked(copyDcHtmlWhenReady).mockImplementation(async (pendingHtml) => {
       await pendingHtml;
     });
-    const setState = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const setState = vi.fn<(state: WorkspaceCopyState) => void>();
     const setManualHtml = vi.fn<(html: string) => void>();
     let current = true;
 
@@ -215,7 +216,7 @@ describe("workspace preview render lifecycle", () => {
       await pendingHtml;
       throw new Error("clipboard denied");
     });
-    const setState = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const setState = vi.fn<(state: WorkspaceCopyState) => void>();
     const setManualHtml = vi.fn<(html: string) => void>();
 
     await copyDcPreview({
@@ -226,6 +227,49 @@ describe("workspace preview render lifecycle", () => {
       setManualHtml,
       setState,
     });
+    expect(setManualHtml).toHaveBeenLastCalledWith("current-html");
+    expect(setState).toHaveBeenLastCalledWith("error");
+  });
+
+  it("reports HTML generation failure without offering an empty manual copy", async () => {
+    vi.mocked(exportDocumentToDcHtml).mockRejectedValue(new Error("render failed"));
+    vi.mocked(copyDcHtmlWhenReady).mockImplementation(async (pendingHtml) => {
+      await pendingHtml;
+    });
+    const setState = vi.fn<(state: WorkspaceCopyState) => void>();
+    const setManualHtml = vi.fn<(html: string) => void>();
+
+    await copyDcPreview({
+      document: document("current"),
+      exportOptions: options,
+      plainText: "current",
+      isCurrent: () => true,
+      setManualHtml,
+      setState,
+    });
+
+    expect(setState).toHaveBeenLastCalledWith("render-error");
+    expect(setManualHtml).toHaveBeenCalledExactlyOnceWith("");
+  });
+
+  it("waits for HTML before offering manual copy after an early clipboard failure", async () => {
+    const html = deferred();
+    vi.mocked(exportDocumentToDcHtml).mockReturnValue(html.promise);
+    vi.mocked(copyDcHtmlWhenReady).mockRejectedValue(new Error("clipboard denied"));
+    const setState = vi.fn<(state: WorkspaceCopyState) => void>();
+    const setManualHtml = vi.fn<(html: string) => void>();
+
+    const copy = copyDcPreview({
+      document: document("current"),
+      exportOptions: options,
+      plainText: "current",
+      isCurrent: () => true,
+      setManualHtml,
+      setState,
+    });
+    html.resolve("current-html");
+    await copy;
+
     expect(setManualHtml).toHaveBeenLastCalledWith("current-html");
     expect(setState).toHaveBeenLastCalledWith("error");
   });
@@ -240,7 +284,7 @@ describe("copy feedback lifecycle", () => {
 
   it("does not let an older reset clear a newer copy result", async () => {
     const controller = createCopyFeedbackController();
-    const publish = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const publish = vi.fn<(state: WorkspaceCopyState) => void>();
     const first = controller.begin("source", publish)!;
     first.setState("copied");
     first.scheduleReset(first.setState, 100);
@@ -258,7 +302,7 @@ describe("copy feedback lifecycle", () => {
 
   it("cancels every channel timer and ignores pending results after disposal", async () => {
     const controller = createCopyFeedbackController();
-    const publish = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const publish = vi.fn<(state: WorkspaceCopyState) => void>();
     for (const channel of ["preview", "source", "guide"] as const) {
       const operation = controller.begin(channel, publish)!;
       operation.setState("copied");

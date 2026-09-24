@@ -5,7 +5,7 @@ import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-doc
 
 type RenderDocument = (document: JSONContent, options: DcExportOptions) => Promise<string>;
 
-export type WorkspaceCopyState = "idle" | "copied" | "error";
+export type WorkspaceCopyState = "idle" | "copied" | "error" | "render-error";
 
 type PreviewRendererOptions = {
   debounceMs: number;
@@ -204,10 +204,15 @@ export async function copyDcPreview({
       scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
     }
   } catch {
-    if (isCurrent()) {
-      setManualHtml(completedHtml);
-      setState("error");
+    try {
+      await copyHtmlPromise;
+    } catch {
+      if (isCurrent()) setState("render-error");
+      return;
     }
+    if (!isCurrent()) return;
+    setManualHtml(completedHtml);
+    setState("error");
   }
 }
 

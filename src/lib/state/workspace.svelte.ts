@@ -268,10 +268,10 @@ export function createWorkspaceState() {
 
   let previewMode = $state<"rendered" | "source">("rendered");
 
-  let copyState = $state<"idle" | "copied" | "error">("idle");
+  let copyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
   let manualCopyHtml = $state("");
 
-  let sourceCopyState = $state<"idle" | "copied" | "error">("idle");
+  let sourceCopyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
 
   let isLinkPanelOpen = $state(false);
 
@@ -287,7 +287,7 @@ export function createWorkspaceState() {
 
   let markdownImportError = $state("");
 
-  let llmPromptCopyState = $state<"idle" | "copied" | "error">("idle");
+  let llmPromptCopyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
 
   let isLlmPanelOpen = $state(false);
 
