@@ -476,6 +476,14 @@ export function createWorkspaceState() {
 
   const copyLabel = $derived(copyState === "copied" ? "복사됨" : "디씨 복사");
 
+  const isCopyDisabled = $derived.by(() => {
+    if (editorMountState !== "ready" || (previewVisible && isRendering)) return true;
+    const blocks = documentJson.content;
+    if (!blocks?.length) return true;
+    const onlyBlock = blocks[0];
+    return blocks.length === 1 && onlyBlock.type === "paragraph" && !onlyBlock.content?.length;
+  });
+
   const sourceCopyLabel = $derived(sourceCopyState === "copied" ? "복사됨" : "원문 복사");
 
   const documentThemeLabel = $derived(
@@ -2801,6 +2809,9 @@ export function createWorkspaceState() {
     },
     get copyState() {
       return copyState;
+    },
+    get isCopyDisabled() {
+      return isCopyDisabled;
     },
     get manualCopyHtml() {
       return manualCopyHtml;

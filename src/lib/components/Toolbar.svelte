@@ -58,7 +58,7 @@
                 title={workspace.copyLabel}
                 aria-label={workspace.copyLabel}
                 onclick={workspace.copyPreview}
-                disabled={!workspace.html || workspace.isRendering}
+                disabled={workspace.isCopyDisabled}
             >
                 {#if workspace.copyState === "copied"}
                     <Check size={17} />
