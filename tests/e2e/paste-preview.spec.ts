@@ -26,7 +26,7 @@ test("makes the code block action explicit and applies it to the current paragra
 test("routes section and link box commands through the editor", async ({ page }) => {
   await page.goto("/");
   const editor = page.locator(".article-editor");
-  await expect(editor).toBeVisible();
+  await expect(editor).toContainText("DC-CODE-PASTE");
 
   await page.getByRole("button", { name: "블록 도구" }).click();
   await page.getByRole("button", { name: "섹션" }).click();
@@ -35,7 +35,7 @@ test("routes section and link box commands through the editor", async ({ page })
   await page.getByRole("button", { name: "링크", exact: true }).click();
   await page.getByLabel("링크 주소").fill("https://example.com");
   await page.getByRole("button", { name: "링크박스" }).click();
-  await expect(editor.locator(".dc-link-box")).toHaveAttribute("data-href", "https://example.com");
+  await expect(editor.locator(".dc-link-box")).toHaveAttribute("data-href", "https://example.com/");
 });
 
 test("renders the paste tool", async ({ page }) => {

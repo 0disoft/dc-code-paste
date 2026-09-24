@@ -6,6 +6,18 @@ import {
   selectedInlineRangeToSectionHeadingCommand,
 } from "$lib/editor/selection-commands";
 import type { DcLanguageId } from "$lib/highlighter/catalog";
+import { createDefaultCtaGroup, type CtaGroupLayout } from "$lib/editor/cta-group";
+import {
+  createDefaultReferenceList,
+  createReferenceListFromText,
+} from "$lib/editor/reference-list";
+import { createDefaultSummaryBox, createSummaryBoxFromText } from "$lib/editor/summary-box";
+import { createDefaultHeroBlock, createHeroBlockFromText } from "$lib/editor/hero-block";
+import {
+  createComparisonBlockFromText,
+  createDefaultComparisonBlock,
+} from "$lib/editor/comparison-block";
+import type { QuoteStyle } from "$lib/editor/quote-style";
 
 type CodeBlockOptions = {
   language: DcLanguageId;
@@ -141,5 +153,78 @@ export function createEditorCommandAdapter(options: {
     });
   }
 
-  return { run, selectedText, applyCodeBlock, applyLinkBox, applySectionHeading, applyCtaButton };
+  function applyQuote(style: QuoteStyle) {
+    run((current) => {
+      if (current.isActive("blockquote")) {
+        return current.chain().focus().updateAttributes("blockquote", { quoteStyle: style }).run();
+      }
+      return current
+        .chain()
+        .focus()
+        .toggleBlockquote()
+        .updateAttributes("blockquote", { quoteStyle: style })
+        .run();
+    });
+  }
+
+  function updateActiveQuoteStyle(style: QuoteStyle) {
+    run((current) =>
+      current.isActive("blockquote")
+        ? current.chain().focus().updateAttributes("blockquote", { quoteStyle: style }).run()
+        : true,
+    );
+  }
+
+  function applyCtaGroup(layout: CtaGroupLayout) {
+    run((current) =>
+      current.isActive("ctaGroup")
+        ? current.chain().focus().updateAttributes("ctaGroup", { layout }).run()
+        : current.chain().focus().insertContent(createDefaultCtaGroup(layout)).run(),
+    );
+  }
+
+  function updateActiveCtaGroupLayout(layout: CtaGroupLayout) {
+    run((current) =>
+      current.isActive("ctaGroup")
+        ? current.chain().focus().updateAttributes("ctaGroup", { layout }).run()
+        : true,
+    );
+  }
+
+  function applyReferenceList() {
+    const content = createReferenceListFromText(selectedText()) ?? createDefaultReferenceList();
+    run((current) => current.chain().focus().insertContent(content).run());
+  }
+
+  function applySummaryBox() {
+    const content = createSummaryBoxFromText(selectedText()) ?? createDefaultSummaryBox();
+    run((current) => current.chain().focus().insertContent(content).run());
+  }
+
+  function applyHeroBlock() {
+    const content = createHeroBlockFromText(selectedText()) ?? createDefaultHeroBlock();
+    run((current) => current.chain().focus().insertContent(content).run());
+  }
+
+  function applyComparisonBlock() {
+    const content = createComparisonBlockFromText(selectedText()) ?? createDefaultComparisonBlock();
+    run((current) => current.chain().focus().insertContent(content).run());
+  }
+
+  return {
+    run,
+    selectedText,
+    applyCodeBlock,
+    applyLinkBox,
+    applySectionHeading,
+    applyCtaButton,
+    applyQuote,
+    updateActiveQuoteStyle,
+    applyCtaGroup,
+    updateActiveCtaGroupLayout,
+    applyReferenceList,
+    applySummaryBox,
+    applyHeroBlock,
+    applyComparisonBlock,
+  };
 }

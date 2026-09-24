@@ -64,16 +64,10 @@ import {
 } from "$lib/editor/draft-storage";
 
 import {
-  createDefaultCtaGroup,
   ctaGroupLayoutOptions,
   normalizeCtaGroupLayout,
   type CtaGroupLayout,
 } from "$lib/editor/cta-group";
-
-import {
-  createDefaultReferenceList,
-  createReferenceListFromText,
-} from "$lib/editor/reference-list";
 
 import { normalizeEditableLinkHref } from "$lib/editor/link";
 
@@ -102,13 +96,7 @@ import {
 
 import { normalizeQuoteStyle, quoteStyleOptions, type QuoteStyle } from "$lib/editor/quote-style";
 
-import { createDefaultHeroBlock, createHeroBlockFromText } from "$lib/editor/hero-block";
-
-import {
-  createDefaultSummaryBox,
-  createSummaryBoxFromText,
-  defaultSummaryBoxLabel,
-} from "$lib/editor/summary-box";
+import { defaultSummaryBoxLabel } from "$lib/editor/summary-box";
 
 import {
   createDefaultTutorialBlock,
@@ -116,11 +104,6 @@ import {
   createTutorialBlockFromText,
   normalizeTutorialStepNumber,
 } from "$lib/editor/tutorial-block";
-
-import {
-  createComparisonBlockFromText,
-  createDefaultComparisonBlock,
-} from "$lib/editor/comparison-block";
 
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 
@@ -2399,42 +2382,14 @@ export function createWorkspaceState() {
   function applyQuote() {
     const nextQuoteStyle = normalizeQuoteStyle(quoteStyle);
     quoteStyle = nextQuoteStyle;
-
-    runEditorCommand((current) => {
-      if (current.isActive("blockquote")) {
-        return current
-          .chain()
-          .focus()
-          .updateAttributes("blockquote", {
-            quoteStyle: nextQuoteStyle,
-          })
-          .run();
-      }
-
-      return current
-        .chain()
-        .focus()
-        .toggleBlockquote()
-        .updateAttributes("blockquote", { quoteStyle: nextQuoteStyle })
-        .run();
-    });
+    editorCommands.applyQuote(nextQuoteStyle);
   }
 
   function updateActiveQuoteStyle() {
     const nextQuoteStyle = normalizeQuoteStyle(quoteStyle);
     quoteStyle = nextQuoteStyle;
 
-    runEditorCommand((current) => {
-      if (!current.isActive("blockquote")) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .updateAttributes("blockquote", { quoteStyle: nextQuoteStyle })
-        .run();
-    });
+    editorCommands.updateActiveQuoteStyle(nextQuoteStyle);
   }
 
   function applyCtaButton() {
@@ -2460,45 +2415,26 @@ export function createWorkspaceState() {
     const layout = normalizeCtaGroupLayout(ctaGroupLayout);
     ctaGroupLayout = layout;
 
-    runEditorCommand((current) => {
-      if (current.isActive("ctaGroup")) {
-        return current.chain().focus().updateAttributes("ctaGroup", { layout }).run();
-      }
-
-      return current.chain().focus().insertContent(createDefaultCtaGroup(layout)).run();
-    });
+    editorCommands.applyCtaGroup(layout);
   }
 
   function updateActiveCtaGroupLayout() {
     const layout = normalizeCtaGroupLayout(ctaGroupLayout);
     ctaGroupLayout = layout;
 
-    runEditorCommand((current) => {
-      if (!current.isActive("ctaGroup")) {
-        return true;
-      }
-
-      return current.chain().focus().updateAttributes("ctaGroup", { layout }).run();
-    });
+    editorCommands.updateActiveCtaGroupLayout(layout);
   }
 
   function applyReferenceList() {
-    const referenceList =
-      createReferenceListFromText(selectedText()) ?? createDefaultReferenceList();
-
-    runEditorCommand((current) => current.chain().focus().insertContent(referenceList).run());
+    editorCommands.applyReferenceList();
   }
 
   function applySummaryBox() {
-    const summaryBox = createSummaryBoxFromText(selectedText()) ?? createDefaultSummaryBox();
-
-    runEditorCommand((current) => current.chain().focus().insertContent(summaryBox).run());
+    editorCommands.applySummaryBox();
   }
 
   function applyHeroBlock() {
-    const heroBlock = createHeroBlockFromText(selectedText()) ?? createDefaultHeroBlock();
-
-    runEditorCommand((current) => current.chain().focus().insertContent(heroBlock).run());
+    editorCommands.applyHeroBlock();
   }
 
   function selectedTutorialBlock(current: Editor) {
@@ -2575,10 +2511,7 @@ export function createWorkspaceState() {
   }
 
   function applyComparisonBlock() {
-    const comparisonBlock =
-      createComparisonBlockFromText(selectedText()) ?? createDefaultComparisonBlock();
-
-    runEditorCommand((current) => current.chain().focus().insertContent(comparisonBlock).run());
+    editorCommands.applyComparisonBlock();
   }
 
   function setLink() {
@@ -3660,11 +3593,8 @@ export function createWorkspaceState() {
     clearDraftSnapshot,
     maxDraftHistoryCount,
     readDraftSnapshot,
-    createDefaultCtaGroup,
     ctaGroupLayoutOptions,
     normalizeCtaGroupLayout,
-    createDefaultReferenceList,
-    createReferenceListFromText,
     normalizeEditableLinkHref,
     llmAuthoringPrompt,
     autocompleteLlmModelOptions,
@@ -3680,17 +3610,11 @@ export function createWorkspaceState() {
     selectedCodeLineRangeFromOffsets,
     normalizeQuoteStyle,
     quoteStyleOptions,
-    createDefaultHeroBlock,
-    createHeroBlockFromText,
-    createDefaultSummaryBox,
-    createSummaryBoxFromText,
     defaultSummaryBoxLabel,
     createDefaultTutorialBlock,
     createTutorialStep,
     createTutorialBlockFromText,
     normalizeTutorialStepNumber,
-    createComparisonBlockFromText,
-    createDefaultComparisonBlock,
     normalizeCodeFilename,
     maxHighlightLineNumber,
     normalizeHighlightLines,
