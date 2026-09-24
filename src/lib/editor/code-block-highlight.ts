@@ -528,6 +528,7 @@ type TokenCacheEntry = { tokens: readonly EditorCodeToken[]; bytes: number };
 const tokenCache = new Map<string, TokenCacheEntry>();
 const maxTokenCacheEntries = 100;
 const maxTokenCacheBytes = 2 * 1024 * 1024;
+const maxHighlightedEditorLineLength = 8_192;
 let tokenCacheBytes = 0;
 
 function normalizeEditorCodeLanguage(value: unknown): DcLanguageId {
@@ -802,6 +803,8 @@ function scanFunctionTokens(
 }
 
 export function highlightCodeTokens(code: string, language: unknown): EditorCodeToken[] {
+  // Large single lines otherwise create thousands of DOM spans on every keystroke.
+  if (code.length > maxHighlightedEditorLineLength && !code.includes("\n")) return [];
   const normalizedLanguage = normalizeEditorCodeLanguage(language);
   const cacheKey = cachedTokenKey(code, normalizedLanguage);
   const cached = tokenCache.get(cacheKey);
@@ -815,6 +818,10 @@ export function highlightCodeTokens(code: string, language: unknown): EditorCode
   let offset = 0;
 
   for (const line of lines) {
+    if (line.length > maxHighlightedEditorLineLength) {
+      offset += line.length + 1;
+      continue;
+    }
     const protectedRanges: ProtectedRange[] = [];
     scanProtectedTokens(line, offset, normalizedLanguage, tokens, protectedRanges);
 

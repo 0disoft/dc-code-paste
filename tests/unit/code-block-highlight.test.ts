@@ -90,14 +90,14 @@ describe("editor code block highlighting", () => {
     expect(usage.entries).toBeLessThan(20);
   });
 
-  it("keeps 20,000-character single-line strings and calls separated", () => {
+  it("leaves oversized editor lines plain while highlighting adjacent short lines", () => {
     const code = 'consume("x");'.repeat(1538) + ";;;;;;";
     expect(code).toHaveLength(20_000);
-    const tokens = highlightCodeTokens(code, "javascript");
-    expect(tokens.filter((token) => token.kind === "function")).toHaveLength(1538);
-    expect(tokens.filter((token) => token.kind === "string")).toHaveLength(1538);
-    expect(tokens).toHaveLength(3076);
-    expect(highlightCodeTokens(`${code}x`, "javascript")).toHaveLength(3076);
+    expect(highlightCodeTokens(code, "javascript")).toEqual([]);
+    expect(highlightCodeTokens(`${code}x`, "javascript")).toEqual([]);
+    const trailing = highlightCodeTokens(`${code}\nconsume("ok");`, "javascript");
+    expect(trailing.map((token) => token.kind)).toEqual(["function", "string"]);
+    expect(trailing[0]?.from).toBe(20_001);
     expect(editorCodeTokenCacheUsage().bytes).toBeLessThanOrEqual(
       editorCodeTokenCacheUsage().maxBytes,
     );
