@@ -127,6 +127,7 @@ import {
   type DraftSaveState,
 } from "$lib/state/draft-persistence";
 import { createDraftHistoryController, draftHistoryFingerprint } from "$lib/state/draft-history";
+import { createPresetController } from "$lib/state/preset-controller";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -420,6 +421,27 @@ export function createWorkspaceState() {
     },
     setState(value) {
       draftHistoryState = value;
+    },
+  });
+  const presetController = createPresetController({
+    getStorage: draftStorage,
+    getName: () => presetName,
+    getCurrent: () => ({ document: documentJson, preferences: currentDraftPreferences() }),
+    cloneDocument: cloneDocumentContent,
+    clonePreferences: cloneDraftPreferences,
+    checkpointBeforeReplacement: checkpointCurrentDraftBeforeReplacement,
+    applySnapshot(preset) {
+      applyDraftPreferences(cloneDraftPreferences(preset.preferences));
+      replaceEditorDocument(preset.document);
+    },
+    setPresets(value) {
+      presets = value;
+    },
+    setState(value) {
+      presetState = value;
+    },
+    clearName() {
+      presetName = "";
     },
   });
   const editorCommands = createEditorCommandAdapter({
@@ -948,8 +970,11 @@ export function createWorkspaceState() {
   }
 
   function refreshPresetSnapshots() {
-    const storage = draftStorage();
-    presets = storage ? readPresetSnapshots(storage) : [];
+    presetController.refresh();
+  }
+
+  function clearPresetState() {
+    presetController.clearState();
   }
 
   function refreshDraftHistorySnapshots() {
@@ -1033,43 +1058,11 @@ export function createWorkspaceState() {
   }
 
   function saveCurrentPreset() {
-    const storage = draftStorage();
-
-    if (!storage) {
-      presetState = "error";
-      return;
-    }
-
-    const preset = createPresetSnapshot(
-      presetName,
-      cloneDocumentContent(documentJson),
-      currentDraftPreferences(),
-    );
-    const nextPresets = [preset, ...readPresetSnapshots(storage)].slice(0, 30);
-
-    if (!writePresetSnapshots(storage, nextPresets)) {
-      presetState = "error";
-      return;
-    }
-
-    presets = nextPresets;
-    presetName = "";
-    presetState = "saved";
-    window.setTimeout(() => {
-      presetState = "idle";
-    }, 1300);
+    presetController.save();
   }
 
   function applyPreset(preset: PresetSnapshot) {
-    if (!checkpointCurrentDraftBeforeReplacement()) {
-      presetState = "error";
-      return;
-    }
-
-    applyDraftPreferences(cloneDraftPreferences(preset.preferences));
-    replaceEditorDocument(preset.document);
-
-    presetState = "idle";
+    presetController.apply(preset);
   }
 
   function savePresetRename(id: string) {
@@ -1077,30 +1070,14 @@ export function createWorkspaceState() {
       return;
     }
 
-    const storage = draftStorage();
-
-    if (!storage) {
-      presetState = "error";
-      return;
-    }
-
-    presets = renamePresetSnapshot(storage, id, renameDraft);
-    cancelRename();
+    if (presetController.rename(id, renameDraft)) cancelRename();
   }
 
   function deletePreset(id: string) {
-    const storage = draftStorage();
-
-    if (!storage) {
-      presetState = "error";
-      return;
-    }
-
+    if (!presetController.remove(id)) return;
     if (isRenaming("preset", id)) {
       cancelRename();
     }
-
-    presets = deletePresetSnapshot(storage, id);
   }
 
   function exportOptions(): DcExportOptions {
@@ -2394,6 +2371,7 @@ export function createWorkspaceState() {
     flushScheduledDraftPersist();
     draftPersistence.dispose();
     draftHistoryController.dispose();
+    presetController.dispose();
   });
 
   onMount(() => {
@@ -2959,14 +2937,8 @@ export function createWorkspaceState() {
     get presets() {
       return presets;
     },
-    set presets(value) {
-      presets = value;
-    },
     get presetState() {
       return presetState;
-    },
-    set presetState(value) {
-      presetState = value;
     },
     get draftHistory() {
       return draftHistory;
@@ -3111,6 +3083,7 @@ export function createWorkspaceState() {
     beginDraftHistoryRename,
     cancelRename,
     refreshPresetSnapshots,
+    clearPresetState,
     refreshDraftHistorySnapshots,
     setDraftHistorySavedState,
     saveDraftHistorySnapshot,

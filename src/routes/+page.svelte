@@ -42,7 +42,7 @@
             draftHistoryStateLabel={workspace.draftHistoryStateLabel}
             renameTarget={workspace.renameTarget}
             onClose={() => (workspace.isStoragePanelOpen = false)}
-            onPresetNameInput={() => (workspace.presetState = "idle")}
+            onPresetNameInput={workspace.clearPresetState}
             onSavePreset={workspace.saveCurrentPreset}
             onApplyPreset={workspace.applyPreset}
             onBeginPresetRename={workspace.beginPresetRename}
