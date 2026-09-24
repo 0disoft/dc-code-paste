@@ -87,6 +87,26 @@ describe("LLM model lookup lifecycle", () => {
     expect(setState).toHaveBeenLastCalledWith("fallback");
   });
 
+  it("returns to idle after closing during a lookup so reopening can retry", async () => {
+    const first = deferred();
+    const second = deferred();
+    const request = vi
+      .fn<RequestModels>()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { controller, setModels, setState } = harness(request);
+    const oldRun = controller.refresh();
+    controller.cancel();
+    expect(setState).toHaveBeenLastCalledWith("idle");
+    first.resolve([{ id: "old", name: "old" }]);
+    await oldRun;
+    const newRun = controller.refresh();
+    second.resolve([{ id: "new", name: "new" }]);
+    await newRun;
+    expect(setModels).toHaveBeenCalledExactlyOnceWith([{ id: "new", name: "new" }]);
+    expect(setState).toHaveBeenLastCalledWith("loaded");
+  });
+
   it("clears the blur timer and suppresses a late response after disposal", async () => {
     const pending = deferred();
     const request = vi.fn<RequestModels>(() => pending.promise);
@@ -102,6 +122,6 @@ describe("LLM model lookup lifecycle", () => {
     await run;
     expect(setModels).not.toHaveBeenCalled();
     expect(setState).toHaveBeenCalledExactlyOnceWith("loading");
-    expect(setAutocompleteOpen).toHaveBeenCalledExactlyOnceWith(true);
+    expect(setAutocompleteOpen.mock.calls.map(([open]) => open)).toEqual([true, false]);
   });
 });

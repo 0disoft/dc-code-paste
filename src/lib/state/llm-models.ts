@@ -72,8 +72,11 @@ export function createLlmModelController({
 
   function cancel() {
     turn += 1;
+    const wasLoading = active !== undefined;
     active?.abort();
     active = undefined;
+    closeAutocomplete();
+    if (wasLoading && !disposed) setState("idle");
   }
 
   function clearError() {
