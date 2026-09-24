@@ -714,7 +714,23 @@ function scanProtectedTokens(
 }
 
 function isProtected(index: number, protectedRanges: readonly ProtectedRange[]): boolean {
-  return protectedRanges.some((range) => index >= range.from && index < range.to);
+  // scanProtectedTokens appends non-overlapping ranges from left to right.
+  let low = 0;
+  let high = protectedRanges.length;
+
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    const range = protectedRanges[middle];
+    if (index < range.from) {
+      high = middle;
+    } else if (index >= range.to) {
+      low = middle + 1;
+    } else {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function scanRegexTokens(
