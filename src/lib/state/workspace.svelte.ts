@@ -61,7 +61,6 @@ import {
   appendDraftHistorySnapshot,
   clearDraftSnapshot,
   createDraftHistorySnapshot,
-  createDraftSnapshot,
   deleteDraftHistorySnapshot,
   draftStorageKey,
   maxDraftHistoryCount,
@@ -70,7 +69,6 @@ import {
   readDraftSnapshot,
   readDraftSnapshotWithRecovery,
   renameDraftHistorySnapshot,
-  writeDraftSnapshot,
   type DraftHistorySnapshot,
   type DraftPreferences,
 } from "$lib/editor/draft-storage";
@@ -155,6 +153,10 @@ import {
   createWorkspacePreviewRenderer,
 } from "$lib/state/workspace-export";
 import { createLlmRequestController, type LlmGenerationState } from "$lib/state/llm-request";
+import {
+  createDraftPersistenceController,
+  type DraftSaveState,
+} from "$lib/state/draft-persistence";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -374,10 +376,8 @@ export function createWorkspaceState() {
   let editorSignal = $state(0);
 
   let canPersistDraft = $state(false);
-  let draftSaveState = $state<"idle" | "dirty" | "saving" | "saved" | "error" | "conflict">("idle");
+  let draftSaveState = $state<DraftSaveState>("idle");
   let draftLastSavedAt = $state("");
-  let lastSavedDraftFingerprint = "";
-  let lastObservedDraftRaw: string | null = null;
   let invalidDraftRaw = $state("");
   let invalidDraftBackupKey = $state("");
   let invalidDraftDownloaded = $state(false);
@@ -385,8 +385,6 @@ export function createWorkspaceState() {
   let lastDraftHistoryFingerprint = "";
 
   let lastDraftHistorySavedAt = 0;
-
-  let draftPersistTimer: ReturnType<typeof setTimeout> | undefined;
 
   let openRouterModelLoadTurn = 0;
 
@@ -410,6 +408,21 @@ export function createWorkspaceState() {
     setInFlight(value) {
       llmGenerationInFlight = value;
     },
+  });
+  const draftPersistence = createDraftPersistenceController({
+    debounceMs: draftPersistDebounceMs,
+    getStorage: draftStorage,
+    getCurrent: () => ({ document: documentJson, preferences: currentDraftPreferences() }),
+    canPersist: () => canPersistDraft,
+    cloneDocument: cloneDocumentContent,
+    clonePreferences: cloneDraftPreferences,
+    setState(value) {
+      draftSaveState = value;
+    },
+    setSavedAt(value) {
+      draftLastSavedAt = value;
+    },
+    onSaved: maybeSaveAutomaticDraftHistory,
   });
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
@@ -771,10 +784,7 @@ export function createWorkspaceState() {
   }
 
   function clearScheduledDraftPersist() {
-    if (draftPersistTimer) {
-      clearTimeout(draftPersistTimer);
-      draftPersistTimer = undefined;
-    }
+    draftPersistence.clearScheduled();
   }
 
   function isLineRangeInputInvalid(value: string) {
@@ -1248,95 +1258,20 @@ export function createWorkspaceState() {
     previewRenderer.schedulePreviewRender(nextDocument, options);
   }
 
-  function persistCurrentDraftSnapshot(nextDocument: JSONContent, preferences: DraftPreferences) {
-    const storage = draftStorage();
-    if (!storage) {
-      draftSaveState = "error";
-      return false;
-    }
-
-    let currentRaw: string | null;
-    try {
-      currentRaw = storage.getItem(draftStorageKey);
-    } catch {
-      draftSaveState = "error";
-      return false;
-    }
-    if (currentRaw !== lastObservedDraftRaw) {
-      observeDraftStorageChange(currentRaw);
-      return draftSaveState !== "conflict";
-    }
-
-    const snapshot = createDraftSnapshot(
-      cloneDocumentContent(nextDocument),
-      cloneDraftPreferences(preferences),
-    );
-    draftSaveState = "saving";
-    if (!writeDraftSnapshot(storage, snapshot)) {
-      draftSaveState = "error";
-      return false;
-    }
-
-    lastObservedDraftRaw = JSON.stringify(snapshot);
-    lastSavedDraftFingerprint = draftHistoryFingerprint(snapshot.document, snapshot.preferences);
-    draftLastSavedAt = snapshot.updatedAt;
-    draftSaveState = "saved";
-    maybeSaveAutomaticDraftHistory();
-    return true;
-  }
-
   function scheduleDraftPersist(nextDocument: JSONContent, preferences: DraftPreferences) {
-    clearScheduledDraftPersist();
-    if (draftSaveState === "conflict") {
-      return;
-    }
-    if (draftHistoryFingerprint(nextDocument, preferences) === lastSavedDraftFingerprint) {
-      draftSaveState = "saved";
-      return;
-    }
-
-    draftSaveState = "dirty";
-    draftPersistTimer = setTimeout(() => {
-      draftPersistTimer = undefined;
-      persistCurrentDraftSnapshot(nextDocument, preferences);
-    }, draftPersistDebounceMs);
+    draftPersistence.schedule({ document: nextDocument, preferences });
   }
 
   function flushScheduledDraftPersist() {
-    clearScheduledDraftPersist();
-
-    if (canPersistDraft && (draftSaveState === "dirty" || draftSaveState === "error")) {
-      persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
-    }
+    draftPersistence.flush();
   }
 
   function retryDraftSave() {
-    if (canPersistDraft) {
-      persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
-    }
+    draftPersistence.retry();
   }
 
   function observeDraftStorageChange(raw: string | null) {
-    if (raw === lastObservedDraftRaw) {
-      return;
-    }
-
-    const remote = raw ? parseDraftSnapshot(raw) : undefined;
-    const currentFingerprint = draftHistoryFingerprint(documentJson, currentDraftPreferences());
-    if (
-      remote &&
-      draftHistoryFingerprint(remote.document, remote.preferences) === currentFingerprint
-    ) {
-      lastObservedDraftRaw = raw;
-      lastSavedDraftFingerprint = currentFingerprint;
-      draftLastSavedAt = remote.updatedAt;
-      draftSaveState = "saved";
-      clearScheduledDraftPersist();
-      return;
-    }
-
-    clearScheduledDraftPersist();
-    draftSaveState = "conflict";
+    draftPersistence.observeExternal(raw);
   }
 
   function loadOtherTabDraft() {
@@ -1364,12 +1299,9 @@ export function createWorkspaceState() {
       return;
     }
 
-    lastObservedDraftRaw = raw;
-    lastSavedDraftFingerprint = draftHistoryFingerprint(remote.document, remote.preferences);
-    draftLastSavedAt = remote.updatedAt;
+    draftPersistence.acceptRemote(raw, remote);
     applyDraftPreferences(cloneDraftPreferences(remote.preferences));
     replaceEditorDocument(remote.document);
-    draftSaveState = "saved";
   }
 
   function overwriteOtherTabDraft() {
@@ -1389,13 +1321,14 @@ export function createWorkspaceState() {
     if (recovered.invalidRaw && !recovered.backupKey) {
       return;
     }
+    let raw: string | null;
     try {
-      lastObservedDraftRaw = storage.getItem(draftStorageKey);
+      raw = storage.getItem(draftStorageKey);
     } catch {
       return;
     }
-    draftSaveState = "dirty";
-    persistCurrentDraftSnapshot(documentJson, currentDraftPreferences());
+    draftPersistence.overwriteBaseline(raw);
+    draftPersistence.persistCurrent();
   }
 
   function normalizeBlockLabel(value: unknown) {
@@ -3025,6 +2958,7 @@ export function createWorkspaceState() {
     clearScheduledPreviewRender();
     exportSession.dispose();
     flushScheduledDraftPersist();
+    draftPersistence.dispose();
   });
 
   onMount(() => {
@@ -3126,22 +3060,19 @@ export function createWorkspaceState() {
             }
           })
         : {};
+      let observedRaw: string | null;
       try {
-        lastObservedDraftRaw = storage?.getItem(draftStorageKey) ?? null;
+        observedRaw = storage?.getItem(draftStorageKey) ?? null;
       } catch {
-        lastObservedDraftRaw = null;
+        observedRaw = null;
       }
+      draftPersistence.seedObserved(observedRaw);
       invalidDraftRaw = draftRead.invalidRaw ?? "";
       invalidDraftBackupKey = draftRead.backupKey ?? "";
       if (draftRead.snapshot) {
         documentJson = cloneDocumentContent(draftRead.snapshot.document);
         applyDraftPreferences(cloneDraftPreferences(draftRead.snapshot.preferences));
-        lastSavedDraftFingerprint = draftHistoryFingerprint(
-          draftRead.snapshot.document,
-          draftRead.snapshot.preferences,
-        );
-        draftLastSavedAt = draftRead.snapshot.updatedAt;
-        draftSaveState = "saved";
+        draftPersistence.acceptRemote(observedRaw, draftRead.snapshot);
       }
 
       mountedEditor = new Editor({
@@ -3800,7 +3731,6 @@ export function createWorkspaceState() {
     schedulePreviewRender,
     retryPreview,
     retryEditor,
-    persistCurrentDraftSnapshot,
     scheduleDraftPersist,
     normalizeBlockLabel,
     normalizeEditableBlockValue,
@@ -3924,7 +3854,6 @@ export function createWorkspaceState() {
     get previewRenderTimer() {
       return previewRenderer.previewRenderTimer;
     },
-    draftPersistTimer,
     get renderTurn() {
       return previewRenderer.renderTurn;
     },
@@ -3960,13 +3889,11 @@ export function createWorkspaceState() {
     appendDraftHistorySnapshot,
     clearDraftSnapshot,
     createDraftHistorySnapshot,
-    createDraftSnapshot,
     deleteDraftHistorySnapshot,
     maxDraftHistoryCount,
     readDraftHistorySnapshots,
     readDraftSnapshot,
     renameDraftHistorySnapshot,
-    writeDraftSnapshot,
     createDefaultCtaGroup,
     ctaGroupLayoutOptions,
     normalizeCtaGroupLayout,
