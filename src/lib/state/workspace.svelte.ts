@@ -58,17 +58,12 @@ import {
 import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
 import {
-  appendDraftHistorySnapshot,
   clearDraftSnapshot,
-  createDraftHistorySnapshot,
-  deleteDraftHistorySnapshot,
   draftStorageKey,
   maxDraftHistoryCount,
   parseDraftSnapshot,
-  readDraftHistorySnapshots,
   readDraftSnapshot,
   readDraftSnapshotWithRecovery,
-  renameDraftHistorySnapshot,
   type DraftHistorySnapshot,
   type DraftPreferences,
 } from "$lib/editor/draft-storage";
@@ -157,6 +152,7 @@ import {
   createDraftPersistenceController,
   type DraftSaveState,
 } from "$lib/state/draft-persistence";
+import { createDraftHistoryController, draftHistoryFingerprint } from "$lib/state/draft-history";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -382,10 +378,6 @@ export function createWorkspaceState() {
   let invalidDraftBackupKey = $state("");
   let invalidDraftDownloaded = $state(false);
 
-  let lastDraftHistoryFingerprint = "";
-
-  let lastDraftHistorySavedAt = 0;
-
   let openRouterModelLoadTurn = 0;
 
   const exportSession = createDcExportSession();
@@ -423,6 +415,23 @@ export function createWorkspaceState() {
       draftLastSavedAt = value;
     },
     onSaved: maybeSaveAutomaticDraftHistory,
+  });
+  const draftHistoryController = createDraftHistoryController({
+    autoIntervalMs: draftHistoryAutoIntervalMs,
+    getStorage: draftStorage,
+    getCurrent: () => ({ document: documentJson, preferences: currentDraftPreferences() }),
+    cloneDocument: cloneDocumentContent,
+    clonePreferences: cloneDraftPreferences,
+    applySnapshot(value) {
+      applyDraftPreferences(value.preferences);
+      replaceEditorDocument(value.document);
+    },
+    setHistory(value) {
+      draftHistory = value;
+    },
+    setState(value) {
+      draftHistoryState = value;
+    },
   });
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
@@ -743,20 +752,12 @@ export function createWorkspaceState() {
     return supportedLanguages.find((item) => item.id === value)?.label ?? value;
   }
 
-  function draftHistoryFingerprint(document: JSONContent, preferences: DraftPreferences) {
-    return JSON.stringify({ document, preferences });
-  }
-
   function currentDraftHistoryFingerprint() {
-    return draftHistoryFingerprint(cloneDocumentContent(documentJson), currentDraftPreferences());
+    return draftHistoryController.currentFingerprint();
   }
 
   function checkpointCurrentDraftBeforeReplacement() {
-    if (currentDraftHistoryFingerprint() === lastDraftHistoryFingerprint) {
-      return true;
-    }
-
-    return saveDraftHistorySnapshot({ automatic: true });
+    return draftHistoryController.checkpointBeforeReplacement();
   }
 
   function draftHistorySummary(snapshot: DraftHistorySnapshot) {
@@ -1012,76 +1013,23 @@ export function createWorkspaceState() {
   }
 
   function refreshDraftHistorySnapshots() {
-    const storage = draftStorage();
-    draftHistory = storage ? readDraftHistorySnapshots(storage) : [];
+    draftHistoryController.refresh();
   }
 
   function setDraftHistorySavedState() {
-    draftHistoryState = "saved";
-    window.setTimeout(() => {
-      draftHistoryState = "idle";
-    }, 1300);
+    draftHistoryController.setSavedState();
   }
 
   function saveDraftHistorySnapshot(options: { automatic: boolean }) {
-    const storage = draftStorage();
-
-    if (!storage) {
-      draftHistoryState = "error";
-      return false;
-    }
-
-    const preferences = currentDraftPreferences();
-    const currentDocument = cloneDocumentContent(documentJson);
-    const fingerprint = draftHistoryFingerprint(currentDocument, preferences);
-
-    if (options.automatic && fingerprint === lastDraftHistoryFingerprint) {
-      return false;
-    }
-
-    const snapshot = createDraftHistorySnapshot(currentDocument, preferences);
-    const nextHistory = appendDraftHistorySnapshot(storage, snapshot);
-
-    if (nextHistory[0]?.id !== snapshot.id) {
-      draftHistoryState = "error";
-      return false;
-    }
-
-    draftHistory = nextHistory;
-    lastDraftHistoryFingerprint = fingerprint;
-    lastDraftHistorySavedAt = Date.now();
-
-    if (!options.automatic) {
-      setDraftHistorySavedState();
-    }
-
-    return true;
+    return draftHistoryController.save(options);
   }
 
   function maybeSaveAutomaticDraftHistory() {
-    const now = Date.now();
-
-    if (now - lastDraftHistorySavedAt < draftHistoryAutoIntervalMs) {
-      return;
-    }
-
-    void saveDraftHistorySnapshot({ automatic: true });
+    draftHistoryController.maybeSaveAutomatic();
   }
 
   function restoreDraftHistorySnapshot(snapshot: DraftHistorySnapshot) {
-    const preferences = cloneDraftPreferences(snapshot.preferences);
-    const nextDocument = cloneDocumentContent(snapshot.document);
-
-    if (!checkpointCurrentDraftBeforeReplacement()) {
-      return;
-    }
-
-    applyDraftPreferences(preferences);
-    replaceEditorDocument(nextDocument);
-
-    lastDraftHistoryFingerprint = draftHistoryFingerprint(nextDocument, preferences);
-    lastDraftHistorySavedAt = Date.now();
-    draftHistoryState = "idle";
+    draftHistoryController.restore(snapshot);
   }
 
   function saveDraftHistoryRename(id: string) {
@@ -1089,30 +1037,15 @@ export function createWorkspaceState() {
       return;
     }
 
-    const storage = draftStorage();
-
-    if (!storage) {
-      draftHistoryState = "error";
-      return;
-    }
-
-    draftHistory = renameDraftHistorySnapshot(storage, id, renameDraft);
-    cancelRename();
+    if (draftHistoryController.rename(id, renameDraft)) cancelRename();
   }
 
   function deleteDraftHistory(id: string) {
-    const storage = draftStorage();
-
-    if (!storage) {
-      draftHistoryState = "error";
-      return;
-    }
-
     if (isRenaming("draft", id)) {
       cancelRename();
     }
 
-    draftHistory = deleteDraftHistorySnapshot(storage, id);
+    draftHistoryController.remove(id);
   }
 
   function importMarkdownDraft() {
@@ -2864,8 +2797,7 @@ export function createWorkspaceState() {
     isLinkPanelOpen = false;
     linkDraft = "";
     linkError = false;
-    lastDraftHistoryFingerprint = currentDraftHistoryFingerprint();
-    lastDraftHistorySavedAt = Date.now();
+    draftHistoryController.markBaseline();
   }
 
   function applyExampleTemplate() {
@@ -2881,8 +2813,7 @@ export function createWorkspaceState() {
     isLinkPanelOpen = false;
     linkDraft = "";
     linkError = false;
-    lastDraftHistoryFingerprint = currentDraftHistoryFingerprint();
-    lastDraftHistorySavedAt = Date.now();
+    draftHistoryController.markBaseline();
   }
 
   async function copyPreview() {
@@ -2959,6 +2890,7 @@ export function createWorkspaceState() {
     exportSession.dispose();
     flushScheduledDraftPersist();
     draftPersistence.dispose();
+    draftHistoryController.dispose();
   });
 
   onMount(() => {
@@ -3027,15 +2959,7 @@ export function createWorkspaceState() {
     window.addEventListener("storage", handleDraftStorageEvent);
     document.addEventListener("visibilitychange", flushDraftWhenHidden);
     refreshPresetSnapshots();
-    refreshDraftHistorySnapshots();
-
-    lastDraftHistoryFingerprint = draftHistory[0]
-      ? draftHistoryFingerprint(
-          cloneDocumentContent(draftHistory[0].document),
-          cloneDraftPreferences(draftHistory[0].preferences),
-        )
-      : "";
-    lastDraftHistorySavedAt = Date.now();
+    draftHistoryController.initialize();
 
     async function mountEditor() {
       const [{ Editor, getSchema }, { createEditorExtensions }] = await Promise.all([
@@ -3849,8 +3773,6 @@ export function createWorkspaceState() {
     calloutColorOptions,
     codeLineMarkers,
     lineRangeHelp,
-    lastDraftHistoryFingerprint,
-    lastDraftHistorySavedAt,
     get previewRenderTimer() {
       return previewRenderer.previewRenderTimer;
     },
@@ -3886,14 +3808,9 @@ export function createWorkspaceState() {
     selectedInlineRangeToCtaButtonCommand,
     selectedInlineRangeToSectionHeadingCommand,
     selectedInlineRangeToLinkBoxCommand,
-    appendDraftHistorySnapshot,
     clearDraftSnapshot,
-    createDraftHistorySnapshot,
-    deleteDraftHistorySnapshot,
     maxDraftHistoryCount,
-    readDraftHistorySnapshots,
     readDraftSnapshot,
-    renameDraftHistorySnapshot,
     createDefaultCtaGroup,
     ctaGroupLayoutOptions,
     normalizeCtaGroupLayout,
