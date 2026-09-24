@@ -259,6 +259,7 @@ export function createWorkspaceState() {
   let documentTheme = $state<DcDocumentTheme>("lightLecture");
 
   let html = $state("");
+  let previewVisible = $state(false);
 
   let isRendering = $state(false);
   let previewError = $state("");
@@ -1106,6 +1107,10 @@ export function createWorkspaceState() {
 
   function schedulePreviewRender(nextDocument: JSONContent, options: DcExportOptions) {
     previewRenderer.schedulePreviewRender(nextDocument, options);
+  }
+
+  function setPreviewVisible(value: boolean) {
+    previewVisible = value;
   }
 
   function scheduleDraftPersist(nextDocument: JSONContent, preferences: DraftPreferences) {
@@ -2606,6 +2611,7 @@ export function createWorkspaceState() {
   });
 
   $effect(() => {
+    if (!previewVisible) return;
     schedulePreviewRender(documentJson, exportOptions());
     return clearScheduledPreviewRender;
   });
@@ -3101,6 +3107,7 @@ export function createWorkspaceState() {
     exportOptions,
     renderPreview,
     schedulePreviewRender,
+    setPreviewVisible,
     retryPreview,
     retryEditor,
     scheduleDraftPersist,

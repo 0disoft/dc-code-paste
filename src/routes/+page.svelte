@@ -13,6 +13,10 @@
 
     const workspace = createWorkspaceState();
     let activeWorkspaceView = $state<WorkspaceView>("editor");
+    function selectWorkspaceView(view: WorkspaceView) {
+        activeWorkspaceView = view;
+        workspace.setPreviewVisible(view === "preview");
+    }
     const draftSavedAtLabel = $derived(
         workspace.draftLastSavedAt && !Number.isNaN(Date.parse(workspace.draftLastSavedAt))
             ? new Date(workspace.draftLastSavedAt).toLocaleTimeString("ko-KR", {
@@ -135,7 +139,7 @@
                     class:active={activeWorkspaceView === "editor"}
                     type="button"
                     aria-pressed={activeWorkspaceView === "editor"}
-                    onclick={() => (activeWorkspaceView = "editor")}
+                    onclick={() => selectWorkspaceView("editor")}
                 >
                     <Type size={15} />
                     <span>글쓰기</span>
@@ -144,7 +148,7 @@
                     class:active={activeWorkspaceView === "preview"}
                     type="button"
                     aria-pressed={activeWorkspaceView === "preview"}
-                    onclick={() => (activeWorkspaceView = "preview")}
+                    onclick={() => selectWorkspaceView("preview")}
                 >
                     <Eye size={15} />
                     <span>미리보기</span>
