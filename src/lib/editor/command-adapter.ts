@@ -1,5 +1,7 @@
 import type { Editor } from "@tiptap/core";
+import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
 import {
+  selectedInlineRangeToCalloutCommand,
   selectedInlineRangeToCodeBlockCommand,
   selectedInlineRangeToCtaButtonCommand,
   selectedInlineRangeToLinkBoxCommand,
@@ -18,6 +20,20 @@ import {
   createDefaultComparisonBlock,
 } from "$lib/editor/comparison-block";
 import type { QuoteStyle } from "$lib/editor/quote-style";
+import {
+  calloutKindFromNodeName,
+  calloutNodeNameByKind,
+  defaultCalloutLabel,
+  isCalloutNodeName,
+  type CalloutKind,
+} from "$lib/editor/callout";
+import { normalizeCalloutToneColor } from "$lib/editor/callout-palette";
+import {
+  createDefaultTutorialBlock,
+  createTutorialBlockFromText,
+  createTutorialStep,
+  normalizeTutorialStepNumber,
+} from "$lib/editor/tutorial-block";
 
 type CodeBlockOptions = {
   language: DcLanguageId;
@@ -26,6 +42,27 @@ type CodeBlockOptions = {
   additionLines: string;
   deletionLines: string;
 };
+
+export function findTutorialBlockTargetFromResolvedPos(resolvedPos: ResolvedPos) {
+  for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+    if (resolvedPos.node(depth).type.name === "tutorialBlock") {
+      return { pos: resolvedPos.before(depth) };
+    }
+  }
+  return null;
+}
+
+function nextTutorialStepNumber(node: ProseMirrorNode) {
+  let maxNumber = 0;
+  let stepCount = 0;
+  node.forEach((child) => {
+    if (child.type.name !== "tutorialStep") return;
+    stepCount += 1;
+    const numeric = Number.parseInt(normalizeTutorialStepNumber(child.attrs.number), 10);
+    if (Number.isFinite(numeric)) maxNumber = Math.max(maxNumber, numeric);
+  });
+  return normalizeTutorialStepNumber(maxNumber > 0 ? maxNumber + 1 : stepCount + 1);
+}
 
 function retargetActiveHrefNode(current: Editor, nodeName: "linkBox" | "ctaButton", href: string) {
   if (!current.schema.nodes[nodeName]) return false;
@@ -47,6 +84,7 @@ function retargetActiveHrefNode(current: Editor, nodeName: "linkBox" | "ctaButto
 export function createEditorCommandAdapter(options: {
   getEditor: () => Editor | undefined;
   onCommand: (editor: Editor) => void;
+  onCalloutRetarget: (kind: CalloutKind, pos: number, label: string) => void;
 }) {
   function run(command: (current: Editor) => boolean) {
     const editor = options.getEditor();
@@ -211,6 +249,102 @@ export function createEditorCommandAdapter(options: {
     run((current) => current.chain().focus().insertContent(content).run());
   }
 
+  function applyTutorialBlock(trackedPos?: number) {
+    const text = selectedText();
+    if (text.trim()) {
+      const content = createTutorialBlockFromText(text);
+      run((current) => {
+        if (!content) return false;
+        return current.chain().focus().insertContent(content).run();
+      });
+      return;
+    }
+
+    run((current) => {
+      const selection = current.state.selection.$from;
+      const selectedPos = findTutorialBlockTargetFromResolvedPos(selection)?.pos;
+      const target = [selectedPos, trackedPos]
+        .filter((pos): pos is number => pos !== undefined)
+        .map((pos) => ({ pos, node: current.state.doc.nodeAt(pos) }))
+        .find(({ node }) => node?.type.name === "tutorialBlock");
+      if (!target?.node) {
+        return current.chain().focus().insertContent(createDefaultTutorialBlock()).run();
+      }
+      return current
+        .chain()
+        .focus()
+        .insertContentAt(
+          target.pos + target.node.nodeSize - 1,
+          createTutorialStep("새 단계", "", nextTutorialStepNumber(target.node)),
+        )
+        .run();
+    });
+  }
+
+  function retargetCalloutAtPosition(
+    current: Editor,
+    pos: number,
+    kind: CalloutKind,
+    toneColor: string,
+  ) {
+    const targetType = current.schema.nodes[calloutNodeNameByKind[kind]];
+    const node = current.state.doc.nodeAt(pos);
+    if (!targetType || !node || !isCalloutNodeName(node.type.name)) return false;
+
+    const previousKind = calloutKindFromNodeName(node.type.name);
+    const previousDefault = previousKind ? defaultCalloutLabel(previousKind) : "";
+    const previousLabel =
+      typeof node.attrs.label === "string"
+        ? node.attrs.label.trim().replace(/\s+/g, " ").slice(0, 40)
+        : "";
+    const label =
+      previousLabel && previousLabel !== previousDefault
+        ? previousLabel
+        : defaultCalloutLabel(kind);
+    current.commands.focus();
+    current.view.dispatch(
+      current.state.tr
+        .setNodeMarkup(pos, targetType, {
+          ...node.attrs,
+          label,
+          toneColor: normalizeCalloutToneColor(toneColor, kind),
+        })
+        .scrollIntoView(),
+    );
+    options.onCalloutRetarget(kind, pos, label);
+    return true;
+  }
+
+  function retargetActiveCallout(current: Editor, kind: CalloutKind, toneColor: string) {
+    const selectionFrom = current.state.selection.$from;
+    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
+      if (isCalloutNodeName(selectionFrom.node(depth).type.name)) {
+        const pos = selectionFrom.before(depth);
+        return retargetCalloutAtPosition(current, pos, kind, toneColor);
+      }
+    }
+    return false;
+  }
+
+  function applyCallout(kind: CalloutKind, toneColor: string) {
+    run((current) => {
+      if (retargetActiveCallout(current, kind, toneColor)) return true;
+      if (
+        current.chain().focus().command(selectedInlineRangeToCalloutCommand(kind, toneColor)).run()
+      ) {
+        return true;
+      }
+      return current
+        .chain()
+        .focus()
+        .wrapIn(calloutNodeNameByKind[kind], {
+          label: defaultCalloutLabel(kind),
+          toneColor: normalizeCalloutToneColor(toneColor, kind),
+        })
+        .run();
+    });
+  }
+
   return {
     run,
     selectedText,
@@ -226,5 +360,9 @@ export function createEditorCommandAdapter(options: {
     applySummaryBox,
     applyHeroBlock,
     applyComparisonBlock,
+    applyTutorialBlock,
+    applyCallout,
+    retargetCalloutAtPosition,
+    retargetActiveCallout,
   };
 }

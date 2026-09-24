@@ -28,6 +28,7 @@ test("routes section and link box commands through the editor", async ({ page })
   const editor = page.locator(".article-editor");
   await expect(editor).toContainText("DC-CODE-PASTE");
 
+  await editor.locator(":scope > p").first().click();
   await page.getByRole("button", { name: "블록 도구" }).click();
   await page.getByRole("button", { name: "섹션" }).click();
   await expect(editor.locator(".dc-section-heading")).toContainText("새 섹션");

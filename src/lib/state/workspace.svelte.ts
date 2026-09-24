@@ -37,7 +37,6 @@ import {
   calloutKindFromNodeName,
   calloutNodeNameByKind,
   defaultCalloutLabel,
-  isCalloutNodeName,
   calloutNodeNames,
   type CalloutKind,
 } from "$lib/editor/callout";
@@ -48,8 +47,10 @@ import {
   normalizeCalloutToneColor,
 } from "$lib/editor/callout-palette";
 
-import { selectedInlineRangeToCalloutCommand } from "$lib/editor/selection-commands";
-import { createEditorCommandAdapter } from "$lib/editor/command-adapter";
+import {
+  createEditorCommandAdapter,
+  findTutorialBlockTargetFromResolvedPos,
+} from "$lib/editor/command-adapter";
 import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
 import {
@@ -98,12 +99,7 @@ import { normalizeQuoteStyle, quoteStyleOptions, type QuoteStyle } from "$lib/ed
 
 import { defaultSummaryBoxLabel } from "$lib/editor/summary-box";
 
-import {
-  createDefaultTutorialBlock,
-  createTutorialStep,
-  createTutorialBlockFromText,
-  normalizeTutorialStepNumber,
-} from "$lib/editor/tutorial-block";
+import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
 
 import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
 
@@ -414,6 +410,15 @@ export function createWorkspaceState() {
   const editorCommands = createEditorCommandAdapter({
     getEditor: () => editor,
     onCommand: refreshEditorState,
+    onCalloutRetarget(kind, pos, label) {
+      syncBlockLabelTarget({
+        type: calloutNodeNameByKind[kind],
+        pos,
+        fallback: defaultCalloutLabel(kind),
+        attrName: "label",
+        label,
+      });
+    },
   });
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
@@ -1348,20 +1353,6 @@ export function createWorkspaceState() {
     );
   }
 
-  function findTutorialBlockTargetFromResolvedPos(
-    resolvedPos: ResolvedPos,
-  ): TutorialBlockTarget | null {
-    for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
-      const node = resolvedPos.node(depth);
-
-      if (node.type.name === "tutorialBlock") {
-        return { pos: resolvedPos.before(depth) };
-      }
-    }
-
-    return null;
-  }
-
   function syncTutorialBlockTarget(current: Editor) {
     tutorialBlockTarget = findTutorialBlockTargetFromResolvedPos(current.state.selection.$from);
   }
@@ -2198,97 +2189,8 @@ export function createWorkspaceState() {
     closeCodeLineContextMenu();
   }
 
-  function calloutLabelAfterToneChange(
-    nodeTypeName: string,
-    attrs: Record<string, unknown>,
-    kind: CalloutKind,
-  ) {
-    const previousKind = calloutKindFromNodeName(nodeTypeName);
-    const previousDefault = previousKind ? defaultCalloutLabel(previousKind) : "";
-    const previousLabel = normalizeBlockLabel(attrs.label);
-
-    return previousLabel && previousLabel !== previousDefault
-      ? previousLabel
-      : defaultCalloutLabel(kind);
-  }
-
-  function retargetCalloutAtPosition(
-    current: Editor,
-    pos: number,
-    kind: CalloutKind,
-    toneColor = activeCalloutColor,
-  ) {
-    const targetType = current.schema.nodes[calloutNodeNameByKind[kind]];
-    const node = current.state.doc.nodeAt(pos);
-
-    if (!targetType || !node || !isCalloutNodeName(node.type.name)) {
-      return false;
-    }
-
-    const label = calloutLabelAfterToneChange(node.type.name, node.attrs, kind);
-    current.commands.focus();
-    current.view.dispatch(
-      current.state.tr
-        .setNodeMarkup(pos, targetType, {
-          ...node.attrs,
-          label,
-          toneColor: normalizeCalloutToneColor(toneColor, kind),
-        })
-        .scrollIntoView(),
-    );
-    syncBlockLabelTarget({
-      type: calloutNodeNameByKind[kind],
-      pos,
-      fallback: defaultCalloutLabel(kind),
-      attrName: "label",
-      label,
-    });
-    return true;
-  }
-
-  function retargetActiveCallout(
-    current: Editor,
-    kind: CalloutKind,
-    toneColor = activeCalloutColor,
-  ) {
-    const selectionFrom = current.state.selection.$from;
-
-    for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
-      const node = selectionFrom.node(depth);
-
-      if (isCalloutNodeName(node.type.name)) {
-        return retargetCalloutAtPosition(current, selectionFrom.before(depth), kind, toneColor);
-      }
-    }
-
-    return false;
-  }
-
   function applyCallout(kind: CalloutKind) {
-    runEditorCommand((current) => {
-      if (retargetActiveCallout(current, kind)) {
-        return true;
-      }
-
-      if (
-        current
-          .chain()
-          .focus()
-          .command(selectedInlineRangeToCalloutCommand(kind, activeCalloutColor))
-          .run()
-      ) {
-        return true;
-      }
-
-      return current
-        .chain()
-        .focus()
-        .wrapIn(calloutNodeNameByKind[kind], {
-          label: defaultCalloutLabel(kind),
-          toneColor: normalizeCalloutToneColor(activeCalloutColor, kind),
-        })
-        .run();
-    });
+    editorCommands.applyCallout(kind, activeCalloutColor);
   }
 
   function applySelectedCallout() {
@@ -2306,10 +2208,10 @@ export function createWorkspaceState() {
     const trackedTarget = blockLabelTarget;
     const didRetargetTrackedCallout =
       trackedTarget !== null &&
-      retargetCalloutAtPosition(editor, trackedTarget.pos, kind, activeCalloutColor);
+      editorCommands.retargetCalloutAtPosition(editor, trackedTarget.pos, kind, activeCalloutColor);
 
     if (!didRetargetTrackedCallout) {
-      retargetActiveCallout(editor, kind, activeCalloutColor);
+      editorCommands.retargetActiveCallout(editor, kind, activeCalloutColor);
     }
 
     refreshEditorState(editor);
@@ -2437,77 +2339,8 @@ export function createWorkspaceState() {
     editorCommands.applyHeroBlock();
   }
 
-  function selectedTutorialBlock(current: Editor) {
-    const selectionTarget = findTutorialBlockTargetFromResolvedPos(current.state.selection.$from);
-
-    for (const target of [selectionTarget, tutorialBlockTarget]) {
-      if (!target) {
-        continue;
-      }
-
-      const node = current.state.doc.nodeAt(target.pos);
-
-      if (node?.type.name === "tutorialBlock") {
-        return {
-          node,
-          pos: target.pos,
-        };
-      }
-    }
-
-    return null;
-  }
-
-  function nextTutorialStepNumber(node: ProseMirrorNode) {
-    let maxNumber = 0;
-    let stepCount = 0;
-
-    node.forEach((child) => {
-      if (child.type.name !== "tutorialStep") {
-        return;
-      }
-
-      stepCount += 1;
-      const normalized = normalizeTutorialStepNumber(child.attrs.number);
-      const numeric = Number.parseInt(normalized, 10);
-
-      if (Number.isFinite(numeric)) {
-        maxNumber = Math.max(maxNumber, numeric);
-      }
-    });
-
-    return normalizeTutorialStepNumber(maxNumber > 0 ? maxNumber + 1 : stepCount + 1);
-  }
-
   function applyTutorialBlock() {
-    const text = selectedText();
-
-    if (!text.trim()) {
-      runEditorCommand((current) => {
-        const target = selectedTutorialBlock(current);
-
-        if (!target) {
-          return current.chain().focus().insertContent(createDefaultTutorialBlock()).run();
-        }
-
-        const insertPos = target.pos + target.node.nodeSize - 1;
-        return current
-          .chain()
-          .focus()
-          .insertContentAt(
-            insertPos,
-            createTutorialStep("새 단계", "", nextTutorialStepNumber(target.node)),
-          )
-          .run();
-      });
-      return;
-    }
-
-    const tutorialBlock = createTutorialBlockFromText(text);
-
-    runEditorCommand((current) =>
-      tutorialBlock ? current.chain().focus().insertContent(tutorialBlock).run() : false,
-    );
+    editorCommands.applyTutorialBlock(tutorialBlockTarget?.pos);
   }
 
   function applyComparisonBlock() {
@@ -3271,14 +3104,8 @@ export function createWorkspaceState() {
     get draftHistory() {
       return draftHistory;
     },
-    set draftHistory(value) {
-      draftHistory = value;
-    },
     get draftHistoryState() {
       return draftHistoryState;
-    },
-    set draftHistoryState(value) {
-      draftHistoryState = value;
     },
     get renameTarget() {
       return renameTarget;
@@ -3506,9 +3333,6 @@ export function createWorkspaceState() {
     closeCodeLineContextMenu,
     codeLineContextMenuActive,
     toggleCodeLineMarker,
-    calloutLabelAfterToneChange,
-    retargetCalloutAtPosition,
-    retargetActiveCallout,
     applyCallout,
     applySelectedCallout,
     updateActiveCalloutColor,
@@ -3527,8 +3351,6 @@ export function createWorkspaceState() {
     applyReferenceList,
     applySummaryBox,
     applyHeroBlock,
-    selectedTutorialBlock,
-    nextTutorialStepNumber,
     applyTutorialBlock,
     applyComparisonBlock,
     setLink,
@@ -3584,12 +3406,10 @@ export function createWorkspaceState() {
     calloutKindFromNodeName,
     calloutNodeNameByKind,
     defaultCalloutLabel,
-    isCalloutNodeName,
     calloutNodeNames,
     defaultCalloutToneColor,
     defaultCalloutToneColors,
     normalizeCalloutToneColor,
-    selectedInlineRangeToCalloutCommand,
     clearDraftSnapshot,
     maxDraftHistoryCount,
     readDraftSnapshot,
@@ -3611,9 +3431,6 @@ export function createWorkspaceState() {
     normalizeQuoteStyle,
     quoteStyleOptions,
     defaultSummaryBoxLabel,
-    createDefaultTutorialBlock,
-    createTutorialStep,
-    createTutorialBlockFromText,
     normalizeTutorialStepNumber,
     normalizeCodeFilename,
     maxHighlightLineNumber,
