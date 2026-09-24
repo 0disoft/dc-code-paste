@@ -1,5 +1,6 @@
 import type { Editor } from "@tiptap/core";
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
+import { NodeSelection } from "@tiptap/pm/state";
 import {
   selectedInlineRangeToCalloutCommand,
   selectedInlineRangeToCodeBlockCommand,
@@ -28,6 +29,7 @@ import {
   type CalloutKind,
 } from "$lib/editor/callout";
 import { normalizeCalloutToneColor } from "$lib/editor/callout-palette";
+import { normalizeEditableLinkHref } from "$lib/editor/link";
 import {
   createDefaultTutorialBlock,
   createTutorialBlockFromText,
@@ -52,6 +54,26 @@ export function findTutorialBlockTargetFromResolvedPos(resolvedPos: ResolvedPos)
   return null;
 }
 
+export function isEditableHrefNodeName(nodeName: string) {
+  return nodeName === "linkBox" || nodeName === "ctaButton" || nodeName === "referenceItem";
+}
+
+export function hrefFromAttributes(attrs: Record<string, unknown>) {
+  return typeof attrs.href === "string" ? normalizeEditableLinkHref(attrs.href) : undefined;
+}
+
+export function editableHrefNodeTargetFromResolvedPos(resolvedPos: ResolvedPos) {
+  for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
+    const node = resolvedPos.node(depth);
+    if (!isEditableHrefNodeName(node.type.name)) continue;
+    return {
+      pos: resolvedPos.before(depth),
+      href: hrefFromAttributes(node.attrs) ?? "",
+    };
+  }
+  return undefined;
+}
+
 function nextTutorialStepNumber(node: ProseMirrorNode) {
   let maxNumber = 0;
   let stepCount = 0;
@@ -64,7 +86,7 @@ function nextTutorialStepNumber(node: ProseMirrorNode) {
   return normalizeTutorialStepNumber(maxNumber > 0 ? maxNumber + 1 : stepCount + 1);
 }
 
-function retargetActiveHrefNode(current: Editor, nodeName: "linkBox" | "ctaButton", href: string) {
+function retargetActiveBlockHref(current: Editor, nodeName: "linkBox" | "ctaButton", href: string) {
   if (!current.schema.nodes[nodeName]) return false;
   const selectionFrom = current.state.selection.$from;
   for (let depth = selectionFrom.depth; depth > 0; depth -= 1) {
@@ -144,7 +166,7 @@ export function createEditorCommandAdapter(options: {
 
   function applyLinkBox(href: string) {
     run((current) => {
-      if (retargetActiveHrefNode(current, "linkBox", href)) return true;
+      if (retargetActiveBlockHref(current, "linkBox", href)) return true;
       if (current.chain().focus().command(selectedInlineRangeToLinkBoxCommand(href)).run()) {
         return true;
       }
@@ -175,7 +197,7 @@ export function createEditorCommandAdapter(options: {
 
   function applyCtaButton(href: string, fallbackLabel: string) {
     run((current) => {
-      if (retargetActiveHrefNode(current, "ctaButton", href)) return true;
+      if (retargetActiveBlockHref(current, "ctaButton", href)) return true;
       if (current.chain().focus().command(selectedInlineRangeToCtaButtonCommand(href)).run()) {
         return true;
       }
@@ -326,6 +348,54 @@ export function createEditorCommandAdapter(options: {
     return false;
   }
 
+  function retargetActiveHrefNode(current: Editor, href: string) {
+    let target: { pos: number; href: string } | undefined;
+    if (current.state.selection instanceof NodeSelection) {
+      const selectedNode = current.state.selection.node;
+      if (isEditableHrefNodeName(selectedNode.type.name)) {
+        target = {
+          pos: current.state.selection.from,
+          href: hrefFromAttributes(selectedNode.attrs) ?? "",
+        };
+      }
+    }
+    target ??= editableHrefNodeTargetFromResolvedPos(current.state.selection.$from);
+    if (!target) return false;
+    const node = current.state.doc.nodeAt(target.pos);
+    if (!node || !isEditableHrefNodeName(node.type.name)) return false;
+    current.commands.focus();
+    current.view.dispatch(
+      current.state.tr
+        .setNodeMarkup(target.pos, node.type, { ...node.attrs, href })
+        .scrollIntoView(),
+    );
+    return true;
+  }
+
+  function setLink(href: string) {
+    run(
+      (current) =>
+        retargetActiveHrefNode(current, href) ||
+        current.chain().focus().extendMarkRange("link").setLink({ href }).run(),
+    );
+  }
+
+  function unsetLink() {
+    run(
+      (current) =>
+        retargetActiveHrefNode(current, "") ||
+        current.chain().focus().extendMarkRange("link").unsetLink().run(),
+    );
+  }
+
+  function setTextColor(color: string) {
+    run((current) => current.chain().focus().setColor(color).run());
+  }
+
+  function setFontSize(value: string) {
+    run((current) => current.chain().focus().setFontSize(value).run());
+  }
+
   function applyCallout(kind: CalloutKind, toneColor: string) {
     run((current) => {
       if (retargetActiveCallout(current, kind, toneColor)) return true;
@@ -364,5 +434,9 @@ export function createEditorCommandAdapter(options: {
     applyCallout,
     retargetCalloutAtPosition,
     retargetActiveCallout,
+    setLink,
+    unsetLink,
+    setTextColor,
+    setFontSize,
   };
 }

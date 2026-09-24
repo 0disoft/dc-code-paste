@@ -56,6 +56,7 @@ export type OpenRouterModelOption = {
 
 export type OpenRouterModelRequestOptions = {
   limit?: number;
+  signal?: AbortSignal;
 };
 
 export type LlmModelAutocompleteOption = {
@@ -349,6 +350,7 @@ export async function requestOpenRouterModels(
   const response = await fetcher(url.toString(), {
     method: "GET",
     headers: trimmedKey ? { Authorization: `Bearer ${trimmedKey}` } : undefined,
+    signal: options.signal,
   });
 
   const payload = await readJsonResponse(response);

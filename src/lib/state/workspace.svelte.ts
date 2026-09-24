@@ -49,7 +49,10 @@ import {
 
 import {
   createEditorCommandAdapter,
+  editableHrefNodeTargetFromResolvedPos,
   findTutorialBlockTargetFromResolvedPos,
+  hrefFromAttributes,
+  isEditableHrefNodeName,
 } from "$lib/editor/command-adapter";
 import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
 
@@ -75,13 +78,9 @@ import { normalizeEditableLinkHref } from "$lib/editor/link";
 import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
 
 import {
-  autocompleteLlmModelOptions,
   defaultLlmProviderId,
-  llmModelAutocompleteLimit,
   llmProviders,
-  openRouterTopWeeklyModelLimit,
   providerDefinition,
-  requestOpenRouterModels,
   type OpenRouterModelOption,
   type LlmProviderId,
 } from "$lib/editor/llm-generation";
@@ -122,6 +121,7 @@ import {
   createWorkspacePreviewRenderer,
 } from "$lib/state/workspace-export";
 import { createLlmRequestController, type LlmGenerationState } from "$lib/state/llm-request";
+import { createLlmModelController, type OpenRouterModelState } from "$lib/state/llm-models";
 import {
   createDraftPersistenceController,
   type DraftSaveState,
@@ -303,7 +303,7 @@ export function createWorkspaceState() {
 
   let isLlmModelAutocompleteOpen = $state(false);
 
-  let openRouterModelState = $state<"idle" | "loading" | "loaded" | "fallback" | "error">("idle");
+  let openRouterModelState = $state<OpenRouterModelState>("idle");
 
   let openRouterModelError = $state("");
 
@@ -352,8 +352,6 @@ export function createWorkspaceState() {
   let invalidDraftBackupKey = $state("");
   let invalidDraftDownloaded = $state(false);
 
-  let openRouterModelLoadTurn = 0;
-
   const exportSession = createDcExportSession();
   const copyFeedback = createCopyFeedbackController();
   const llmRequest = createLlmRequestController({
@@ -373,6 +371,23 @@ export function createWorkspaceState() {
     },
     setInFlight(value) {
       llmGenerationInFlight = value;
+    },
+  });
+  const llmModels = createLlmModelController({
+    getProvider: () => llmProvider,
+    getApiKey: () => llmApiKey,
+    getTopWeeklyOnly: () => isOpenRouterTopWeeklyOnly,
+    setModels(value) {
+      openRouterModels = value;
+    },
+    setState(value) {
+      openRouterModelState = value;
+    },
+    setError(value) {
+      openRouterModelError = value;
+    },
+    setAutocompleteOpen(value) {
+      isLlmModelAutocompleteOpen = value;
     },
   });
   const draftPersistence = createDraftPersistenceController({
@@ -492,29 +507,14 @@ export function createWorkspaceState() {
     activeLlmProvider.supportsBrowserGeneration !== false,
   );
 
-  const llmModelOptions = $derived(
-    llmProvider === "openrouter" && openRouterModels.length > 0
-      ? openRouterModels
-      : activeLlmProvider.models.map((model) => ({
-          id: model,
-          name: model,
-        })),
-  );
-
-  const shouldShowInitialLlmModels = $derived(
-    llmModel.trim().length === 0 &&
-      llmModelOptions.length > 0 &&
-      (llmProvider !== "openrouter" || (isOpenRouterTopWeeklyOnly && openRouterModels.length > 0)),
-  );
-
   const activeLlmModelAutocompleteOptions = $derived(
-    autocompleteLlmModelOptions(llmModelOptions, llmModel, {
-      limit:
-        llmProvider === "openrouter" && shouldShowInitialLlmModels
-          ? openRouterTopWeeklyModelLimit
-          : llmModelAutocompleteLimit,
-      showInitialOptions: shouldShowInitialLlmModels,
-    }),
+    llmModels.autocompleteOptions(
+      llmProvider,
+      activeLlmProvider.models,
+      openRouterModels,
+      llmModel,
+      isOpenRouterTopWeeklyOnly,
+    ),
   );
 
   const shouldShowLlmModelAutocomplete = $derived(
@@ -805,6 +805,7 @@ export function createWorkspaceState() {
 
   function closeTransientPanels() {
     cancelLlmGeneration();
+    llmModels.cancel();
     closeCodeLineContextMenu();
     cancelRename();
     isLinkPanelOpen = false;
@@ -826,6 +827,7 @@ export function createWorkspaceState() {
 
     if (isMarkdownPanelOpen) {
       cancelLlmGeneration();
+      llmModels.cancel();
       isLlmPanelOpen = false;
       isStoragePanelOpen = false;
     }
@@ -836,6 +838,7 @@ export function createWorkspaceState() {
 
     if (isStoragePanelOpen) {
       cancelLlmGeneration();
+      llmModels.cancel();
       isMarkdownPanelOpen = false;
       isLlmPanelOpen = false;
       resetMarkdownImportState();
@@ -855,11 +858,13 @@ export function createWorkspaceState() {
       }
     } else {
       cancelLlmGeneration();
+      llmModels.cancel();
     }
   }
 
   function closeLlmPanel() {
     cancelLlmGeneration();
+    llmModels.cancel();
     isLlmPanelOpen = false;
   }
 
@@ -880,7 +885,8 @@ export function createWorkspaceState() {
 
     llmProvider = nextProvider;
     llmModel = "";
-    isLlmModelAutocompleteOpen = true;
+    llmModels.cancel();
+    llmModels.openAutocomplete();
 
     if (nextProvider === "openrouter") {
       void refreshOpenRouterModels();
@@ -890,91 +896,38 @@ export function createWorkspaceState() {
   function updateLlmModel(value: string) {
     llmModel = value;
     markLlmInputChanged();
-    isLlmModelAutocompleteOpen = true;
+    llmModels.openAutocomplete();
   }
 
   function selectLlmModel(value: string) {
     llmModel = value;
     markLlmInputChanged();
-    isLlmModelAutocompleteOpen = false;
+    llmModels.closeAutocomplete();
+  }
+
+  function openLlmModelAutocomplete() {
+    llmModels.openAutocomplete();
   }
 
   function closeLlmModelAutocompleteSoon() {
-    window.setTimeout(() => {
-      isLlmModelAutocompleteOpen = false;
-    }, 120);
+    llmModels.closeAutocompleteSoon();
   }
 
   function closeLlmModelAutocomplete() {
-    isLlmModelAutocompleteOpen = false;
+    llmModels.closeAutocomplete();
   }
 
-  async function refreshOpenRouterModels() {
-    if (llmProvider !== "openrouter") {
-      return;
-    }
-
-    const turn = ++openRouterModelLoadTurn;
-    const useTopWeeklyLimit = isOpenRouterTopWeeklyOnly;
-
-    openRouterModelState = "loading";
-    openRouterModelError = "";
-
-    try {
-      const models = await requestOpenRouterModels(llmApiKey, {
-        limit: useTopWeeklyLimit ? openRouterTopWeeklyModelLimit : undefined,
-      });
-      applyOpenRouterModels(models, "loaded", turn);
-    } catch (error) {
-      if (!llmApiKey.trim()) {
-        applyOpenRouterModelError(error, turn);
-        return;
-      }
-
-      try {
-        const models = await requestOpenRouterModels("", {
-          limit: useTopWeeklyLimit ? openRouterTopWeeklyModelLimit : undefined,
-        });
-        applyOpenRouterModels(models, "fallback", turn);
-      } catch (fallbackError) {
-        applyOpenRouterModelError(fallbackError, turn);
-      }
-    }
+  function refreshOpenRouterModels() {
+    return llmModels.refresh();
   }
 
   function setOpenRouterTopWeeklyOnly(value: boolean) {
     isOpenRouterTopWeeklyOnly = value;
-    openRouterModelError = "";
+    llmModels.clearError();
 
     if (llmProvider === "openrouter") {
       void refreshOpenRouterModels();
     }
-  }
-
-  function applyOpenRouterModels(
-    models: OpenRouterModelOption[],
-    state: "loaded" | "fallback",
-    turn: number,
-  ) {
-    if (turn !== openRouterModelLoadTurn) {
-      return;
-    }
-
-    openRouterModels = models;
-    openRouterModelState = models.length > 0 ? state : "error";
-    openRouterModelError = models.length > 0 ? "" : "사용 가능한 모델 없음";
-
-    isLlmModelAutocompleteOpen = true;
-  }
-
-  function applyOpenRouterModelError(error: unknown, turn: number) {
-    if (turn !== openRouterModelLoadTurn) {
-      return;
-    }
-
-    openRouterModelState = "error";
-    openRouterModelError =
-      error instanceof Error ? error.message : "OpenRouter 모델 목록을 불러오지 못했습니다.";
   }
 
   function beginPresetRename(preset: PresetSnapshot, event: MouseEvent) {
@@ -1858,34 +1811,6 @@ export function createWorkspaceState() {
     linkInput?.select();
   }
 
-  function isEditableHrefNodeName(nodeName: string) {
-    return nodeName === "linkBox" || nodeName === "ctaButton" || nodeName === "referenceItem";
-  }
-
-  function hrefFromAttributes(attrs: Record<string, unknown>) {
-    return typeof attrs.href === "string" ? normalizeEditableLinkHref(attrs.href) : undefined;
-  }
-
-  function editableHrefNodeTargetFromResolvedPos(
-    resolvedPos: ResolvedPos,
-  ): { pos: number; href: string } | undefined {
-    for (let depth = resolvedPos.depth; depth > 0; depth -= 1) {
-      const node = resolvedPos.node(depth);
-
-      if (!isEditableHrefNodeName(node.type.name)) {
-        continue;
-      }
-
-      const href = hrefFromAttributes(node.attrs);
-      return {
-        pos: resolvedPos.before(depth),
-        href: href ?? "",
-      };
-    }
-
-    return undefined;
-  }
-
   function linkMarkHrefAtPosition(view: EditorView, pos: number) {
     const linkType = view.state.schema.marks.link;
 
@@ -1930,42 +1855,6 @@ export function createWorkspaceState() {
     }
 
     return undefined;
-  }
-
-  function retargetActiveHrefNode(current: Editor, href: string) {
-    let target: { pos: number; href: string } | undefined;
-
-    if (current.state.selection instanceof NodeSelection) {
-      const selectedNode = current.state.selection.node;
-
-      if (isEditableHrefNodeName(selectedNode.type.name)) {
-        target = {
-          pos: current.state.selection.from,
-          href: hrefFromAttributes(selectedNode.attrs) ?? "",
-        };
-      }
-    }
-
-    target ??= editableHrefNodeTargetFromResolvedPos(current.state.selection.$from);
-
-    if (!target) {
-      return false;
-    }
-
-    const node = current.state.doc.nodeAt(target.pos);
-
-    if (!node || !isEditableHrefNodeName(node.type.name)) {
-      return false;
-    }
-
-    current.commands.focus();
-    current.view.dispatch(
-      current.state.tr
-        .setNodeMarkup(target.pos, node.type, { ...node.attrs, href })
-        .scrollIntoView(),
-    );
-
-    return true;
   }
 
   function openCodeFilenameEditorFromEvent(view: EditorView, event: MouseEvent) {
@@ -2360,21 +2249,13 @@ export function createWorkspaceState() {
 
     linkError = false;
     linkDraft = href;
-    runEditorCommand(
-      (current) =>
-        retargetActiveHrefNode(current, href) ||
-        current.chain().focus().extendMarkRange("link").setLink({ href }).run(),
-    );
+    editorCommands.setLink(href);
   }
 
   function unsetLink() {
     linkError = false;
     linkDraft = "";
-    runEditorCommand(
-      (current) =>
-        retargetActiveHrefNode(current, "") ||
-        current.chain().focus().extendMarkRange("link").unsetLink().run(),
-    );
+    editorCommands.unsetLink();
   }
 
   function toggleLinkPanel() {
@@ -2392,11 +2273,11 @@ export function createWorkspaceState() {
     const safety = editorThemeColorSafety[documentTheme];
     const readableColor = sanitizeReadableTextColor(color, safety.background, safety.fallback);
 
-    runEditorCommand((current) => current.chain().focus().setColor(readableColor).run());
+    editorCommands.setTextColor(readableColor);
   }
 
   function setFontSize(value: string) {
-    runEditorCommand((current) => current.chain().focus().setFontSize(value).run());
+    editorCommands.setFontSize(value);
   }
 
   function resetDraft() {
@@ -2507,6 +2388,7 @@ export function createWorkspaceState() {
   onDestroy(() => {
     copyFeedback.dispose();
     llmRequest.dispose();
+    llmModels.dispose();
     clearScheduledPreviewRender();
     exportSession.dispose();
     flushScheduledDraftPersist();
@@ -3020,32 +2902,17 @@ export function createWorkspaceState() {
     get openRouterModels() {
       return openRouterModels;
     },
-    set openRouterModels(value) {
-      openRouterModels = value;
-    },
     get isOpenRouterTopWeeklyOnly() {
       return isOpenRouterTopWeeklyOnly;
-    },
-    set isOpenRouterTopWeeklyOnly(value) {
-      isOpenRouterTopWeeklyOnly = value;
     },
     get isLlmModelAutocompleteOpen() {
       return isLlmModelAutocompleteOpen;
     },
-    set isLlmModelAutocompleteOpen(value) {
-      isLlmModelAutocompleteOpen = value;
-    },
     get openRouterModelState() {
       return openRouterModelState;
     },
-    set openRouterModelState(value) {
-      openRouterModelState = value;
-    },
     get openRouterModelError() {
       return openRouterModelError;
-    },
-    set openRouterModelError(value) {
-      openRouterModelError = value;
     },
     get llmGenerationState() {
       return llmGenerationState;
@@ -3185,12 +3052,6 @@ export function createWorkspaceState() {
     get activeLlmProvider() {
       return activeLlmProvider;
     },
-    get llmModelOptions() {
-      return llmModelOptions;
-    },
-    get shouldShowInitialLlmModels() {
-      return shouldShowInitialLlmModels;
-    },
     get activeLlmModelAutocompleteOptions() {
       return activeLlmModelAutocompleteOptions;
     },
@@ -3241,12 +3102,11 @@ export function createWorkspaceState() {
     selectLlmProvider,
     updateLlmModel,
     selectLlmModel,
+    openLlmModelAutocomplete,
     closeLlmModelAutocomplete,
     closeLlmModelAutocompleteSoon,
     refreshOpenRouterModels,
     setOpenRouterTopWeeklyOnly,
-    applyOpenRouterModels,
-    applyOpenRouterModelError,
     beginPresetRename,
     beginDraftHistoryRename,
     cancelRename,
@@ -3325,7 +3185,6 @@ export function createWorkspaceState() {
     linkMarkHrefAtPosition,
     editableLinkHrefFromElement,
     editableHrefNodeTargetFromElement,
-    retargetActiveHrefNode,
     openCodeFilenameEditorFromEvent,
     openEditableLinkFromEvent,
     openBlockLabelEditorFromEvent,
@@ -3387,7 +3246,6 @@ export function createWorkspaceState() {
     get renderTurn() {
       return previewRenderer.renderTurn;
     },
-    openRouterModelLoadTurn,
     onDestroy,
     onMount,
     tick,
@@ -3417,13 +3275,9 @@ export function createWorkspaceState() {
     normalizeCtaGroupLayout,
     normalizeEditableLinkHref,
     llmAuthoringPrompt,
-    autocompleteLlmModelOptions,
     defaultLlmProviderId,
-    llmModelAutocompleteLimit,
     llmProviders,
-    openRouterTopWeeklyModelLimit,
     providerDefinition,
-    requestOpenRouterModels,
     parseMarkdownToDocument,
     codeLineRangeContains,
     codeLineRangeLabel,

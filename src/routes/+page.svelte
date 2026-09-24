@@ -81,7 +81,7 @@
             onSelectProvider={workspace.selectLlmProvider}
             onInputModel={workspace.updateLlmModel}
             onSelectModel={workspace.selectLlmModel}
-            onFocusModelInput={() => (workspace.isLlmModelAutocompleteOpen = true)}
+            onFocusModelInput={workspace.openLlmModelAutocomplete}
             onBlurModelInput={workspace.closeLlmModelAutocompleteSoon}
             onCloseModelAutocomplete={workspace.closeLlmModelAutocomplete}
             onSetOpenRouterTopWeeklyOnly={workspace.setOpenRouterTopWeeklyOnly}
