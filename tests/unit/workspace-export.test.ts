@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JSONContent } from "@tiptap/core";
 import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
 import { copyDcHtmlWhenReady } from "$lib/dc/clipboard";
-import { copyDcPreview, createWorkspacePreviewRenderer } from "$lib/state/workspace-export";
+import {
+  copyDcPreview,
+  createCopyFeedbackController,
+  createWorkspacePreviewRenderer,
+} from "$lib/state/workspace-export";
 
 vi.mock("$lib/dc/export-document", () => ({
   exportDocumentToDcHtml: vi.fn<typeof exportDocumentToDcHtml>(),
@@ -224,5 +228,48 @@ describe("workspace preview render lifecycle", () => {
     });
     expect(setManualHtml).toHaveBeenLastCalledWith("current-html");
     expect(setState).toHaveBeenLastCalledWith("error");
+  });
+});
+
+describe("copy feedback lifecycle", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it("does not let an older reset clear a newer copy result", async () => {
+    const controller = createCopyFeedbackController();
+    const publish = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    const first = controller.begin("source", publish)!;
+    first.setState("copied");
+    first.scheduleReset(first.setState, 100);
+
+    await vi.advanceTimersByTimeAsync(50);
+    const second = controller.begin("source", publish)!;
+    second.setState("copied");
+    second.scheduleReset(second.setState, 100);
+    first.setState("error");
+    await vi.advanceTimersByTimeAsync(50);
+    expect(publish).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(publish).toHaveBeenLastCalledWith("idle");
+  });
+
+  it("cancels every channel timer and ignores pending results after disposal", async () => {
+    const controller = createCopyFeedbackController();
+    const publish = vi.fn<(state: "idle" | "copied" | "error") => void>();
+    for (const channel of ["preview", "source", "guide"] as const) {
+      const operation = controller.begin(channel, publish)!;
+      operation.setState("copied");
+      operation.scheduleReset(operation.setState, 100);
+      expect(operation.isCurrent()).toBe(true);
+    }
+    expect(vi.getTimerCount()).toBe(3);
+    controller.dispose();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(publish).toHaveBeenCalledTimes(3);
+    expect(controller.begin("source", publish)).toBeUndefined();
   });
 });

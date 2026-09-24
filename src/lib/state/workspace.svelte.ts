@@ -152,6 +152,7 @@ import {
   copyDcPreview,
   copyPlainTextWithState,
   copySourceHtml as copySourceHtmlText,
+  createCopyFeedbackController,
   createWorkspacePreviewRenderer,
 } from "$lib/state/workspace-export";
 
@@ -295,7 +296,6 @@ export function createWorkspaceState() {
 
   let copyState = $state<"idle" | "copied" | "error">("idle");
   let manualCopyHtml = $state("");
-  let copyTurn = 0;
 
   let sourceCopyState = $state<"idle" | "copied" | "error">("idle");
 
@@ -398,6 +398,7 @@ export function createWorkspaceState() {
   const llmGenerationTimeoutMs = 90_000;
 
   const exportSession = createDcExportSession();
+  const copyFeedback = createCopyFeedbackController();
   const previewRenderer = createWorkspacePreviewRenderer({
     debounceMs: previewRenderDebounceMs,
     renderDocument: exportSession.exportDocument,
@@ -2955,12 +2956,15 @@ export function createWorkspaceState() {
   }
 
   async function copyPreview() {
-    const turn = ++copyTurn;
+    const operation = copyFeedback.begin("preview", (value) => {
+      copyState = value;
+    });
+    if (!operation) return;
     const currentDocument = documentJson;
     const currentOptions = exportOptions();
     const optionsFingerprint = JSON.stringify(currentOptions);
     const isCurrent = () =>
-      turn === copyTurn &&
+      operation.isCurrent() &&
       documentJson === currentDocument &&
       JSON.stringify(exportOptions()) === optionsFingerprint;
     await copyDcPreview({
@@ -2970,29 +2974,34 @@ export function createWorkspaceState() {
       plainText: editor?.getText() ?? "",
       isCurrent,
       setManualHtml(value) {
-        if (turn === copyTurn) manualCopyHtml = value;
+        if (isCurrent()) manualCopyHtml = value;
       },
-      setState(value) {
-        if (turn === copyTurn) copyState = value;
-      },
+      setState: operation.setState,
+      scheduleReset: operation.scheduleReset,
     });
   }
 
   async function copySourceHtml() {
+    const operation = copyFeedback.begin("source", (value) => {
+      sourceCopyState = value;
+    });
+    if (!operation) return;
     await copySourceHtmlText({
       html,
-      setState(value) {
-        sourceCopyState = value;
-      },
+      setState: operation.setState,
+      scheduleReset: operation.scheduleReset,
     });
   }
 
   async function copyLlmAuthoringGuide() {
+    const operation = copyFeedback.begin("guide", (value) => {
+      llmPromptCopyState = value;
+    });
+    if (!operation) return;
     await copyPlainTextWithState({
       text: llmAuthoringPrompt,
-      setState(value) {
-        llmPromptCopyState = value;
-      },
+      setState: operation.setState,
+      scheduleReset: operation.scheduleReset,
     });
   }
 
@@ -3090,7 +3099,7 @@ export function createWorkspaceState() {
   }
 
   onDestroy(() => {
-    copyTurn += 1;
+    copyFeedback.dispose();
     cancelLlmGeneration();
     clearScheduledPreviewRender();
     exportSession.dispose();

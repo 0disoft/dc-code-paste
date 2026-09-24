@@ -18,6 +18,7 @@ type PreviewRendererOptions = {
 type CopyStateOptions = {
   setState: (state: WorkspaceCopyState) => void;
   resetDelayMs?: number;
+  scheduleReset?: (setState: (state: WorkspaceCopyState) => void, delayMs: number) => void;
 };
 
 type CopyDcPreviewOptions = CopyStateOptions & {
@@ -42,10 +43,63 @@ const defaultCopyResetDelayMs = 1300;
 function scheduleCopiedStateReset({
   setState,
   resetDelayMs = defaultCopyResetDelayMs,
+  scheduleReset,
 }: CopyStateOptions) {
+  if (scheduleReset) {
+    scheduleReset(setState, resetDelayMs);
+    return;
+  }
   setTimeout(() => {
     setState("idle");
   }, resetDelayMs);
+}
+
+type CopyChannel = "preview" | "source" | "guide";
+
+export function createCopyFeedbackController() {
+  const turns: Record<CopyChannel, number> = { preview: 0, source: 0, guide: 0 };
+  const resetTimers = new Map<CopyChannel, ReturnType<typeof setTimeout>>();
+  let disposed = false;
+
+  function clearReset(channel: CopyChannel) {
+    const timer = resetTimers.get(channel);
+    if (timer !== undefined) clearTimeout(timer);
+    resetTimers.delete(channel);
+  }
+
+  function begin(channel: CopyChannel, publish: (state: WorkspaceCopyState) => void) {
+    if (disposed) return undefined;
+    const turn = ++turns[channel];
+    clearReset(channel);
+    const isCurrent = () => !disposed && turns[channel] === turn;
+    return {
+      isCurrent,
+      setState(state: WorkspaceCopyState) {
+        if (isCurrent()) publish(state);
+      },
+      scheduleReset(setState: (state: WorkspaceCopyState) => void, delayMs: number) {
+        if (!isCurrent()) return;
+        clearReset(channel);
+        resetTimers.set(
+          channel,
+          setTimeout(() => {
+            resetTimers.delete(channel);
+            if (isCurrent()) setState("idle");
+          }, delayMs),
+        );
+      },
+    };
+  }
+
+  function dispose() {
+    disposed = true;
+    for (const channel of ["preview", "source", "guide"] as const) {
+      turns[channel] += 1;
+      clearReset(channel);
+    }
+  }
+
+  return { begin, dispose };
 }
 
 export function createWorkspacePreviewRenderer({
@@ -128,6 +182,7 @@ export async function copyDcPreview({
   setManualHtml,
   setState,
   resetDelayMs,
+  scheduleReset,
 }: CopyDcPreviewOptions) {
   setState("idle");
   setManualHtml("");
@@ -146,7 +201,7 @@ export async function copyDcPreview({
     await copyDcHtmlWhenReady(copyHtmlPromise, plainText);
     if (isCurrent()) {
       setState("copied");
-      scheduleCopiedStateReset({ setState, resetDelayMs });
+      scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
     }
   } catch {
     if (isCurrent()) {
@@ -156,13 +211,18 @@ export async function copyDcPreview({
   }
 }
 
-export async function copySourceHtml({ html, setState, resetDelayMs }: CopySourceHtmlOptions) {
+export async function copySourceHtml({
+  html,
+  setState,
+  resetDelayMs,
+  scheduleReset,
+}: CopySourceHtmlOptions) {
   setState("idle");
 
   try {
     await copyPlainText(html);
     setState("copied");
-    scheduleCopiedStateReset({ setState, resetDelayMs });
+    scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
   } catch {
     setState("error");
   }
@@ -172,13 +232,14 @@ export async function copyPlainTextWithState({
   text,
   setState,
   resetDelayMs,
+  scheduleReset,
 }: CopyPlainTextOptions) {
   setState("idle");
 
   try {
     await copyPlainText(text);
     setState("copied");
-    scheduleCopiedStateReset({ setState, resetDelayMs });
+    scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
   } catch {
     setState("error");
   }
