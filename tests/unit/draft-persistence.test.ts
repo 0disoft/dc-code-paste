@@ -93,6 +93,17 @@ describe("draft persistence lifecycle", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("reports an oversized draft as unsaved", () => {
+    const { controller, storage, setCurrent, setState, setSavedAt, onSaved } = createHarness();
+    setCurrent("x".repeat(2_000_000));
+
+    expect(controller.persistCurrent()).toBe(false);
+    expect(setState).toHaveBeenLastCalledWith("error");
+    expect(storage.getItem(draftStorageKey)).toBeNull();
+    expect(setSavedAt).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
   it("stops a pending save when another tab writes a different draft", async () => {
     const { controller, storage, getCurrent, setState } = createHarness();
     controller.schedule(getCurrent());

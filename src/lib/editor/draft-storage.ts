@@ -413,7 +413,9 @@ export function readDraftHistorySnapshots(storage: DraftStorage): DraftHistorySn
 
 export function writeDraftSnapshot(storage: DraftStorage, snapshot: DraftSnapshot): boolean {
   try {
-    storage.setItem(draftStorageKey, JSON.stringify(snapshot));
+    const raw = JSON.stringify(snapshot);
+    if (raw.length > maxDraftChars) return false;
+    storage.setItem(draftStorageKey, raw);
     return true;
   } catch {
     return false;

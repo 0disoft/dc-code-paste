@@ -81,6 +81,27 @@ describe("draft storage", () => {
     expect(storage.getItem(draftStorageKey)).toBeNull();
   });
 
+  it("rejects oversized drafts before replacing a readable saved draft", () => {
+    const storage = new MemoryStorage();
+    const original = createDraftSnapshot(sampleDocument, preferences);
+    expect(writeDraftSnapshot(storage, original)).toBe(true);
+
+    const oversized = createDraftSnapshot(
+      {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [{ type: "text", text: "x".repeat(2_000_000) }],
+          },
+        ],
+      },
+      preferences,
+    );
+    expect(writeDraftSnapshot(storage, oversized)).toBe(false);
+    expect(readDraftSnapshot(storage)).toEqual(original);
+  });
+
   it("normalizes legacy modern export preferences to DC table", () => {
     const snapshot = createDraftSnapshot(sampleDocument, preferences);
     const restored = parseDraftSnapshot(
