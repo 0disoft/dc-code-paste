@@ -871,10 +871,13 @@ a.ui-menu-item {
   font-size: 15px;
 }
 .summary-settings .ui-swatch-row {
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
 }
 .summary-settings .ui-swatch {
-  width: 48px;
+  width: 100%;
+  min-width: 0;
   height: 48px;
 }
 .summary-settings .ui-segmented button {
