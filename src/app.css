@@ -1,16 +1,8 @@
 :root {
   color-scheme: dark;
   font-family:
-    Pretendard,
-    "Noto Sans KR",
-    "Noto Sans CJK KR",
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "Malgun Gothic",
-    sans-serif;
+    Pretendard, "Noto Sans KR", "Noto Sans CJK KR", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", sans-serif;
   background: oklch(19.13% 0 0);
   color: oklch(96.01% 0.018 89.72);
   font-synthesis: none;
