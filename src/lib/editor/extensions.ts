@@ -4,6 +4,7 @@ import FontFamily from "@tiptap/extension-font-family";
 import Link from "@tiptap/extension-link";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import { Extension } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import { defaultLanguage } from "#lib/highlighter/catalog.ts";
 import { normalizeQuoteStyle } from "#lib/editor/quote-style.ts";
@@ -14,6 +15,34 @@ import { createCodeBlockHighlightPlugin } from "./code-block-highlight";
 import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
 import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 import { SelectedBlockDecoration } from "./block-inspector";
+
+const DcStarterKit = StarterKit.extend({
+  addExtensions() {
+    return (this.parent?.() ?? []).map((extension) => {
+      if (extension.name !== "trailingNode") return extension;
+      return extension.extend({
+        addProseMirrorPlugins() {
+          return (this.parent?.() ?? []).map(
+            (plugin) =>
+              new Plugin({
+                ...plugin.spec,
+                appendTransaction(transactions, oldState, state) {
+                  // Preference history steps change settings without editing the document.
+                  // Keep the insertion paragraph for content changes and intentional editor focus.
+                  if (oldState.doc.eq(state.doc) && !transactions.some((tr) => tr.getMeta("focus")))
+                    return null;
+                  return (
+                    plugin.spec.appendTransaction?.call(plugin, transactions, oldState, state) ??
+                    null
+                  );
+                },
+              }),
+          );
+        },
+      });
+    });
+  },
+});
 
 const DcCodeBlock = CodeBlock.extend({
   addProseMirrorPlugins() {
@@ -88,7 +117,7 @@ const QuoteStyleAttributes = Extension.create({
 
 export function createEditorExtensions() {
   return [
-    StarterKit.configure({
+    DcStarterKit.configure({
       codeBlock: false,
       link: false,
     }),

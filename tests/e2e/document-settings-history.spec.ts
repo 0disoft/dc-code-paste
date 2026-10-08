@@ -1,5 +1,41 @@
 import { expect, test } from "@playwright/test";
 
+test("keeps the saved document unchanged when adjusting settings before editing", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("dc-code-paste:draft:v1")))
+    .not.toBeNull();
+  const original = await page.evaluate(
+    () => JSON.parse(localStorage.getItem("dc-code-paste:draft:v1")!).document,
+  );
+  await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+  await page.getByLabel("본문 글꼴", { exact: true }).selectOption("Georgia");
+  await page.getByLabel("본문 글자 크기", { exact: true }).selectOption("20px");
+  await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("darkEditorial");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => JSON.parse(localStorage.getItem("dc-code-paste:draft:v1")!).preferences.documentTheme,
+      ),
+    )
+    .toBe("darkEditorial");
+  expect(
+    await page.evaluate(() => JSON.parse(localStorage.getItem("dc-code-paste:draft:v1")!).document),
+  ).toEqual(original);
+  const editor = page.locator(".article-editor");
+  await editor.press("Control+End");
+  await expect(editor.locator(":scope > *")).toHaveCount(original.content.length + 1);
+  const lastBlock = editor.locator(":scope > :last-child");
+  await expect(lastBlock).toHaveJSProperty("nodeName", "P");
+  await editor.press("Control+End");
+  await expect(editor.locator(":scope > *")).toHaveCount(original.content.length + 1);
+  await page.keyboard.insertText("마지막 블록 다음의 새 문단");
+  await expect(lastBlock).toHaveText("마지막 블록 다음의 새 문단");
+});
+
 for (const mobile of [false, true]) {
   test(`undoes article settings separately without changing text on ${mobile ? "mobile" : "desktop"}`, async ({
     page,
