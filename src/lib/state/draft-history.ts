@@ -89,7 +89,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
     }, 1300);
   }
 
-  function save({ automatic }: { automatic: boolean }) {
+  function save({ automatic, force = false }: { automatic: boolean; force?: boolean }) {
     if (disposed) return false;
     const storage = options.getStorage();
     if (!storage) {
@@ -99,7 +99,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
 
     const value = current();
     const fingerprint = draftHistoryFingerprint(value.document, value.preferences);
-    if (automatic && fingerprint === lastFingerprint) return false;
+    if (automatic && !force && fingerprint === lastFingerprint) return false;
 
     const snapshot = createDraftHistorySnapshot(value.document, value.preferences);
     const history = appendDraftHistorySnapshot(storage, snapshot);
@@ -116,7 +116,14 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
   }
 
   function checkpointBeforeReplacement() {
-    return currentFingerprint() === lastFingerprint || save({ automatic: true });
+    if (disposed) return false;
+    const fingerprint = currentFingerprint();
+    // A loaded baseline may never have been saved, or its recovery point may have been deleted.
+    const hasRecoveryPoint = refresh().some(
+      (snapshot) =>
+        draftHistoryFingerprint(snapshot.document, snapshot.preferences) === fingerprint,
+    );
+    return hasRecoveryPoint || save({ automatic: true, force: true });
   }
 
   function maybeSaveAutomatic() {

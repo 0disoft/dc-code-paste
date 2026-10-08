@@ -110,6 +110,54 @@ describe("draft history lifecycle", () => {
     expect(history()).toHaveLength(1);
   });
 
+  it("checkpoints a newly loaded baseline before replacing it again", () => {
+    const { controller, history, edit } = harness();
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    edit("loaded draft");
+    controller.markBaseline();
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(history()).toHaveLength(2);
+    expect(history()[0]?.document).toEqual(document("loaded draft"));
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(history()).toHaveLength(2);
+  });
+
+  it("recreates a recovery point when the matching saved draft was removed", () => {
+    const { controller, history } = harness();
+    expect(controller.save({ automatic: false })).toBe(true);
+    expect(controller.remove(history()[0]!.id)).toBe(true);
+    expect(history()).toHaveLength(0);
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(history()).toHaveLength(1);
+    expect(history()[0]?.document).toEqual(document("first"));
+  });
+
+  it("refuses replacement if an unsaved baseline cannot be checkpointed", () => {
+    const { controller, storage, states, edit, current } = harness();
+    expect(controller.save({ automatic: false })).toBe(true);
+    const original = controller.refresh()[0]!;
+    edit("loaded draft");
+    controller.markBaseline();
+    vi.spyOn(storage, "setItem").mockImplementation(() => {
+      throw new Error("storage full");
+    });
+    expect(controller.restore(original)).toBe(false);
+    expect(current().document).toEqual(document("loaded draft"));
+    expect(states.at(-1)).toBe("error");
+    controller.dispose();
+  });
+
+  it("checks stored recovery points after another tab clears the history", () => {
+    const { controller, history, storage } = harness();
+    expect(controller.save({ automatic: false })).toBe(true);
+    storage.removeItem(draftHistoryStorageKey);
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(JSON.parse(storage.getItem(draftHistoryStorageKey) ?? "")).toHaveLength(1);
+    expect(history()[0]?.document).toEqual(document("first"));
+    controller.dispose();
+    expect(controller.checkpointBeforeReplacement()).toBe(false);
+  });
+
   it("keeps a later error from being reset by an old saved-state timer", () => {
     const { controller, states } = harness();
     expect(controller.save({ automatic: false })).toBe(true);
