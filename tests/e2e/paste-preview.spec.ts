@@ -94,6 +94,15 @@ test("applies code and edits its filename through the contextual inspector", asy
     .dblclick({ position: { x: 40, y: 12 } });
   await expect(page.getByLabel("코드 파일명", { exact: true })).toBeFocused();
   await page.locator("details > summary").filter({ hasText: "글자 서식" }).click();
+  await expect(
+    page
+      .locator("details")
+      .filter({ has: page.locator("summary").filter({ hasText: "글자 서식" }) }),
+  ).toHaveAttribute("open", "");
+  await page.locator("details > summary").filter({ hasText: "글자 서식" }).click();
+  await page.getByLabel("코드 파일명", { exact: true }).fill("article-updated.py");
+  await page.locator("details > summary").filter({ hasText: "글자 서식" }).click();
+  await expect(editor.locator('pre[data-filename="article-updated.py"]')).toHaveCount(1);
   await page.getByRole("button", { name: "코드블록 해제", exact: true }).click();
   await expect(editor.locator("pre")).toHaveCount(initialCount);
 });

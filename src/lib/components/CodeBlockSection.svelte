@@ -30,6 +30,7 @@
 
     function applyOnEnter(event: KeyboardEvent, apply: () => void) {
         if (event.key !== "Enter" || isComposingKeyEvent(event)) return;
+        event.preventDefault();
         apply();
     }
 </script>
@@ -64,7 +65,7 @@
             bind:value={workspace.codeFilename}
             aria-label="코드 파일명"
             placeholder="main.cpp"
-            onblur={workspace.applyCodeFilename}
+            onblur={() => workspace.applyCodeFilename(false)}
             onkeydown={(event) => applyOnEnter(event, workspace.applyCodeFilename)}
         />
     </label>
@@ -87,7 +88,7 @@
                 aria-invalid={workspace.codeLineHighlightsInvalid}
                 aria-describedby={highlightRangesInvalid ? "code-line-range-help" : undefined}
                 placeholder="2,4-6"
-                onblur={workspace.applyCodeLineHighlights}
+                onblur={() => workspace.applyCodeLineHighlights(false)}
                 onkeydown={(event) => applyOnEnter(event, workspace.applyCodeLineHighlights)}
             />
         </label>
@@ -103,7 +104,7 @@
                 aria-invalid={workspace.codeAdditionLinesInvalid}
                 aria-describedby={highlightRangesInvalid ? "code-line-range-help" : undefined}
                 placeholder="2,4-6"
-                onblur={workspace.applyCodeAdditionLines}
+                onblur={() => workspace.applyCodeAdditionLines(false)}
                 onkeydown={(event) => applyOnEnter(event, workspace.applyCodeAdditionLines)}
             />
         </label>
@@ -119,7 +120,7 @@
                 aria-invalid={workspace.codeDeletionLinesInvalid}
                 aria-describedby={highlightRangesInvalid ? "code-line-range-help" : undefined}
                 placeholder="2,4-6"
-                onblur={workspace.applyCodeDeletionLines}
+                onblur={() => workspace.applyCodeDeletionLines(false)}
                 onkeydown={(event) => applyOnEnter(event, workspace.applyCodeDeletionLines)}
             />
         </label>

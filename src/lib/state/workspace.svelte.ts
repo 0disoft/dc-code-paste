@@ -1550,15 +1550,13 @@ export function createWorkspaceState() {
     });
   }
 
-  function applyCodeFilename() {
+  function applyCodeFilename(focusEditor = true) {
     const filename = normalizeCodeFilename(codeFilename);
     codeFilename = filename;
-    runEditorCommand((current) =>
-      current.chain().focus().updateAttributes("codeBlock", { filename }).run(),
-    );
+    editorCommands.updateCodeBlockAttributes({ filename }, focusEditor);
   }
 
-  function applyCodeLineHighlights() {
+  function applyCodeLineHighlights(focusEditor = true) {
     if (codeLineHighlightsInvalid) {
       return;
     }
@@ -1572,12 +1570,10 @@ export function createWorkspaceState() {
       "highlightLines",
     );
     syncCodeLineMarkerDrafts(markerAttrs);
-    runEditorCommand((current) =>
-      current.chain().focus().updateAttributes("codeBlock", markerAttrs).run(),
-    );
+    editorCommands.updateCodeBlockAttributes(markerAttrs, focusEditor);
   }
 
-  function applyCodeAdditionLines() {
+  function applyCodeAdditionLines(focusEditor = true) {
     if (codeAdditionLinesInvalid) {
       return;
     }
@@ -1591,12 +1587,10 @@ export function createWorkspaceState() {
       "additionLines",
     );
     syncCodeLineMarkerDrafts(markerAttrs);
-    runEditorCommand((current) =>
-      current.chain().focus().updateAttributes("codeBlock", markerAttrs).run(),
-    );
+    editorCommands.updateCodeBlockAttributes(markerAttrs, focusEditor);
   }
 
-  function applyCodeDeletionLines() {
+  function applyCodeDeletionLines(focusEditor = true) {
     if (codeDeletionLinesInvalid) {
       return;
     }
@@ -1610,9 +1604,7 @@ export function createWorkspaceState() {
       "deletionLines",
     );
     syncCodeLineMarkerDrafts(markerAttrs);
-    runEditorCommand((current) =>
-      current.chain().focus().updateAttributes("codeBlock", markerAttrs).run(),
-    );
+    editorCommands.updateCodeBlockAttributes(markerAttrs, focusEditor);
   }
 
   function syncCodeLineMarkerDrafts(attrs: Record<CodeLineMarker, string>) {

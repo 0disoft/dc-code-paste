@@ -392,6 +392,23 @@ export function createEditorCommandAdapter(options: {
     run((current) => current.chain().focus().setColor(color).run());
   }
 
+  function updateCodeBlockAttributes(attrs: Record<string, unknown>, focusEditor = true) {
+    run((current) => {
+      const previous = current.getAttributes("codeBlock");
+      if (Object.entries(attrs).every(([key, value]) => previous[key] === value)) {
+        return focusEditor ? current.commands.focus() : true;
+      }
+      const selection = current.state.selection;
+      const chain = current.chain();
+      if (focusEditor) chain.focus();
+      chain.updateAttributes("codeBlock", attrs);
+      // Replacing node markup maps a node selection to a text selection.
+      // Keep the inspector stable while a pointer click is still in progress.
+      if (selection instanceof NodeSelection) chain.setNodeSelection(selection.from);
+      return chain.run();
+    });
+  }
+
   function setFontSize(value: string) {
     run((current) =>
       value
@@ -441,6 +458,7 @@ export function createEditorCommandAdapter(options: {
     setLink,
     unsetLink,
     setTextColor,
+    updateCodeBlockAttributes,
     setFontSize,
   };
 }
