@@ -51,6 +51,89 @@ function textOfTestDocument(node: JSONContent): string {
 }
 
 describe("exportDocumentToDcHtml", () => {
+  it("keeps table captions and merged cells in exported HTML", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "dcDataTable",
+          content: [
+            { type: "dcDataTableCaption", content: [{ type: "text", text: "<수입>" }] },
+            {
+              type: "dcDataTableRow",
+              content: [
+                {
+                  type: "dcDataTableCell",
+                  attrs: { header: true, colspan: 2 },
+                  content: [{ type: "text", text: "금액" }],
+                },
+              ],
+            },
+            {
+              type: "dcDataTableRow",
+              content: [
+                {
+                  type: "dcDataTableCell",
+                  attrs: { rowspan: 2 },
+                  content: [{ type: "text", text: "분기" }],
+                },
+                {
+                  type: "dcDataTableCell",
+                  content: [
+                    { type: "text", text: "100" },
+                    { type: "hardBreak" },
+                    { type: "text", text: "만원" },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "dcDataTableRow",
+              content: [{ type: "dcDataTableCell", content: [{ type: "text", text: "150" }] }],
+            },
+          ],
+        },
+      ],
+    };
+    const html = await exportDocumentToDcHtml(document, exportOptions);
+    expect(html).toContain("<caption>&lt;수입&gt;</caption>");
+    expect(html).toContain('<th colspan="2"');
+    expect(html).toContain('<td rowspan="2"');
+    expect(html).toContain("100<br>만원");
+    expect(html).toMatch(/^<table[^>]*role=none/);
+    expect(html).toMatch(/<table[^>]*><caption>/);
+    const tableBody = /<caption>.*?<\/caption><tbody>([\s\S]*?)<\/tbody>/.exec(html)?.[1];
+    expect(tableBody?.match(/<tr>/g)).toHaveLength(3);
+  });
+
+  it("rejects invalid cell spans from imported draft data", async () => {
+    const html = await exportDocumentToDcHtml(
+      {
+        type: "doc",
+        content: [
+          {
+            type: "dcDataTable",
+            content: [
+              {
+                type: "dcDataTableRow",
+                content: [
+                  {
+                    type: "dcDataTableCell",
+                    attrs: { colspan: '2" onclick="alert(1)', rowspan: -5 },
+                    content: [{ type: "text", text: "본문" }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      exportOptions,
+    );
+    expect(html).toContain("본문");
+    expect(html).not.toMatch(/colspan=|rowspan=|onclick=|alert\(/);
+  });
+
   it("exports clean editorial headlines and blue summaries as compatible inline HTML", async () => {
     const document: JSONContent = {
       type: "doc",
@@ -1571,9 +1654,7 @@ describe("exportDocumentToDcHtml", () => {
       structure: "dcTable",
     });
 
-    expect(html).toMatch(
-      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff"/,
-    );
+    expect(html).toMatch(/^<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff"/);
     expect(html).toContain("<tbody><tr><td");
     expect(html).toContain('bgcolor="#e6fbe4"');
     expect(html).toContain('bgcolor="#e5f6ff"');
@@ -1631,9 +1712,7 @@ describe("exportDocumentToDcHtml", () => {
       structure: "dcTable",
     });
 
-    expect(html).toMatch(
-      /^<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#151515"/,
-    );
+    expect(html).toMatch(/^<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#151515"/);
     expect(html).toMatch(/background-color:#[0-9a-f]{6}/);
     expect(html).toMatch(/color:#[0-9a-f]{6}/);
     expect(html).toContain("만물큐레이션");

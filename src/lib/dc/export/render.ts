@@ -10,6 +10,7 @@ import { normalizeCtaGroupLayout, type CtaGroupLayout } from "#lib/editor/cta-gr
 import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts";
 import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
+import { normalizeTableSpan } from "#lib/editor/data-table.ts";
 import {
   normalizeBlockAppearance,
   summaryToneColors,
@@ -53,6 +54,7 @@ export const dcExportSupportedNodeTypes = new Set([
   "linkBox",
   "dcDataTable",
   "dcDataTableRow",
+  "dcDataTableCaption",
   "dcDataTableCell",
   "tipBox",
   "warningBox",
@@ -561,7 +563,7 @@ function renderAttributionFooter(options: DcExportOptions): string {
     "text-decoration": "none",
   });
 
-  return `<table width="100%" style="${tableStyle}"><tbody><tr><td align="right" style="${cellStyle}"><a href="${attributionHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${attributionText}</a></td></tr></tbody></table>`;
+  return `<table width="100%" role=none style="${tableStyle}"><tbody><tr><td align="right" style="${cellStyle}"><a href="${attributionHref}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${attributionText}</a></td></tr></tbody></table>`;
 }
 
 function renderDcTableBlock({
@@ -601,7 +603,7 @@ function renderDcTableBlock({
     "font-size": safeBodyFontSize(options),
   });
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${fallbackBackground}" role=none style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
 }
 
 function renderDcProseCellBlock({
@@ -635,7 +637,7 @@ function renderDcProseCellBlock({
     "line-height": lineHeight,
   });
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" role=none style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${body}</td></tr></tbody></table>`;
 }
 
 function safeHref(value: unknown): string | undefined {
@@ -920,7 +922,7 @@ async function renderList(
     }),
   );
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" role=none style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
 }
 
 async function renderListItemBody(
@@ -961,6 +963,7 @@ function renderDataTable(node: JSONContent, options: DcExportOptions): string {
     "line-height": 1.62,
   });
   const rows = childrenOf(node)
+    .filter((row) => row.type === "dcDataTableRow")
     .map((row) => {
       const cells = childrenOf(row)
         .map((cell) => {
@@ -987,7 +990,10 @@ function renderDataTable(node: JSONContent, options: DcExportOptions): string {
             inlineCodeText: palette.inlineCodeText,
           });
 
-          return `<${tag} style="${cellStyle}">${body || "&nbsp;"}</${tag}>`;
+          const colspan = normalizeTableSpan(cell.attrs?.colspan);
+          const rowspan = normalizeTableSpan(cell.attrs?.rowspan);
+          const spans = `${colspan > 1 ? ` colspan="${colspan}"` : ""}${rowspan > 1 ? ` rowspan="${rowspan}"` : ""}`;
+          return `<${tag}${spans} style="${cellStyle}">${body || "&nbsp;"}</${tag}>`;
         })
         .join("");
 
@@ -996,8 +1002,12 @@ function renderDataTable(node: JSONContent, options: DcExportOptions): string {
     .filter(Boolean)
     .join("");
 
+  const captionNode = childrenOf(node).find((child) => child.type === "dcDataTableCaption");
+  const caption = captionNode
+    ? `<caption>${renderInlineChildren(captionNode, options, { text: palette.text, background: palette.articleBackground })}</caption>`
+    : "";
   return rows
-    ? `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`
+    ? `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}">${caption}<tbody>${rows}</tbody></table>`
     : "";
 }
 
@@ -1375,7 +1385,7 @@ function renderCtaGroupTable(
       )
       .join("");
 
-    return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`;
+    return `<table cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody>${rows}</tbody></table>`;
   }
 
   const cells = buttons
@@ -1385,7 +1395,7 @@ function renderCtaGroupTable(
     )
     .join("");
 
-  return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells}</tr></tbody></table>`;
+  return `<table cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody><tr>${cells}</tr></tbody></table>`;
 }
 
 function referenceListPalette(options: DcExportOptions) {
@@ -1501,7 +1511,7 @@ function renderDcRoundedBadge({
     "white-space": "nowrap",
   });
 
-  return `<table cellpadding="0" cellspacing="0" border="0" bgcolor="${fallbackBackgroundColor}" style="${outerTableStyle}"><tbody><tr><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td><td height="${height}" valign="middle" bgcolor="${fallbackBackgroundColor}" style="${textStyle}"><span style="${spanStyle}">${escapeHtml(text)}</span></td><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td></tr></tbody></table>`;
+  return `<table cellpadding="0" cellspacing="0" bgcolor="${fallbackBackgroundColor}" role=none style="${outerTableStyle}"><tbody><tr><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td><td height="${height}" valign="middle" bgcolor="${fallbackBackgroundColor}" style="${textStyle}"><span style="${spanStyle}">${escapeHtml(text)}</span></td><td width="${sideWidth}" height="${height}" bgcolor="${fallbackBackgroundColor}" style="${sideCellStyle}">&nbsp;</td></tr></tbody></table>`;
 }
 
 async function renderReferenceList(node: JSONContent, options: DcExportOptions): Promise<string> {
@@ -1572,7 +1582,7 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
     })
     .join("");
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows}</tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody>${rows}</tbody></table>`;
 }
 
 function summaryBoxPalette(options: DcExportOptions) {
@@ -1709,7 +1719,7 @@ function renderSummaryBoxTable(
     })
     .join("");
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${labelCellStyle}">${escapeHtml(label)}</td></tr>${rows}</tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody><tr><td style="${labelCellStyle}">${escapeHtml(label)}</td></tr>${rows}</tbody></table>`;
 }
 
 function heroBlockPalette(options: DcExportOptions) {
@@ -1927,7 +1937,7 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
     rows.push(`<tr><td style="${bodyCellStyle}">${body}</td></tr>`);
   }
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody>${rows.join("")}</tbody></table>`;
 }
 
 function tutorialBlockPalette(options: DcExportOptions) {
@@ -2109,7 +2119,7 @@ async function renderTutorialBlockTable(
         : "";
       const titleHtml = title ? `<strong style="${titleStyle}">${title}</strong>` : "&nbsp;";
 
-      return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.cardFallbackBackground}" style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}">${badge}</td><td style="${headCellStyle}">${titleHtml}</td></tr>${bodyRow}</tbody></table>`;
+      return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.cardFallbackBackground}" role=none style="${cardTableStyle}"><tbody><tr><td style="${numberCellStyle}">${badge}</td><td style="${headCellStyle}">${titleHtml}</td></tr>${bodyRow}</tbody></table>`;
     }),
   );
 
@@ -2226,7 +2236,7 @@ async function renderComparisonBlockTable(
     }),
   );
 
-  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr>${cells[0]}<td width="2%" bgcolor="${palette.spacerFallbackBackground}" style="${spacerCellStyle}">&nbsp;</td>${cells[1]}</tr></tbody></table>`;
+  return `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody><tr>${cells[0]}<td width="2%" bgcolor="${palette.spacerFallbackBackground}" style="${spacerCellStyle}">&nbsp;</td>${cells[1]}</tr></tbody></table>`;
 }
 
 async function renderBlockAsync(
@@ -2333,7 +2343,7 @@ async function exportDocumentWithBlockCache(
   });
 
   return compactInheritedProseStyles(
-    `<table width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${palette.fallbackBackground}" style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${bodyWithAttribution}</td></tr></tbody></table>`,
+    `<table width="100%" cellpadding="0" cellspacing="0" bgcolor="${palette.fallbackBackground}" role=none style="${tableStyle}"><tbody><tr><td style="${cellStyle}">${bodyWithAttribution}</td></tr></tbody></table>`,
     options,
   );
 }

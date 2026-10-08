@@ -4,6 +4,7 @@ import { normalizeEditableLinkHref } from "./link";
 import { defaultSummaryBoxLabel } from "./summary-box";
 import { normalizeTutorialStepNumber } from "./tutorial-block";
 import { normalizeBlockAppearance } from "./block-appearance";
+import { isPastedDataTable, normalizeTableSpan, parsePastedDataTable } from "./data-table";
 
 export const SectionHeading = Node.create({
   name: "sectionHeading",
@@ -448,6 +449,22 @@ export const DcDataTableCell = Node.create({
           element.tagName.toLowerCase() === "th" || element.getAttribute("data-header") === "true",
         renderHTML: (attributes) => (attributes.header ? { "data-header": "true" } : {}),
       },
+      colspan: {
+        default: 1,
+        parseHTML: (element) => normalizeTableSpan(element.getAttribute("colspan")),
+        renderHTML: (attributes) =>
+          normalizeTableSpan(attributes.colspan) > 1
+            ? { colspan: normalizeTableSpan(attributes.colspan) }
+            : {},
+      },
+      rowspan: {
+        default: 1,
+        parseHTML: (element) => normalizeTableSpan(element.getAttribute("rowspan")),
+        renderHTML: (attributes) =>
+          normalizeTableSpan(attributes.rowspan) > 1
+            ? { rowspan: normalizeTableSpan(attributes.rowspan) }
+            : {},
+      },
     };
   },
 
@@ -490,14 +507,35 @@ export const DcDataTableRow = Node.create({
   },
 });
 
-export const DcDataTable = Node.create({
-  name: "dcDataTable",
-  group: "block",
-  content: "dcDataTableRow+",
+export const DcDataTableCaption = Node.create({
+  name: "dcDataTableCaption",
+  content: "inline*",
   defining: true,
 
   parseHTML() {
-    return [{ tag: "table[data-dc-data-table]" }];
+    return [{ tag: "caption[data-dc-table-caption]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["caption", mergeAttributes(HTMLAttributes, { "data-dc-table-caption": "" }), 0];
+  },
+});
+
+export const DcDataTable = Node.create({
+  name: "dcDataTable",
+  group: "block",
+  content: "dcDataTableCaption? dcDataTableRow+",
+  defining: true,
+
+  parseHTML() {
+    return [
+      { tag: "table[data-dc-data-table]" },
+      {
+        tag: "table",
+        getAttrs: (element) => (isPastedDataTable(element) ? {} : false),
+        getContent: (element, schema) => parsePastedDataTable(element as HTMLElement, schema),
+      },
+    ];
   },
 
   renderHTML({ HTMLAttributes }) {
@@ -507,7 +545,7 @@ export const DcDataTable = Node.create({
         "data-dc-data-table": "",
         class: "dc-data-table",
       }),
-      ["tbody", 0],
+      0,
     ];
   },
 });
@@ -527,5 +565,6 @@ export const editorialExtensions = [
   ComparisonBlock,
   DcDataTableCell,
   DcDataTableRow,
+  DcDataTableCaption,
   DcDataTable,
 ];

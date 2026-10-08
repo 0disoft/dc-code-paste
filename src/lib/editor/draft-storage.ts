@@ -73,6 +73,7 @@ const draftNodeTypes = new Set([
   "linkBox",
   "dcDataTable",
   "dcDataTableRow",
+  "dcDataTableCaption",
   "dcDataTableCell",
   "tipBox",
   "warningBox",
