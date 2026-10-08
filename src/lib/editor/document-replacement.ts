@@ -46,6 +46,19 @@ export class DocumentPreferencesStep extends Step {
 
 Step.jsonID(preferencesStepId, DocumentPreferencesStep);
 
+export function recordDocumentPreferencesChange(
+  editor: Editor,
+  before: DraftPreferences,
+  after: DraftPreferences,
+) {
+  if (JSON.stringify(before) === JSON.stringify(after)) return false;
+  editor.view.dispatch(
+    closeHistory(editor.state.tr.step(new DocumentPreferencesStep(before, after))),
+  );
+  editor.view.dispatch(closeHistory(editor.state.tr));
+  return true;
+}
+
 export function replaceDocumentWithPreferences(
   editor: Editor,
   document: JSONContent,

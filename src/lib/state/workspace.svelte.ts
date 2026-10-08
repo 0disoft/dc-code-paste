@@ -47,6 +47,7 @@ import {
 import { createDraftFile, readDraftFile } from "#lib/editor/draft-file.ts";
 import {
   DocumentPreferencesStep,
+  recordDocumentPreferencesChange,
   replaceDocumentWithPreferences,
 } from "#lib/editor/document-replacement.ts";
 import { sampleDocument } from "#lib/editor/sample-document.ts";
@@ -838,6 +839,25 @@ export function createWorkspaceState() {
       : defaultCodeFontSize;
     showLineNumbers = preferences.showLineNumbers;
     documentTheme = preferences.documentTheme;
+  }
+
+  function changeDocumentPreferences(
+    changes: Partial<
+      Pick<
+        DraftPreferences,
+        | "bodyFontFamily"
+        | "bodyFontSize"
+        | "documentTheme"
+        | "theme"
+        | "codeFontSize"
+        | "showLineNumbers"
+      >
+    >,
+  ) {
+    const before = cloneDraftPreferences(currentDraftPreferences());
+    const after = { ...before, ...changes };
+    if (editor) recordDocumentPreferencesChange(editor, before, after);
+    else applyDraftPreferences(after);
   }
 
   function firstCodeBlockLanguage(value: JSONContent): DcLanguageId | undefined {
@@ -2946,13 +2966,13 @@ export function createWorkspaceState() {
       return theme;
     },
     set theme(value) {
-      theme = value;
+      changeDocumentPreferences({ theme: value });
     },
     get bodyFontSize() {
       return bodyFontSize;
     },
     set bodyFontSize(value) {
-      bodyFontSize = value;
+      changeDocumentPreferences({ bodyFontSize: value });
     },
     get selectionFontSize() {
       return selectionFontSize;
@@ -2988,7 +3008,7 @@ export function createWorkspaceState() {
       return codeFontSize;
     },
     set codeFontSize(value) {
-      codeFontSize = value;
+      changeDocumentPreferences({ codeFontSize: value });
     },
     get codeLineHighlights() {
       return codeLineHighlights;
@@ -3018,13 +3038,13 @@ export function createWorkspaceState() {
       return showLineNumbers;
     },
     set showLineNumbers(value) {
-      showLineNumbers = value;
+      changeDocumentPreferences({ showLineNumbers: value });
     },
     get documentTheme() {
       return documentTheme;
     },
     set documentTheme(value) {
-      documentTheme = value;
+      changeDocumentPreferences({ documentTheme: value });
     },
     get html() {
       return html;
@@ -3476,7 +3496,7 @@ export function createWorkspaceState() {
       return bodyFontFamily;
     },
     set bodyFontFamily(value) {
-      bodyFontFamily = value;
+      changeDocumentPreferences({ bodyFontFamily: value });
     },
     get selectionFontFamily() {
       return selectionFontFamily;
