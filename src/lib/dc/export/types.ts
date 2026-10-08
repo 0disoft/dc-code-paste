@@ -1,7 +1,7 @@
 import type { DcThemeId } from "#lib/highlighter/catalog.ts";
 
 export type DcExportStructure = "dcTable";
-export type DcDocumentTheme = "lightLecture" | "darkEditorial";
+export type DcDocumentTheme = "lightLecture" | "darkEditorial" | "cleanEditorial";
 
 export type DcExportOptions = {
   theme: DcThemeId;

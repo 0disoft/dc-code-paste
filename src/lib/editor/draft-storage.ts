@@ -154,7 +154,7 @@ function isJsonContent(
 }
 
 function isDocumentTheme(value: unknown): value is DcDocumentTheme {
-  return value === "lightLecture" || value === "darkEditorial";
+  return value === "lightLecture" || value === "darkEditorial" || value === "cleanEditorial";
 }
 
 function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined {

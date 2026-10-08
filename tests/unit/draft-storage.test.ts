@@ -66,6 +66,14 @@ const throwingStorage = {
 };
 
 describe("draft storage", () => {
+  it("round-trips the clean editorial theme while preserving legacy themes", () => {
+    for (const documentTheme of ["cleanEditorial", "lightLecture", "darkEditorial"] as const) {
+      const snapshot = createDraftSnapshot(sampleDocument, { ...preferences, documentTheme });
+      expect(parseDraftSnapshot(JSON.stringify(snapshot))?.preferences.documentTheme).toBe(
+        documentTheme,
+      );
+    }
+  });
   it("round-trips a validated draft snapshot", () => {
     const storage = new MemoryStorage();
     const snapshot = createDraftSnapshot(sampleDocument, preferences);

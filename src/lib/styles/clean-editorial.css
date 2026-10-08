@@ -1,0 +1,105 @@
+.editor-surface-clean {
+  padding-top: 24px;
+}
+
+.editor-surface-clean .article-editor .dc-hero-block {
+  padding: 30px 0 18px;
+  border: 0;
+  border-top: 3px solid #315dfb;
+  border-bottom: 1px solid #8fa5df;
+  background: #ffffff;
+  color: #18181b;
+}
+
+.editor-surface-clean .article-editor .dc-hero-label {
+  margin-bottom: 14px;
+  color: #263f9a;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.editor-surface-clean .article-editor .dc-hero-body h1 {
+  margin-bottom: 12px;
+  color: #18181b;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: -0.035em;
+}
+
+.editor-surface-clean .article-editor .dc-hero-body p {
+  color: #475569;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.62;
+}
+
+.editor-surface-clean .article-editor .dc-section-heading {
+  padding: 0;
+  border: 0;
+  color: #18181b;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.editor-surface-clean .article-editor .dc-summary-box {
+  border-color: #c7d2fe;
+  border-top-width: 1px;
+  background: #eef2ff;
+  color: #222222;
+}
+
+.editor-surface-clean .article-editor .dc-summary-box::before {
+  color: #263f9a;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.editor-surface-clean .article-editor .dc-summary-item {
+  font-size: max(14px, calc(var(--editor-body-font-size, 18px) - 2px));
+}
+
+.editor-surface-clean .article-editor .dc-summary-item::before {
+  background: #315dfb;
+}
+
+.editor-surface-clean .article-editor pre {
+  border-color: #dce1eb;
+  background: #f6f8fa;
+  color: #24292e;
+  box-shadow: none;
+}
+
+.editor-surface-clean .article-editor pre.dc-editor-code[data-filename]::before {
+  border-color: #dce1eb;
+  background: #f6f8fa;
+  color: #64748b;
+}
+
+.editor-surface-clean .article-editor .dc-code-token-keyword {
+  color: #0000ff;
+}
+.editor-surface-clean .article-editor .dc-code-token-string {
+  color: #008000;
+}
+.editor-surface-clean .article-editor .dc-code-token-comment {
+  color: #64748b;
+}
+.editor-surface-clean .article-editor .dc-code-token-number {
+  color: #0550ae;
+}
+.editor-surface-clean .article-editor .dc-code-token-function {
+  color: #24292e;
+}
+
+@media (max-width: 600px) {
+  .editor-surface-clean .article-editor .dc-hero-body h1 {
+    font-size: 30px;
+  }
+  .editor-surface-clean .article-editor .dc-hero-body p {
+    font-size: 18px;
+  }
+  .editor-surface-clean .article-editor .dc-section-heading {
+    font-size: 22px;
+  }
+}

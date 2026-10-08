@@ -122,7 +122,7 @@ type RenderContext = {
 };
 
 function normalizeDocumentTheme(value: DcDocumentTheme | undefined): DcDocumentTheme {
-  return value === "darkEditorial" ? "darkEditorial" : "lightLecture";
+  return value === "darkEditorial" || value === "cleanEditorial" ? value : "lightLecture";
 }
 
 function documentPalette(options: DcExportOptions): DocumentPalette {
@@ -1278,6 +1278,7 @@ function renderQuoteContent(
 }
 
 async function renderSectionHeading(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const clean = options.documentTheme === "cleanEditorial";
   const palette = documentPalette(options);
   const content = renderInlineChildren(node, options, {
     text: palette.sectionText,
@@ -1286,7 +1287,7 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
   const body = `<strong style="${joinStyle({
     color: palette.sectionText,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": "20px",
+    "font-size": clean ? "26px" : "20px",
     "font-weight": 700,
     "line-height": 1.35,
   })}">${content || "&nbsp;"}</strong>`;
@@ -1296,8 +1297,8 @@ async function renderSectionHeading(node: JSONContent, options: DcExportOptions)
     options,
     backgroundColor: palette.articleBackground,
     fallbackBackground: palette.fallbackBackground,
-    borderColor: palette.sectionAccent,
-    padding: "4px 0 4px 14px",
+    borderColor: clean ? undefined : palette.sectionAccent,
+    padding: clean ? "4px 0" : "4px 0 4px 14px",
   });
 }
 
@@ -1574,6 +1575,17 @@ function renderReferenceListTable(items: JSONContent[], options: DcExportOptions
 }
 
 function summaryBoxPalette(options: DcExportOptions) {
+  if (options.documentTheme === "cleanEditorial") {
+    const tone = summaryToneColors.blue;
+    return {
+      ...tone,
+      fallbackBackground: tone.background,
+      text: "#222222",
+      mutedText: "#475569",
+      bulletBackground: tone.accent,
+      bulletText: "#ffffff",
+    };
+  }
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
       background: dcDarkPanelBackground,
@@ -1630,6 +1642,10 @@ function renderSummaryBoxTable(
   label: string,
   attrs: Record<string, unknown> = {},
 ): string {
+  const clean = options.documentTheme === "cleanEditorial";
+  const itemFontSize = clean
+    ? `${Math.max(14, Number.parseInt(safeBodyFontSize(options)) - 2)}px`
+    : safeBodyFontSize(options);
   const appearance = normalizeBlockAppearance(attrs);
   const palette = summaryBoxPalette(options);
   if (attrs.tone) {
@@ -1647,14 +1663,14 @@ function renderSummaryBoxTable(
     "border-collapse": "collapse",
     "background-color": palette.background,
     border: `1px solid ${palette.border}`,
-    "border-top": `4px solid ${palette.accent}`,
+    "border-top": clean ? `1px solid ${palette.border}` : `4px solid ${palette.accent}`,
   });
   const labelCellStyle = joinStyle({
     padding: `${spacing.top}px ${spacing.horizontal}px ${spacing.row}px`,
     "text-align": appearance.alignment,
     color: palette.label,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": "12px",
+    "font-size": clean ? "16px" : "12px",
     "font-weight": 700,
     "line-height": 1.2,
   });
@@ -1663,7 +1679,7 @@ function renderSummaryBoxTable(
     "text-align": appearance.alignment,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeBodyFontSize(options),
+    "font-size": itemFontSize,
     "line-height": 1.62,
     "vertical-align": "top",
   });
@@ -1672,7 +1688,7 @@ function renderSummaryBoxTable(
     "text-align": appearance.alignment,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": safeBodyFontSize(options),
+    "font-size": itemFontSize,
     "line-height": 1.62,
     "vertical-align": "top",
   });
@@ -1696,6 +1712,17 @@ function renderSummaryBoxTable(
 }
 
 function heroBlockPalette(options: DcExportOptions) {
+  if (options.documentTheme === "cleanEditorial") {
+    return {
+      background: "#ffffff",
+      fallbackBackground: "#ffffff",
+      border: "#8fa5df",
+      accent: "#315dfb",
+      label: "#263f9a",
+      title: "#18181b",
+      subtitle: "#475569",
+    };
+  }
   if (normalizeDocumentTheme(options.documentTheme) === "darkEditorial") {
     return {
       background: dcDarkPageBackground,
@@ -1806,6 +1833,7 @@ async function renderHeroBodyBlocks(
 }
 
 async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions): Promise<string> {
+  const clean = options.documentTheme === "cleanEditorial";
   const palette = heroBlockPalette(options);
   const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
@@ -1815,8 +1843,9 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
     margin: "0 0 22px",
     "border-collapse": "collapse",
     "background-color": palette.background,
-    border: `1px solid ${palette.border}`,
-    "border-top": `4px solid ${palette.accent}`,
+    border: clean ? "0" : `1px solid ${palette.border}`,
+    "border-top": `${clean ? 3 : 4}px solid ${palette.accent}`,
+    "border-bottom": clean ? `1px solid ${palette.border}` : undefined,
   });
   const cellBaseStyle = {
     "background-color": palette.background,
@@ -1827,37 +1856,43 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
   const labelStyle = joinStyle({
     color: palette.label,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
-    "font-size": "12px",
+    "font-size": clean ? "18px" : "12px",
     "font-weight": 700,
     "line-height": 1.2,
   });
   const titleStyle = joinStyle({
     color: palette.title,
-    "font-size": "28px",
+    "font-size": clean ? "42px" : "28px",
     "font-weight": 700,
     "line-height": 1.22,
   });
   const subtitleStyle = joinStyle({
     color: palette.subtitle,
-    "font-size": safeBodyFontSize(options),
-    "font-weight": 700,
+    "font-size": clean ? "20px" : safeBodyFontSize(options),
+    "font-weight": clean ? 400 : 700,
     "line-height": 1.62,
   });
   const labelCellStyle = joinStyle({
     ...cellBaseStyle,
-    padding: "22px 24px 12px",
+    padding: clean ? "30px 0 14px" : "22px 24px 12px",
   });
   const titleCellStyle = joinStyle({
     ...cellBaseStyle,
-    padding: subtitle ? "0 24px 10px" : "0 24px 22px",
+    padding: clean
+      ? subtitle
+        ? "0 0 12px"
+        : "0 0 18px"
+      : subtitle
+        ? "0 24px 10px"
+        : "0 24px 22px",
   });
   const subtitleCellStyle = joinStyle({
     ...cellBaseStyle,
-    padding: "0 24px 22px",
+    padding: clean ? "0 0 18px" : "0 24px 22px",
   });
   const bodyCellStyle = joinStyle({
     ...cellBaseStyle,
-    padding: "0 24px 22px",
+    padding: clean ? "0 0 18px" : "0 24px 22px",
   });
   const rows = [
     `<tr><td style="${labelCellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span></td></tr>`,

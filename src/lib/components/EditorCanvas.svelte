@@ -60,6 +60,7 @@
         <div
             class="editor-surface"
             class:editor-surface-dark={workspace.documentTheme === "darkEditorial"}
+            class:editor-surface-clean={workspace.documentTheme === "cleanEditorial"}
             style={`--editor-body-font-size:${workspace.bodyFontSize};` +
                 `--editor-code-font-size:${workspace.codeFontSize}`}
             bind:this={workspace.editorHost}

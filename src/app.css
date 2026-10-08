@@ -1,6 +1,7 @@
 @import "./lib/styles/chrome.css";
 @import "./lib/styles/editor-prose.css";
 @import "./lib/styles/dc-blocks.css";
+@import "./lib/styles/clean-editorial.css";
 
 :root {
   color-scheme: light;

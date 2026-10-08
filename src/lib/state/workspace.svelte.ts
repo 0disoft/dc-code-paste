@@ -148,7 +148,7 @@ export function createWorkspaceState() {
 
   const selectionFontFamily = defaultProseFontFamily;
 
-  const defaultBodyFontSize = "17px";
+  const defaultBodyFontSize = "18px";
 
   const defaultCodeFontSize = "15px";
 
@@ -168,11 +168,13 @@ export function createWorkspaceState() {
   const draftPersistDebounceMs = 450;
 
   const documentThemes: { label: string; value: DcDocumentTheme }[] = [
+    { label: "깔끔한 글", value: "cleanEditorial" },
     { label: "밝은 글", value: "lightLecture" },
     { label: "어두운 글", value: "darkEditorial" },
   ];
 
   const editorThemeColorSafety = {
+    cleanEditorial: { background: "#ffffff", fallback: "#222222" },
     lightLecture: {
       background: "oklch(97.12% 0.012 97.41)",
       fallback: "oklch(21.18% 0.012 255.31)",
@@ -244,7 +246,7 @@ export function createWorkspaceState() {
 
   let language = $state<DcLanguageId>(defaultLanguage);
 
-  let theme = $state<DcThemeId>(defaultTheme);
+  let theme = $state<DcThemeId>("github-light");
 
   let bodyFontSize = $state(defaultBodyFontSize);
 
@@ -270,7 +272,7 @@ export function createWorkspaceState() {
 
   let showLineNumbers = $state(false);
 
-  let documentTheme = $state<DcDocumentTheme>("lightLecture");
+  let documentTheme = $state<DcDocumentTheme>("cleanEditorial");
 
   let html = $state("");
   let previewVisible = $state(false);
@@ -665,14 +667,14 @@ export function createWorkspaceState() {
   function defaultDraftPreferences(): DraftPreferences {
     return {
       language: defaultLanguage,
-      theme: defaultTheme,
+      theme: "github-light",
       bodyFontFamily,
       bodyFontSize: defaultBodyFontSize,
       selectionFontFamily,
       selectionFontSize: defaultBodyFontSize,
       codeFontSize: defaultCodeFontSize,
       showLineNumbers: false,
-      documentTheme: "lightLecture",
+      documentTheme: "cleanEditorial",
       structure: defaultDcExportStructure,
     };
   }
@@ -794,7 +796,8 @@ export function createWorkspaceState() {
 
   function draftHistorySummary(snapshot: DraftHistorySnapshot) {
     const themeLabel =
-      snapshot.preferences.documentTheme === "darkEditorial" ? "어두운 글" : "밝은 글";
+      documentThemes.find((item) => item.value === snapshot.preferences.documentTheme)?.label ??
+      "밝은 글";
     const textLength = countDocumentText(snapshot.document).toLocaleString();
 
     return `${themeLabel} · ${languageLabel(snapshot.preferences.language)} · ${textLength}자`;

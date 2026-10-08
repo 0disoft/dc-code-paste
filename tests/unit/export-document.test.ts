@@ -51,6 +51,41 @@ function textOfTestDocument(node: JSONContent): string {
 }
 
 describe("exportDocumentToDcHtml", () => {
+  it("exports clean editorial headlines and blue summaries as compatible inline HTML", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "heroBlock",
+          attrs: { label: "생각을 정리하는 글" },
+          content: [
+            {
+              type: "heading",
+              attrs: { level: 1 },
+              content: [{ type: "text", text: "새로운 글" }],
+            },
+            { type: "paragraph", content: [{ type: "text", text: "부제목" }] },
+          ],
+        },
+        {
+          type: "summaryBox",
+          content: [{ type: "summaryItem", content: [{ type: "text", text: "핵심 내용" }] }],
+        },
+      ],
+    };
+    const html = await exportDocumentToDcHtml(document, {
+      ...exportOptions,
+      documentTheme: "cleanEditorial",
+      bodyFontSize: "18px",
+    });
+    expect(html).toContain('bgcolor="#ffffff"');
+    expect(html).toContain('bgcolor="#eef2ff"');
+    expect(html).toContain("border-top:3px solid #315dfb");
+    expect(html).toContain("font-size:42px");
+    expect(html).toContain("font-size:16px");
+    expect(html).not.toContain("#fbf6e6");
+    expect(html).not.toMatch(/\sclass=|\sdata-[\w-]+=/);
+  });
   it("normalizes the export structure contract and legacy structure values", () => {
     expect(normalizeDcExportStructure(defaultDcExportStructure)).toBe("dcTable");
     expect(normalizeDcExportStructure("modern")).toBe("dcTable");

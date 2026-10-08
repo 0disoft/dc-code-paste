@@ -118,7 +118,9 @@
                             <small>
                                 {preset.preferences.documentTheme === "darkEditorial"
                                     ? "어두운 글"
-                                    : "밝은 글"} · {workspace.presetDateLabel(preset.updatedAt)}
+                                    : preset.preferences.documentTheme === "cleanEditorial"
+                                      ? "깔끔한 글"
+                                      : "밝은 글"} · {workspace.presetDateLabel(preset.updatedAt)}
                             </small>
                         </button>
                     {/if}

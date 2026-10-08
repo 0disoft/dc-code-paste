@@ -35,7 +35,13 @@
     ];
 
     const appearance = $derived(workspace.selectedBlockInfo);
-    const activeTone = $derived(appearance?.hasCustomTone ? appearance.tone : null);
+    const activeTone = $derived(
+        appearance?.hasCustomTone
+            ? appearance.tone
+            : workspace.documentTheme === "cleanEditorial"
+              ? "blue"
+              : null,
+    );
     const activeAlignment = $derived(appearance?.alignment ?? "left");
     const activeSpacing = $derived(appearance?.spacing ?? "normal");
 </script>
