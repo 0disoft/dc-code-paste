@@ -12,7 +12,7 @@ test("opens the editor when browser storage access is blocked", async ({ page })
     });
   });
 
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
   await page.locator(".article-editor").click();
   await page.keyboard.insertText("STORAGE_BLOCKED_EDIT");
@@ -22,7 +22,7 @@ test("opens the editor when browser storage access is blocked", async ({ page })
 test("preserves an invalid saved draft before starting a new one", async ({ page }) => {
   const raw = '{"version":1,"document":{"type":"unknownNode"}}';
   await page.addInitScript(([key, value]) => localStorage.setItem(key, value), [draftKey, raw]);
-  await page.goto("/");
+  await page.goto("./");
 
   await waitForEditor(page);
   await expect(page.getByRole("alert")).toContainText(
@@ -41,7 +41,7 @@ test("reports a failed autosave while keeping the editor usable", async ({ page 
       throw new DOMException("Storage full", "QuotaExceededError");
     };
   });
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
 
   await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
@@ -53,14 +53,14 @@ test("reports a failed autosave while keeping the editor usable", async ({ page 
 });
 
 test("stops a stale tab from overwriting another tab's draft", async ({ page, context }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
   await expect(page.getByText(/저장됨/)).toBeVisible();
 
   const otherTab = await context.newPage();
-  await otherTab.goto("/");
+  await otherTab.goto("./");
   await waitForEditor(otherTab);
   await openMarkdown(otherTab, "# OTHER_TAB_DRAFT");
   await expect.poll(() => storedDraftText(otherTab)).toContain("OTHER_TAB_DRAFT");
@@ -93,14 +93,19 @@ async function storedDraftText(page: Page): Promise<string> {
   }, draftKey);
 }
 
+async function openTool(page: Page, name: string) {
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+}
+
 async function openMarkdown(page: Page, markdown: string) {
-  await page.getByRole("button", { name: "Markdown" }).click();
+  await openTool(page, "Markdown");
   await page.getByLabel("Markdown 원문").fill(markdown);
   await page.getByRole("button", { name: "Markdown 적용하기" }).click();
 }
 
 test("flushes the latest edit when the page is leaving", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
@@ -117,19 +122,19 @@ test("flushes the latest edit when the page is leaving", async ({ page }) => {
 });
 
 test("checkpoints the current draft before applying a preset", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
 
-  await page.getByRole("button", { name: "저장함" }).click();
+  await openTool(page, "저장함");
   await page.getByLabel("프리셋 이름").fill("BASE_PRESET");
   await page.getByRole("button", { name: "프리셋 저장" }).click();
   await page.keyboard.press("Escape");
 
   const sentinel = "CURRENTDRAFTBEFOREPRESET";
   await openMarkdown(page, `# ${sentinel}\n\n복구되어야 하는 본문`);
-  await page.getByRole("button", { name: "저장함" }).click();
+  await openTool(page, "저장함");
   await page
     .getByLabel("저장된 프리셋")
     .getByRole("button")
@@ -142,18 +147,18 @@ test("checkpoints the current draft before applying a preset", async ({ page }) 
 });
 
 test("renames a saved preset without applying it on double click", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
-  await page.getByRole("button", { name: "저장함" }).click();
+  await openTool(page, "저장함");
   await page.getByLabel("프리셋 이름").fill("SAVED_PRESET");
   await page.getByRole("button", { name: "프리셋 저장" }).click();
   await page.getByRole("button", { name: "닫기" }).click();
   await openMarkdown(page, "# CURRENT_DRAFT");
   const historyBefore = await page.evaluate((key) => localStorage.getItem(key), historyKey);
 
-  await page.getByRole("button", { name: "저장함" }).click();
+  await openTool(page, "저장함");
   await page.getByRole("button", { name: "SAVED_PRESET 이름 변경" }).dblclick();
   await page.getByLabel("프리셋 제목 변경").fill("RENAMED_PRESET");
   await page.getByLabel("프리셋 제목 변경").press("Enter");
@@ -164,11 +169,11 @@ test("renames a saved preset without applying it on double click", async ({ page
 });
 
 test("ignores Enter and Escape while an input is composing", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
-  await page.getByRole("button", { name: "저장함" }).click();
+  await openTool(page, "저장함");
   const name = page.getByLabel("프리셋 이름");
   await name.fill("조합 중 이름");
   await name.dispatchEvent("keydown", { key: "Enter", isComposing: true, bubbles: true });
@@ -202,16 +207,16 @@ test("ignores a late LLM response after the user edits Markdown", async ({ page 
     });
   });
 
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
-  await page.getByRole("button", { name: "AI 작성" }).click();
+  await openTool(page, "AI 작성");
   await page.getByLabel("API 키").fill("sk-or-v1-test");
   await page.getByRole("combobox", { name: "모델" }).fill("test/model");
   await page.getByRole("textbox", { name: "요청" }).fill("테스트 글 작성");
   await page.getByRole("button", { name: "AI 글 생성하기" }).click();
 
   await page.getByRole("button", { name: "AI 작성 닫기" }).click();
-  await page.getByRole("button", { name: "Markdown" }).click();
+  await openTool(page, "Markdown");
   await page.getByLabel("Markdown 원문").fill("# MANUAL_MARKDOWN");
   releaseResponse();
 
@@ -232,9 +237,9 @@ test("selects model suggestions with the keyboard without losing focus", async (
     }),
   );
 
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
-  await page.getByRole("button", { name: "AI 작성" }).click();
+  await openTool(page, "AI 작성");
   const modelInput = page.getByRole("combobox", { name: "모델" });
   await modelInput.fill("test/");
   const options = page.getByRole("listbox", { name: "모델 추천" }).getByRole("option");
@@ -280,9 +285,9 @@ test("keeps one LLM request in flight when its inputs change", async ({ page }) 
     });
   });
 
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
-  await page.getByRole("button", { name: "AI 작성" }).click();
+  await openTool(page, "AI 작성");
   await page.getByLabel("API 키").fill("sk-or-v1-test");
   await page.getByRole("combobox", { name: "모델" }).fill("test/old-model");
   await page.getByRole("textbox", { name: "요청" }).fill("첫 요청");
@@ -304,7 +309,7 @@ test("keeps one LLM request in flight when its inputs change", async ({ page }) 
 });
 
 test("restores editor selection and focus after HTML clipboard fallback", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("./");
   await waitForEditor(page);
   const copy = page.getByRole("button", { name: "디씨 복사" });
   const before = await page.evaluate(() => {

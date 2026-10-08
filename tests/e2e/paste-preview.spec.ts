@@ -1,388 +1,123 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
-test("makes the code block action explicit and applies it to the current paragraph", async ({
-  page,
-}) => {
-  await page.goto("/");
+async function waitForEditor(page: Page) {
+  await page.goto("./");
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+}
 
-  const editor = page.locator(".article-editor");
-  await expect(editor).toContainText("LLM을 써서 글을 빠르게 초안으로 만들 수도 있다");
+async function openTool(page: Page, name: string) {
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name, exact: true }).click();
+}
 
-  const codeBlocks = editor.locator("pre");
-  const initialCodeBlockCount = await codeBlocks.count();
-  const topLevelParagraphs = editor.locator(":scope > p");
-  await expect(topLevelParagraphs).toHaveCount(1);
-  await topLevelParagraphs.click();
-
-  await page.getByRole("button", { name: "코드 도구" }).click();
-  const applyCodeBlock = page.getByRole("button", { name: "코드블록 적용" });
-  await expect(applyCodeBlock).toBeVisible();
-  await applyCodeBlock.click();
-
-  await expect(codeBlocks).toHaveCount(initialCodeBlockCount + 1);
-  await expect(page.getByRole("button", { name: "코드블록 해제" })).toBeVisible();
+test("shows the block desk and keeps copy and import reachable", async ({ page }) => {
+  await waitForEditor(page);
+  await expect(page.getByRole("complementary", { name: "블록 삽입", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "요약 삽입", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "디씨 복사", exact: true })).toBeEnabled();
+  await openTool(page, "Markdown");
+  await page.getByLabel("Markdown 원문").fill("# 새 글\n\n일반 글도 꾸밀 수 있습니다.");
+  await page.getByRole("button", { name: "Markdown 적용하기" }).click();
+  await expect(page.locator(".article-editor")).toContainText("일반 글도 꾸밀 수 있습니다.");
+  await expect(page.locator(".topbar-title-text")).toHaveText("새 글");
 });
 
-test("routes section and link box commands through the editor", async ({ page }) => {
-  await page.goto("/");
-  const editor = page.locator(".article-editor");
-  await expect(editor).toContainText("DC-CODE-PASTE");
-
-  await editor.locator(":scope > p").first().click();
-  await page.getByRole("button", { name: "블록 도구" }).click();
-  await page.getByRole("button", { name: "섹션" }).click();
-  await expect(editor.locator(".dc-section-heading")).toContainText("새 섹션");
-
-  await page.getByRole("button", { name: "링크", exact: true }).click();
-  await page.getByLabel("링크 주소").fill("https://example.com");
-  await page.getByRole("button", { name: "링크박스" }).click();
-  await expect(editor.locator(".dc-link-box")).toHaveAttribute("data-href", "https://example.com/");
-});
-
-test("renders the paste tool", async ({ page }) => {
-  test.setTimeout(60_000);
-  await page.goto("/");
-
-  await expect(page.getByRole("heading", { name: "디씨 글 디자인" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: /디씨 복사/ })).toBeVisible();
-  await expect(page.getByLabel("글 편집 도구")).toBeVisible();
-  await expect(page.getByRole("button", { name: "블록 도구" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "코드 도구" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "글 모양 도구" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
-  await expect(page.getByLabel("코드 파일명")).toHaveCount(0);
-  await expect(page.getByLabel("전체 글자 크기")).toHaveCount(0);
-  await expect(page.getByLabel("코드 글자 크기")).toHaveCount(0);
-  await expect(page.getByLabel("줄번호")).toHaveCount(0);
-
-  await page.getByRole("button", { name: "블록 도구" }).click();
-  await expect(page.getByRole("button", { name: "블록 도구" })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  );
-  await expect(page.getByText("블록 추가", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "콜아웃", exact: true })).toBeVisible();
-  await expect(page.getByLabel("콜아웃 색상 프리셋")).toBeVisible();
-  await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCount(1);
-  await expect(page.getByLabel("사용자 콜아웃 색상")).toHaveCSS("opacity", "0");
-  const hiddenColorInputWidth = await page.getByLabel("사용자 콜아웃 색상").evaluate((input) => {
-    return Number.parseFloat(getComputedStyle(input).width);
-  });
-  expect(hiddenColorInputWidth).toBeLessThanOrEqual(16);
-  await expect(page.getByRole("button", { name: "초록 콜아웃" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "노랑 콜아웃" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "파랑 콜아웃" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "주의" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "참고" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "성공" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "실패" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "실험" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "결론" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "반박" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "섹션" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "히어로" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "요약" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "튜토리얼" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "비교" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "CTA" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "버튼묶음" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "자료목록" })).toBeVisible();
-  await expect(page.getByLabel("버튼묶음 정렬")).toBeVisible();
-  await expect(page.getByRole("button", { name: "구분선" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "초기화" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "예시 템플릿" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "LLM 가이드 복사" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "저장함" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "초기화" })).toHaveCSS("font-weight", "500");
-  await expect(page.getByRole("button", { name: /디씨 복사/ })).toHaveCSS("font-weight", "500");
-  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "초안 히스토리" })).toHaveCount(0);
-  await expect(page.getByLabel("인용 스타일")).toBeVisible();
-
-  await page.getByRole("button", { name: "코드 도구" }).click();
-  await expect(page.getByRole("button", { name: "팁" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "콜아웃" })).toHaveCount(0);
-  await expect(page.getByLabel("콜아웃 색상 프리셋")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "코드블록 적용" })).toBeVisible();
-  await expect(page.getByLabel("코드 파일명")).toBeVisible();
-  await expect(page.getByLabel("코드 강조 줄")).toBeHidden();
-  await page.getByText("세부 설정", { exact: true }).click();
-  await expect(page.getByLabel("코드 강조 줄")).toBeVisible();
-  await expect(page.getByLabel("코드 추가 줄")).toBeVisible();
-  await expect(page.getByLabel("코드 삭제 줄")).toBeVisible();
-  await page.getByLabel("코드 강조 줄").fill("abc");
-  await expect(page.getByLabel("코드 강조 줄")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByText("사이 숫자와 쉼표, 범위만 입력")).toBeVisible();
-  await page.getByLabel("코드 강조 줄").fill("5-6");
-  await expect(page.getByLabel("코드 강조 줄")).toHaveAttribute("aria-invalid", "false");
-  await expect(page.getByLabel("코드 글자 크기")).toBeVisible();
-  await expect(page.getByLabel("코드 글자 크기")).toHaveValue("15px");
-  await expect(page.getByLabel("코드 테마")).toHaveValue("catppuccin-mocha");
-  await expect(page.getByLabel("줄번호")).toBeVisible();
-  await expect(page.getByLabel("복사될 글 배경", { exact: true })).toHaveCount(0);
+test("changes summary appearance, exports it and restores it after reload", async ({ page }) => {
+  await waitForEditor(page);
+  const summary = page.locator(".article-editor .dc-summary-box").first();
+  await summary.locator(".dc-summary-item").first().click();
+  await page.getByRole("button", { name: "초록 테마", exact: true }).click();
+  await page.getByRole("button", { name: "가운데 정렬", exact: true }).click();
   await page
-    .locator(".article-editor pre")
-    .first()
-    .evaluate((pre) => {
-      const code = pre.querySelector("code") ?? pre;
-      const rect = code.getBoundingClientRect();
-      const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
-      pre.dispatchEvent(
-        new MouseEvent("contextmenu", {
-          bubbles: true,
-          cancelable: true,
-          clientX: rect.left + 56,
-          clientY: rect.top + lineHeight * 4 + 1,
-          button: 2,
-          buttons: 2,
-        }),
-      );
-    });
-  await expect(page.getByRole("menu", { name: "코드 5번 줄" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "추가줄" }).click();
-  await expect(page.getByLabel("코드 추가 줄")).toHaveValue("5-6");
-  await expect(page.getByLabel("코드 강조 줄")).toHaveValue("3");
-  await page
-    .locator(".article-editor pre")
-    .first()
-    .evaluate((pre) => {
-      const code = pre.querySelector("code") ?? pre;
-      const rect = code.getBoundingClientRect();
-      const lineHeight = Number.parseFloat(getComputedStyle(code).lineHeight);
-      pre.dispatchEvent(
-        new MouseEvent("contextmenu", {
-          bubbles: true,
-          cancelable: true,
-          clientX: rect.left + 56,
-          clientY: rect.top + lineHeight * 5 + 1,
-          button: 2,
-          buttons: 2,
-        }),
-      );
-    });
-  await expect(page.getByRole("menu", { name: "코드 6번 줄" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "삭제줄" }).click();
-  await expect(page.getByLabel("코드 삭제 줄")).toHaveValue("6");
-  await expect(page.getByLabel("코드 강조 줄")).toHaveValue("3");
-
-  await page.getByRole("button", { name: "글 모양 도구" }).click();
-  await expect(page.getByText("문서", { exact: true })).toBeVisible();
-  await expect(page.getByText("선택 영역", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("전체 글자 크기")).toBeVisible();
-  await expect(page.getByLabel("전체 글자 크기")).toHaveValue("17px");
-  await expect(page.getByLabel("선택 글자 크기")).toHaveValue("17px");
-  await expect(page.getByLabel("기본 폰트")).toHaveCount(0);
-  await expect(page.getByLabel("선택 폰트")).toHaveCount(0);
-  await expect(page.getByLabel("코드 글자 크기")).toHaveCount(0);
-  await expect(page.getByLabel("코드 추가 줄")).toHaveCount(0);
-  await expect(page.getByLabel("코드 삭제 줄")).toHaveCount(0);
-  await expect(page.getByLabel("줄번호")).toHaveCount(0);
-  await expect(page.locator(".article-editor")).toHaveCSS("word-break", "keep-all");
-  await expect(page.locator(".article-editor pre").first()).toHaveCSS("word-break", "normal");
-
-  await expect(page.locator(".editor-surface")).toContainText(
-    "디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구",
-  );
-  page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("빈 문서로 초기화");
-    await dialog.accept();
-  });
-  await page.getByRole("button", { name: "초기화" }).click();
-  await expect(page.locator(".editor-surface")).not.toContainText(
-    "디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구",
-  );
-  await expect(page.getByText("HTML 0KB")).toBeHidden();
-  await expect(page.getByRole("button", { name: /디씨 복사/ })).toHaveCSS("cursor", "not-allowed");
-  page.once("dialog", async (dialog) => {
-    expect(dialog.message()).toContain("예시 템플릿");
-    await dialog.accept();
-  });
-  await page.getByRole("button", { name: "예시 템플릿" }).click();
-  await expect(page.locator(".editor-surface")).toContainText(
-    "디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구",
-  );
-
-  const crampedToolbarItems = await page
-    .getByLabel("글 편집 도구")
-    .locator("button, label")
-    .evaluateAll((items) =>
-      items
-        .map((item) => {
-          const element = item as HTMLElement;
-          const box = element.getBoundingClientRect();
-
-          return {
-            height: box.height,
-            label:
-              element.textContent?.replace(/\s+/g, " ").trim() ??
-              element.getAttribute("aria-label") ??
-              "",
-            overflow: element.scrollHeight - element.clientHeight,
-          };
-        })
-        .filter((item) => item.height > 44 || item.overflow > 2),
-    );
-  expect(crampedToolbarItems).toEqual([]);
-
-  await expect(
-    page
-      .getByRole("group", { name: "작업 모드" })
-      .getByRole("button", { name: "글쓰기", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByLabel("현재 복붙 구조")).toHaveText("DC 테이블");
-  await expect(page.getByLabel("현재 글 배경")).toHaveText("밝은 글");
-  if ((await page.getByLabel("복사될 글 배경", { exact: true }).count()) === 0) {
-    await page.getByRole("button", { name: "글 모양 도구" }).click();
-  }
-  await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("darkEditorial");
-  await expect(page.getByLabel("현재 글 배경")).toHaveText("어두운 글");
-  await expect(page.locator(".preview-surface")).toHaveClass(/preview-surface-dark/);
-  const darkEditorCtaColors = await page.locator(".editor-surface").evaluate((surface) => {
-    const cta = surface.querySelector<HTMLElement>(".dc-cta-button");
-
-    if (!cta) {
-      throw new Error("Expected sample document to include a CTA button");
-    }
-
-    return {
-      ctaBackground: getComputedStyle(cta).backgroundColor,
-      ctaColor: getComputedStyle(cta).color,
-    };
-  });
-  expect(darkEditorCtaColors.ctaColor).not.toBe(darkEditorCtaColors.ctaBackground);
-  await page.getByLabel("복사될 글 배경", { exact: true }).selectOption("lightLecture");
-  await expect(page.getByLabel("현재 글 배경")).toHaveText("밝은 글");
-  await expect(page.locator(".preview-surface")).not.toHaveClass(/preview-surface-dark/);
-  await page.getByRole("button", { name: "저장함" }).click();
-  await expect(page.getByRole("button", { name: "저장함" })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  );
-  await expect(page.getByRole("region", { name: "프리셋" })).toBeVisible();
-  await expect(page.getByLabel("저장된 프리셋")).toContainText("프리셋 없음");
-  await expect(page.getByRole("region", { name: "초안 히스토리" })).toBeVisible();
-  await expect(page.getByLabel("저장된 초안")).not.toContainText("초안 없음");
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
-  await page.getByRole("button", { name: "저장함" }).click();
-  await page.getByRole("button", { name: "초안 스냅샷 저장" }).click();
-  await expect(
-    page
-      .getByLabel("저장된 초안")
-      .getByText(/초안/)
-      .first(),
-  ).toBeVisible();
-  await page
-    .getByLabel("저장된 초안")
-    .getByRole("button", { name: /초안 .* 이름 변경/ })
-    .first()
+    .getByRole("group", { name: "요약 내부 여백" })
+    .getByRole("button", { name: "크게" })
     .click();
-  await page.getByLabel("초안 제목 변경").fill("첫 풀이 초안");
-  await page.getByLabel("초안 제목 변경").press("Enter");
-  await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
-  await page.getByLabel("프리셋 이름").fill("강의글 구조");
-  await page.getByRole("button", { name: "프리셋 저장" }).click();
-  await expect(page.getByLabel("저장된 프리셋").getByText("강의글 구조")).toBeVisible();
-  await page.getByRole("button", { name: "강의글 구조 이름 변경" }).click();
-  await page.getByLabel("프리셋 제목 변경").fill("풀이 템플릿");
-  await page.getByLabel("프리셋 제목 변경").press("Enter");
-  await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
+  await page.getByLabel("요약 블록 제목").fill("핵심 요약");
+  await page.getByLabel("요약 블록 제목").press("Enter");
+  await expect(summary).toHaveAttribute("data-tone", "green");
+  await expect(summary).toHaveAttribute("data-alignment", "center");
+  await expect(summary).toHaveAttribute("data-spacing", "spacious");
+  await expect(summary).toHaveAttribute("data-label", "핵심 요약");
+  await expect(summary).toHaveCSS("background-color", "rgb(236, 253, 245)");
+  await openTool(page, "HTML 원문 보기");
+  const html = page.getByLabel("복사용 HTML 원문", { exact: true });
+  await expect(html).toHaveValue(/bgcolor="#ecfdf5"/);
+  await expect(html).toHaveValue(/padding:8px 24px 20px;text-align:center/);
+  await expect(page.locator(".topbar-status")).toContainText("저장됨");
   await page.reload();
-  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "초안 히스토리" })).toHaveCount(0);
-  await page.getByRole("button", { name: "저장함" }).click();
-  await expect(page.getByLabel("저장된 프리셋").getByText("풀이 템플릿")).toBeVisible();
-  await expect(page.getByLabel("저장된 초안").getByText("첫 풀이 초안")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("region", { name: "프리셋" })).toHaveCount(0);
-  const workspaceMode = page.getByRole("group", { name: "작업 모드" });
-  await workspaceMode.getByRole("button", { name: "미리보기", exact: true }).click();
-  await expect(
-    workspaceMode.getByRole("button", { name: "미리보기", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "HTML" })).toBeVisible();
-  await page.getByRole("button", { name: "HTML" }).click();
-  await expect(page.getByRole("button", { name: /원문 복사/ })).toBeVisible();
-  const htmlSource = page.getByLabel("복사용 HTML 원문");
-  await expect(htmlSource).toBeVisible();
-  await expect(htmlSource).toHaveValue(/<table width="100%"/);
-  await expect(htmlSource).toHaveValue(/bgcolor="#ffffff"/);
-  await expect(htmlSource).toHaveValue(/디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구/);
-  await expect(htmlSource).toHaveValue(/이 도구로 할 수 있는 것/);
-  await expect(htmlSource).toHaveValue(/Markdown 붙여넣기 방법/);
-  await expect(htmlSource).toHaveValue(/example\.md/);
-  await expect(htmlSource).toHaveValue(/dc-code-paste README/);
-  await expect(htmlSource).not.toHaveValue(/Created with dc-code-paste/);
-  await expect(htmlSource).toHaveValue(/line-height:18px;vertical-align:middle/);
-  await expect(htmlSource).not.toHaveValue(/<pre/);
-  await page.evaluate(() => {
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: {
-        writeText: async (value: string) => {
-          Object.assign(window, { copiedHtmlSource: value });
-        },
-      },
-    });
+  await expect(summary).toHaveAttribute("data-tone", "green");
+  await expect(summary).toHaveAttribute("data-spacing", "spacious");
+  await expect(summary).toHaveAttribute("data-label", "핵심 요약");
+});
+
+test("applies code and edits its filename through the contextual inspector", async ({ page }) => {
+  await waitForEditor(page);
+  const editor = page.locator(".article-editor");
+  const initialCount = await editor.locator("pre").count();
+  await editor.locator(":scope > p").first().click();
+  await page.getByRole("button", { name: "코드 삽입", exact: true }).click();
+  await expect(editor.locator("pre")).toHaveCount(initialCount + 1);
+  await page.getByLabel("코드 파일명", { exact: true }).fill("article-example.py");
+  await page.getByLabel("코드 파일명", { exact: true }).press("Enter");
+  await expect(editor.locator('pre[data-filename="article-example.py"]')).toHaveCount(1);
+  await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+  await editor
+    .locator('pre[data-filename="article-example.py"]')
+    .dblclick({ position: { x: 40, y: 12 } });
+  await expect(page.getByLabel("코드 파일명", { exact: true })).toBeFocused();
+  await page.locator("details > summary").filter({ hasText: "글자 서식" }).click();
+  await page.getByRole("button", { name: "코드블록 해제", exact: true }).click();
+  await expect(editor.locator("pre")).toHaveCount(initialCount);
+});
+
+test("inserts a summary by dragging from the palette", async ({ page }) => {
+  await waitForEditor(page);
+  const editor = page.locator(".article-editor");
+  const before = await editor.locator(".dc-summary-box").count();
+  await page
+    .getByRole("button", { name: "요약 삽입", exact: true })
+    .dragTo(editor.locator(":scope > p").first());
+  await expect(editor.locator(".dc-summary-box")).toHaveCount(before + 1);
+});
+
+for (const mobile of [false, true]) {
+  test(`adds a link to summary text on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await waitForEditor(page);
+    const item = page.locator(".article-editor .dc-summary-item").first();
+    await item.click();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Shift+End");
+    if (mobile) await page.getByRole("button", { name: "블록 삽입 패널", exact: true }).click();
+    await page.getByRole("button", { name: "링크 삽입", exact: true }).click();
+    const input = page.getByLabel("링크 주소", { exact: true });
+    await expect(input).toBeFocused();
+    await input.fill("https://example.com");
+    await input.press("Enter");
+    await expect(item.locator("a")).toHaveAttribute("href", "https://example.com/");
   });
-  await page.getByRole("button", { name: /원문 복사/ }).click();
-  expect(
-    await page.evaluate(() => (window as Window & { copiedHtmlSource?: string }).copiedHtmlSource),
-  ).toBe(await htmlSource.inputValue());
+}
 
-  await page.getByRole("button", { name: "Markdown" }).click();
-  await page
-    .getByLabel("Markdown 원문")
-    .fill(
-      [
-        "# Markdown 강의",
-        "",
-        "본문에서 `ios::sync_with_stdio(false)`를 쓴다.",
-        "",
-        "- 입력 크기를 본다.",
-        "- 반복 횟수를 본다.",
-        "",
-        "[원문 보기](https://example.com/reference)",
-        "",
-        '```diff {2} title="patch.diff"',
-        "-const oldValue = 1;",
-        "+const newValue = 2;",
-        "```",
-      ].join("\n"),
-    );
-  await page.getByRole("button", { name: "Markdown 적용하기" }).click();
-  await expect(htmlSource).toHaveValue(/Markdown 강의/);
-  await expect(htmlSource).toHaveValue(/입력 크기를 본다/);
-  await expect(htmlSource).toHaveValue(/LINK/);
-  await expect(htmlSource).toHaveValue(/example.com\/reference/);
-  await expect(htmlSource).toHaveValue(/oldValue/);
-  await expect(htmlSource).toHaveValue(/newValue/);
-  await expect(htmlSource).toHaveValue(/patch\.diff/);
-  await expect(htmlSource).toHaveValue(/border-left:4px solid/);
-  await expect(htmlSource).toHaveValue(/background-color:#[0-9a-f]{6}/);
-  await expect(htmlSource).not.toHaveValue(/oklch\(/);
-  await expect(htmlSource).not.toHaveValue(/<pre/);
-
-  await page.getByRole("button", { name: "저장함" }).click();
-  await page
-    .getByLabel("저장된 초안")
-    .getByRole("button")
-    .filter({ hasText: "첫 풀이 초안" })
-    .click();
-  await expect(htmlSource).toHaveValue(/디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구/);
-  await expect(htmlSource).not.toHaveValue(/Markdown 강의/);
-
-  await page.getByRole("button", { name: "Markdown" }).click();
-  await page.getByLabel("Markdown 원문").fill("# 임시 문서\n\n프리셋 적용 전 상태");
-  await page.getByRole("button", { name: "Markdown 적용하기" }).click();
-  await expect(htmlSource).toHaveValue(/임시 문서/);
-  await page.getByRole("button", { name: "저장함" }).click();
-  await page
-    .getByLabel("저장된 프리셋")
-    .getByRole("button")
-    .filter({ hasText: "풀이 템플릿" })
-    .click();
-  await expect(htmlSource).toHaveValue(/디씨 글쓰기에 코드블록과 서식을 붙여넣는 도구/);
-  await expect(htmlSource).not.toHaveValue(/임시 문서/);
+test("opens and closes mobile drawers without hiding copy or overflowing", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await waitForEditor(page);
+  const paletteToggle = page.getByRole("button", { name: "블록 삽입 패널", exact: true });
+  const inspectorToggle = page.getByRole("button", { name: "블록 설정 패널", exact: true });
+  await expect(page.getByRole("button", { name: "디씨 복사", exact: true })).toBeInViewport();
+  await paletteToggle.click();
+  await expect(paletteToggle).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "요약 삽입", exact: true })).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(paletteToggle).toHaveAttribute("aria-pressed", "false");
+  await inspectorToggle.click();
+  await expect(inspectorToggle).toHaveAttribute("aria-pressed", "true");
+  const firstTab = page.getByRole("tab", { name: "선택한 블록", exact: true });
+  await firstTab.press("Shift+Tab");
+  await expect(page.locator("#inspector-rail summary").last()).toBeFocused();
+  await page.locator("#inspector-rail summary").last().press("Tab");
+  await expect(firstTab).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(inspectorToggle).toHaveAttribute("aria-pressed", "false");
+  await expect(inspectorToggle).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

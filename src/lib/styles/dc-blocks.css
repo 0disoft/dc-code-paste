@@ -1,0 +1,561 @@
+/* Documented content blocks rendered inside the writing surface. Extracted from
+   the scoped style block in src/routes/+page.svelte (global now, so the Svelte
+   global wrappers are gone). Tone, alignment and spacing of the summary block
+   live in block-appearance.css. */
+.editor-surface .dc-section-heading {
+  margin: 24px 0 14px;
+  padding: 4px 0 4px 14px;
+  border-left: 4px solid oklch(61.2% 0.049 77.83);
+  color: oklch(25.72% 0.021 255.63);
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.editor-surface-dark .dc-section-heading {
+  border-left-color: oklch(88.91% 0.091 87.72);
+  color: oklch(97.22% 0.008 92.87);
+}
+
+.editor-surface .article-editor .dc-cta-button {
+  display: inline-block;
+  margin: 0 10px 16px 0;
+  padding: 11px 22px;
+  border: 1px solid oklch(70.74% 0.08 82.27);
+  background: oklch(93.5% 0.044 88.16);
+  color: oklch(26.32% 0.03 80.84);
+  font-weight: 900;
+  line-height: 1.2;
+  text-decoration: none;
+}
+
+.editor-surface-dark .article-editor .dc-cta-button {
+  border-color: oklch(96.28% 0.022 90.84);
+  background: oklch(91.44% 0.064 90.52);
+  color: oklch(13.77% 0.018 87.82);
+}
+
+.editor-surface .article-editor .dc-cta-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 16px;
+}
+
+.editor-surface .article-editor .dc-cta-group[data-layout="vertical"] {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.editor-surface .article-editor .dc-cta-group .dc-cta-button {
+  margin: 0;
+}
+
+.editor-surface .dc-reference-list {
+  margin: 0 0 16px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid oklch(78.06% 0.088 247.23);
+  border-left: 4px solid oklch(56.77% 0.154 252.96);
+  border-radius: 7px;
+  background: oklch(97.5% 0.025 247.64);
+  color: oklch(28.43% 0.052 249.88);
+  list-style: none;
+}
+
+.editor-surface .dc-reference-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  padding: 11px 14px 11px 12px;
+  border-bottom: 1px solid oklch(88.91% 0.035 247.16);
+  line-height: 1.18;
+}
+
+.editor-surface .dc-reference-item:last-child {
+  border-bottom: 0;
+}
+
+.editor-surface .dc-reference-item::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 18px;
+  border-radius: 4px;
+  background: oklch(56.77% 0.154 252.96);
+  color: oklch(99.21% 0.006 247.8);
+  content: counter(list-item, decimal-leading-zero);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 18px;
+  align-self: center;
+}
+
+.editor-surface .dc-reference-item a {
+  display: inline-block;
+  margin: 0;
+  line-height: 1.18;
+  vertical-align: middle;
+}
+
+.editor-surface-dark .dc-reference-list {
+  border-color: oklch(34.06% 0.044 236.72);
+  border-left-color: oklch(74.22% 0.14 232.34);
+  background: oklch(9.8% 0.014 94.7);
+  color: oklch(91.87% 0.029 233.82);
+}
+
+.editor-surface-dark .dc-reference-item {
+  border-bottom-color: oklch(24.21% 0.025 236.68);
+}
+
+.editor-surface-dark .dc-reference-item::before {
+  background: oklch(74.22% 0.14 232.34);
+  color: oklch(8.61% 0.019 237.62);
+}
+
+.editor-surface .dc-summary-box {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid oklch(84.22% 0.041 88.36);
+  border-top: 4px solid oklch(61.2% 0.049 77.83);
+  border-radius: 7px;
+  background: oklch(97.68% 0.02 91.92);
+  color: oklch(25.72% 0.021 255.63);
+}
+
+.editor-surface .dc-summary-box::before {
+  display: block;
+  margin: 0 0 9px;
+  color: oklch(36.42% 0.042 78.12);
+  content: attr(data-label);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.editor-surface .dc-summary-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor-surface .dc-summary-item {
+  position: relative;
+  margin: 0 0 7px;
+  padding-left: 28px;
+  line-height: 1.62;
+  list-style: none;
+  min-width: 0;
+}
+
+.editor-surface .dc-summary-item:last-child {
+  margin-bottom: 0;
+}
+
+.editor-surface .dc-summary-item::before {
+  position: absolute;
+  top: 0.81em;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: oklch(61.2% 0.049 77.83);
+  content: "";
+}
+
+.editor-surface-dark .dc-summary-box:not([data-tone]) {
+  border-color: oklch(36.21% 0.032 84.68);
+  border-top-color: oklch(84.08% 0.11 84.51);
+  background: oklch(10.18% 0.015 94.76);
+  color: oklch(94.12% 0.012 93.37);
+}
+
+.editor-surface-dark .dc-summary-box::before {
+  color: oklch(88.91% 0.091 87.72);
+}
+
+.editor-surface-dark .dc-summary-item::before {
+  background: oklch(84.08% 0.11 84.51);
+}
+
+.editor-surface .dc-hero-block {
+  margin: 0 0 22px;
+  padding: 22px 24px;
+  border: 1px solid oklch(84.22% 0.041 88.36);
+  border-top: 4px solid oklch(61.2% 0.049 77.83);
+  background: oklch(97.68% 0.02 91.92);
+  color: oklch(24.19% 0.019 255.77);
+}
+
+.editor-surface .dc-hero-rule {
+  display: none;
+}
+
+.editor-surface .dc-hero-label {
+  display: block;
+  margin: 0 0 16px;
+  color: oklch(45.61% 0.026 79.44);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.editor-surface .dc-hero-body h1 {
+  margin: 0 0 12px;
+  color: oklch(24.19% 0.019 255.77);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.22;
+}
+
+.editor-surface .dc-hero-body p {
+  margin: 0;
+  color: oklch(43.22% 0.022 255.32);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.62;
+}
+
+.editor-surface-dark .dc-hero-block {
+  border-color: oklch(28.12% 0.03 83.2);
+  border-top-color: oklch(84.08% 0.11 84.51);
+  background: oklch(6.62% 0.012 94.34);
+  color: oklch(98.32% 0.006 93.08);
+}
+
+.editor-surface-dark .dc-hero-label {
+  color: oklch(84.08% 0.11 84.51);
+}
+
+.editor-surface-dark .dc-hero-body h1 {
+  color: oklch(98.32% 0.006 93.08);
+}
+
+.editor-surface-dark .dc-hero-body p {
+  color: oklch(78.72% 0.023 86.9);
+}
+
+.editor-surface .dc-tutorial-block {
+  counter-reset: dc-tutorial-step;
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.editor-surface .dc-tutorial-step {
+  counter-increment: dc-tutorial-step;
+  padding: 14px 16px;
+  border: 1px solid oklch(85.31% 0.027 84.92);
+  border-left: 4px solid oklch(61.2% 0.049 77.83);
+  border-radius: 7px;
+  background: oklch(99.1% 0.009 93.08);
+  color: oklch(31.82% 0.02 255.28);
+}
+
+.editor-surface .dc-tutorial-head {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 0;
+  align-items: center;
+  margin: 0 0 8px;
+}
+
+.editor-surface .dc-tutorial-number::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 22px;
+  border-radius: 4px;
+  background: oklch(61.2% 0.049 77.83);
+  color: oklch(99.1% 0.006 93.08);
+  content: attr(data-number);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 22px;
+}
+
+.editor-surface .dc-tutorial-number:not([data-number])::before {
+  content: counter(dc-tutorial-step, decimal-leading-zero);
+}
+
+.editor-surface .dc-tutorial-title {
+  color: oklch(25.72% 0.021 255.63);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.32;
+}
+
+.editor-surface .dc-tutorial-body {
+  padding-left: 34px;
+}
+
+.editor-surface .dc-tutorial-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.editor-surface-dark .dc-tutorial-step {
+  border-color: oklch(34.91% 0.033 83.29);
+  border-left-color: oklch(84.08% 0.11 84.51);
+  background: oklch(12.04% 0.017 94.12);
+  color: oklch(88.62% 0.016 91.83);
+}
+
+.editor-surface-dark .dc-tutorial-number::before {
+  background: oklch(84.08% 0.11 84.51);
+  color: oklch(10.18% 0.015 94.76);
+}
+
+.editor-surface-dark .dc-tutorial-title {
+  color: oklch(97.22% 0.008 92.87);
+}
+
+.editor-surface .dc-comparison-block {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0 0 18px;
+  background: oklch(98.38% 0.01 97.33);
+}
+
+.editor-surface .dc-comparison-column {
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid oklch(85.31% 0.027 84.92);
+  border-left: 4px solid oklch(62.42% 0.178 24.04);
+  border-radius: 7px;
+  background: oklch(97.18% 0.032 24.18);
+  color: oklch(31.82% 0.02 255.28);
+}
+
+.editor-surface .dc-comparison-column[data-side="right"] {
+  border-left-color: oklch(66.42% 0.152 154.12);
+  background: oklch(96.78% 0.033 154.76);
+}
+
+.editor-surface .dc-comparison-title {
+  display: block;
+  margin: 0 0 8px;
+  color: oklch(34.1% 0.098 24.62);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.editor-surface .dc-comparison-column[data-side="right"] .dc-comparison-title {
+  color: oklch(29.24% 0.08 154.12);
+}
+
+.editor-surface .dc-comparison-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.editor-surface-dark .dc-comparison-column {
+  border-color: oklch(31.22% 0.028 84.54);
+  border-left-color: oklch(75.02% 0.17 24.82);
+  background: oklch(13.02% 0.026 24.58);
+  color: oklch(91.88% 0.016 91.83);
+}
+
+.editor-surface-dark .dc-comparison-block {
+  background: oklch(7.2% 0.012 94.1);
+}
+
+.editor-surface-dark .dc-comparison-column[data-side="right"] {
+  border-left-color: oklch(76.71% 0.151 154.54);
+  background: oklch(12.42% 0.022 154.8);
+}
+
+.editor-surface-dark .dc-comparison-title {
+  color: oklch(93.14% 0.03 24.92);
+}
+
+.editor-surface-dark .dc-comparison-column[data-side="right"] .dc-comparison-title {
+  color: oklch(92.34% 0.029 154.17);
+}
+
+.editor-surface .dc-data-table {
+  width: 100%;
+  margin: 0 0 16px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: oklch(23.39% 0.012 255.51);
+  font-size: var(--editor-body-font-size, 17px);
+  line-height: 1.62;
+}
+
+.editor-surface .dc-data-table-cell {
+  border: 1px solid oklch(84.71% 0.018 83.76);
+  padding: 8px 10px;
+  background: oklch(99.2% 0.006 91.5);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.editor-surface th.dc-data-table-cell {
+  background: oklch(95.64% 0.026 83.11);
+  color: oklch(24.19% 0.019 255.77);
+  font-weight: 700;
+}
+
+.editor-surface-dark .dc-data-table {
+  color: #e8e8e8;
+}
+
+.editor-surface-dark .dc-data-table-cell {
+  border-color: #3a3a3a;
+  background: #151515;
+  color: #e8e8e8;
+}
+
+.editor-surface-dark th.dc-data-table-cell {
+  background: #242424;
+  color: #f4f4f4;
+}
+
+.editor-surface .dc-callout {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-left: 4px solid var(--dc-callout-border);
+  border-radius: 7px;
+  background: var(--dc-callout-background);
+  color: var(--dc-callout-text);
+}
+
+.editor-surface-dark .dc-callout {
+  border-left-color: var(--dc-callout-dark-border);
+  background: var(--dc-callout-dark-background);
+  color: var(--dc-callout-dark-text);
+}
+
+.editor-surface .dc-callout-tip {
+  --dc-callout-border: oklch(70.89% 0.156 142.5);
+  --dc-callout-background: oklch(96.48% 0.047 142.49);
+  --dc-callout-text: oklch(30.18% 0.073 145.31);
+}
+
+.editor-surface-dark .dc-callout-tip {
+  --dc-callout-dark-border: oklch(76.13% 0.153 142.04);
+  --dc-callout-dark-background: oklch(11.88% 0.018 142.78);
+  --dc-callout-dark-text: oklch(91.89% 0.026 143.2);
+}
+
+.editor-surface .dc-callout-warning {
+  --dc-callout-border: oklch(73.08% 0.151 60.74);
+  --dc-callout-background: oklch(96.87% 0.048 75.17);
+  --dc-callout-text: oklch(34.21% 0.082 52.58);
+}
+
+.editor-surface-dark .dc-callout-warning {
+  --dc-callout-dark-border: oklch(78.46% 0.145 69.41);
+  --dc-callout-dark-background: oklch(12.26% 0.018 58.76);
+  --dc-callout-dark-text: oklch(92.96% 0.03 76.33);
+}
+
+.editor-surface .dc-callout-reference {
+  --dc-callout-border: oklch(68.74% 0.127 246.28);
+  --dc-callout-background: oklch(96.27% 0.036 247.39);
+  --dc-callout-text: oklch(32.26% 0.07 249.42);
+}
+
+.editor-surface-dark .dc-callout-reference {
+  --dc-callout-dark-border: oklch(72.52% 0.142 232.16);
+  --dc-callout-dark-background: oklch(11.62% 0.021 245.9);
+  --dc-callout-dark-text: oklch(91.87% 0.029 233.82);
+}
+
+.editor-surface .dc-callout-emphasis {
+  --dc-callout-border: oklch(64.73% 0.162 303.08);
+  --dc-callout-background: oklch(96.21% 0.036 302.35);
+  --dc-callout-text: oklch(33.84% 0.091 303.69);
+}
+
+.editor-surface-dark .dc-callout-emphasis {
+  --dc-callout-dark-border: oklch(73.79% 0.151 303.45);
+  --dc-callout-dark-background: oklch(12.04% 0.022 302.17);
+  --dc-callout-dark-text: oklch(93.04% 0.029 303.2);
+}
+
+.editor-surface .dc-callout-success {
+  --dc-callout-border: oklch(66.42% 0.152 154.12);
+  --dc-callout-background: oklch(96.12% 0.041 152.76);
+  --dc-callout-text: oklch(29.24% 0.08 154.12);
+}
+
+.editor-surface-dark .dc-callout-success {
+  --dc-callout-dark-border: oklch(76.71% 0.151 154.54);
+  --dc-callout-dark-background: oklch(11.76% 0.02 154.8);
+  --dc-callout-dark-text: oklch(92.34% 0.029 154.17);
+}
+
+.editor-surface .dc-callout-failure {
+  --dc-callout-border: oklch(62.42% 0.178 24.04);
+  --dc-callout-background: oklch(96.23% 0.039 24.18);
+  --dc-callout-text: oklch(34.1% 0.098 24.62);
+}
+
+.editor-surface-dark .dc-callout-failure {
+  --dc-callout-dark-border: oklch(75.02% 0.17 24.82);
+  --dc-callout-dark-background: oklch(12.02% 0.021 24.58);
+  --dc-callout-dark-text: oklch(93.14% 0.03 24.92);
+}
+
+.editor-surface .dc-callout-experiment {
+  --dc-callout-border: oklch(62.11% 0.15 263.9);
+  --dc-callout-background: oklch(96.2% 0.032 264.42);
+  --dc-callout-text: oklch(31.56% 0.081 264.1);
+}
+
+.editor-surface-dark .dc-callout-experiment {
+  --dc-callout-dark-border: oklch(73.44% 0.145 264.2);
+  --dc-callout-dark-background: oklch(11.48% 0.022 264.32);
+  --dc-callout-dark-text: oklch(92.52% 0.031 264.14);
+}
+
+.editor-surface .dc-callout-conclusion {
+  --dc-callout-border: oklch(72.44% 0.119 91.73);
+  --dc-callout-background: oklch(96.87% 0.042 94.2);
+  --dc-callout-text: oklch(34.5% 0.065 88.3);
+}
+
+.editor-surface-dark .dc-callout-conclusion {
+  --dc-callout-dark-border: oklch(80.18% 0.126 91.43);
+  --dc-callout-dark-background: oklch(12.18% 0.018 91.22);
+  --dc-callout-dark-text: oklch(93.56% 0.027 91.42);
+}
+
+.editor-surface .dc-callout-rebuttal {
+  --dc-callout-border: oklch(64.8% 0.157 330.2);
+  --dc-callout-background: oklch(96.1% 0.038 330.12);
+  --dc-callout-text: oklch(34.4% 0.096 329.55);
+}
+
+.editor-surface-dark .dc-callout-rebuttal {
+  --dc-callout-dark-border: oklch(75.91% 0.154 330.36);
+  --dc-callout-dark-background: oklch(12.11% 0.023 330.24);
+  --dc-callout-dark-text: oklch(93.11% 0.031 330.24);
+}
+
+.editor-surface .dc-link-box {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid oklch(78.06% 0.088 247.23);
+  border-left: 4px solid oklch(56.77% 0.154 252.96);
+  border-radius: 7px;
+  background: oklch(97.5% 0.025 247.64);
+  color: oklch(28.43% 0.052 249.88);
+}
+
+.editor-surface-dark .dc-link-box {
+  border-color: oklch(34.06% 0.044 236.72);
+  border-left-color: oklch(74.22% 0.14 232.34);
+  background: oklch(10.35% 0.015 93.61);
+  color: oklch(90.9% 0.024 237.46);
+}

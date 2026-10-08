@@ -111,14 +111,14 @@ export const sampleDocument: JSONContent = {
       ],
     },
     paragraph([
-      text("LLM을 써서 글을 빠르게 초안으로 만들 수도 있다. 상단 툴바의 "),
+      text("LLM을 써서 글을 빠르게 초안으로 만들 수도 있다. 상단 더보기 메뉴의 "),
       codeText("LLM 가이드"),
       text(
         " 버튼을 누르면 이 도구의 Markdown 문법 설명이 클립보드에 복사된다. 이걸 ChatGPT·Claude·DeepSeek 같은 LLM에 붙여넣고 글 작성을 요청하면 된다.",
       ),
     ]),
     callout("tipBox", "Markdown 붙여넣기 방법", "#16a34a", [
-      text("LLM 결과를 왼쪽 편집기에 직접 붙여넣으면 서식이 깨진다. "),
+      text("LLM 결과를 편집기에 직접 붙여넣으면 서식이 깨진다. "),
       codeText("Markdown"),
       text(" 버튼으로 입력창을 열고, 거기에 붙여넣은 뒤 "),
       codeText("적용하기"),
@@ -145,7 +145,11 @@ export const sampleDocument: JSONContent = {
       type: "tutorialBlock",
       content: [
         tutorialStep("01", "LLM 가이드 복사", [
-          paragraph([text("상단 툴바 "), codeText("LLM 가이드"), text(" 버튼을 클릭한다.")]),
+          paragraph([
+            text("상단 더보기 메뉴에서 "),
+            codeText("LLM 가이드"),
+            text(" 버튼을 클릭한다."),
+          ]),
         ]),
         tutorialStep("02", "LLM에게 글 요청", [
           paragraph([
@@ -163,7 +167,7 @@ export const sampleDocument: JSONContent = {
           paragraph([
             codeText("적용하기"),
             text(
-              " 버튼을 누르면 에디터에 내용이 반영되고, 오른쪽 미리보기에서 결과를 확인할 수 있다.",
+              " 버튼을 누르면 에디터에 내용이 반영되고, 미리보기 화면에서 결과를 확인할 수 있다.",
             ),
           ]),
         ]),

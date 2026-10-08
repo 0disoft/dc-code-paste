@@ -56,6 +56,7 @@ export function selectedBlockInfo(editor: Editor | undefined) {
     type: target.node.type.name,
     label: labels[target.node.type.name],
     hasAppearance: target.node.type.name === "summaryBox",
+    hasCustomTone: target.node.attrs.tone != null,
     ...normalizeBlockAppearance(target.node.attrs),
   };
 }
