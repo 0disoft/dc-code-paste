@@ -12,6 +12,9 @@ test("shows inherited text size instead of the previous selection's size", async
   await paragraphs.first().click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
+  await expect(page.getByRole("region", { name: "선택 영역", exact: true })).toContainText(
+    "선택한 글자에 적용됩니다.",
+  );
   await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe("꾸밀 문단");
   const size = page.getByLabel("선택 글자 크기", { exact: true });
   await size.selectOption("20px");
@@ -22,6 +25,9 @@ test("shows inherited text size instead of the previous selection's size", async
   await paragraphs.first().click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
+  await expect(page.getByRole("region", { name: "선택 영역", exact: true })).toContainText(
+    "선택한 글자에 적용됩니다.",
+  );
   await expect(size).toHaveValue("20px");
   await page.getByRole("button", { name: "글자 꾸밈 초기화", exact: true }).click();
   await expect(size).toHaveValue("");
@@ -49,9 +55,14 @@ test("sets, exports and restores body and selected fonts without losing links or
   await paragraphs.first().click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
+  await expect(page.getByRole("region", { name: "선택 영역", exact: true })).toContainText(
+    "선택한 글자에 적용됩니다.",
+  );
   const font = page.getByLabel("선택 글꼴", { exact: true });
   await font.selectOption({ label: "Georgia" });
+  await expect(page.locator(".article-editor")).toBeFocused();
   await page.getByLabel("선택 글자 크기", { exact: true }).selectOption("20px");
+  await expect(page.locator(".article-editor")).toBeFocused();
   await page.getByRole("button", { name: "파랑 글자색", exact: true }).click();
   await expect(paragraphs.first().locator("span")).toHaveCSS("font-family", /Georgia/);
   await paragraphs.last().click();
@@ -73,6 +84,9 @@ test("sets, exports and restores body and selected fonts without losing links or
   await paragraphs.first().click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
+  await expect(page.getByRole("region", { name: "선택 영역", exact: true })).toContainText(
+    "선택한 글자에 적용됩니다.",
+  );
   await expect(font).toHaveValue("Georgia,Batang,serif");
   await font.selectOption("");
   await expect(paragraphs.first().locator("span")).not.toHaveAttribute("style", /font-family/);

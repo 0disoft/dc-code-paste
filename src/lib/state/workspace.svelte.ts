@@ -213,6 +213,14 @@ export function createWorkspaceState() {
     { label: "보라", color: "oklch(47.55% 0.145 302.98)" },
   ];
 
+  const readableTextSwatches = $derived.by(() => {
+    const safety = editorThemeColorSafety[documentTheme];
+    return swatches.map((swatch) => ({
+      ...swatch,
+      color: sanitizeReadableTextColor(swatch.color, safety.background, safety.fallback),
+    }));
+  });
+
   const calloutColorOptions: {
     label: string;
     kind: CalloutKind;
@@ -2424,6 +2432,10 @@ export function createWorkspaceState() {
   }
 
   function setTextColor(color: string) {
+    if (!color) {
+      editorCommands.setTextColor("");
+      return;
+    }
     const safety = editorThemeColorSafety[documentTheme];
     const readableColor = sanitizeReadableTextColor(color, safety.background, safety.fallback);
 
@@ -3469,7 +3481,9 @@ export function createWorkspaceState() {
     draftPersistDebounceMs,
     documentThemes,
     editorThemeColorSafety,
-    swatches,
+    get swatches() {
+      return readableTextSwatches;
+    },
     calloutColorOptions,
     codeLineMarkers,
     lineRangeHelp,

@@ -53,16 +53,26 @@
         <span class="ui-label">글자색</span>
         <div class="ui-swatch-row" role="group" aria-label="글자색">
             {#each workspace.swatches as swatch (swatch.color)}
+                {@const active = !style.colorMixed && style.color.toLowerCase() === swatch.color.toLowerCase()}
                 <button
                     class="ui-swatch is-round"
+                    class:is-active={active}
                     type="button"
                     title={`${swatch.label} 글자색`}
                     aria-label={`${swatch.label} 글자색`}
-                    aria-pressed={!style.colorMixed && style.color.toLowerCase() === swatch.color.toLowerCase()}
+                    aria-pressed={active}
                     style={`--swatch:${swatch.color}`}
                     onclick={() => workspace.setTextColor(swatch.color)}
                 ></button>
             {/each}
+            <button
+                class="ui-btn ui-btn--outline"
+                class:is-active={!style.colorMixed && !style.color}
+                type="button"
+                aria-label="본문 글자색"
+                aria-pressed={!style.colorMixed && !style.color}
+                onclick={() => workspace.setTextColor("")}
+            >본문 색</button>
         </div>
     </div>
 

@@ -399,7 +399,11 @@ export function createEditorCommandAdapter(options: {
   }
 
   function setTextColor(color: string) {
-    run((current) => current.chain().focus().setColor(color).run());
+    run((current) =>
+      color
+        ? current.chain().focus().setColor(color).run()
+        : current.chain().focus().unsetColor().run(),
+    );
   }
 
   function updateCodeBlockAttributes(attrs: Record<string, unknown>, focusEditor = true) {
