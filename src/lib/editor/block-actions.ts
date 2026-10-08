@@ -1,8 +1,9 @@
 import type { Editor } from "@tiptap/core";
 import { Fragment } from "@tiptap/pm/model";
-import { NodeSelection, Selection } from "@tiptap/pm/state";
+import { Selection } from "@tiptap/pm/state";
 import { closeHistory } from "@tiptap/pm/history";
 import { selectedBlockTarget } from "./block-inspector";
+import { selectionAtBlockStart } from "./block-selection";
 
 export type BlockAction = "up" | "down" | "duplicate" | "delete";
 
@@ -62,8 +63,9 @@ export function applyBlockAction(editor: Editor, action: BlockAction) {
   tr.setSelection(
     action === "delete"
       ? Selection.near(tr.doc.resolve(position))
-      : NodeSelection.create(tr.doc, position),
+      : selectionAtBlockStart(tr.doc, position),
   );
   editor.view.dispatch(closeHistory(tr).scrollIntoView());
+  editor.commands.focus();
   return true;
 }

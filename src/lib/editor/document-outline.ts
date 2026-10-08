@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/core";
 import type { Node } from "@tiptap/pm/model";
-import { NodeSelection, Selection } from "@tiptap/pm/state";
 import { blockTypeLabel } from "./block-inspector";
+import { selectionAtBlockStart } from "./block-selection";
 
 export function documentOutline(doc: Node) {
   const entries: { index: number; position: number; label: string; text: string }[] = [];
@@ -40,11 +40,7 @@ export function navigateToBlock(editor: Editor, index: number) {
   if (!Number.isInteger(index) || index < 0 || index >= editor.state.doc.childCount) return false;
   let position = 0;
   for (let i = 0; i < index; i++) position += editor.state.doc.child(i).nodeSize;
-  const node = editor.state.doc.child(index);
-  const selection =
-    node.isLeaf && NodeSelection.isSelectable(node)
-      ? NodeSelection.create(editor.state.doc, position)
-      : Selection.near(editor.state.doc.resolve(position + 1));
+  const selection = selectionAtBlockStart(editor.state.doc, position);
   editor.view.dispatch(
     editor.state.tr.setSelection(selection).setMeta("addToHistory", false).scrollIntoView(),
   );

@@ -1,5 +1,5 @@
 import { getSchema, type Editor, type JSONContent } from "@tiptap/core";
-import { EditorState, NodeSelection, TextSelection, type Transaction } from "@tiptap/pm/state";
+import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { expect, it } from "vitest";
 import { createEditorExtensions } from "../../src/lib/editor/extensions";
 import { applyBlockAction, availableBlockActions } from "../../src/lib/editor/block-actions";
@@ -13,6 +13,11 @@ function harness(content: JSONContent[], position = 1) {
       return state;
     },
     schema,
+    commands: {
+      focus() {
+        return true;
+      },
+    },
     view: {
       dispatch(tr: Transaction) {
         state = state.apply(tr);
@@ -35,12 +40,15 @@ it("moves and duplicates a selected summary with its content and appearance inta
   expect(applyBlockAction(editor, "up")).toBe(true);
   expect(editor.state.doc.firstChild?.attrs.tone).toBe("green");
   expect(editor.state.doc.textContent).toBe("핵심앞뒤");
-  expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+  expect(editor.state.selection).toBeInstanceOf(TextSelection);
+  expect(editor.state.selection.empty).toBe(true);
   expect(availableBlockActions(editor).up).toBe(false);
   expect(applyBlockAction(editor, "down")).toBe(true);
   expect(editor.state.doc.textContent).toBe("앞핵심뒤");
   expect(applyBlockAction(editor, "duplicate")).toBe(true);
   expect(editor.state.doc.textContent).toBe("앞핵심핵심뒤");
+  editor.view.dispatch(editor.state.tr.insertText("추가"));
+  expect(editor.state.doc.textContent).toBe("앞핵심추가핵심뒤");
   expect(applyBlockAction(editor, "delete")).toBe(true);
   expect(editor.state.doc.textContent).toBe("앞핵심뒤");
 });
