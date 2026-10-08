@@ -63,10 +63,12 @@ export function selectedBlockInfo(editor: Editor | undefined) {
 export function setSelectedBlockAppearance(editor: Editor, values: Partial<BlockAppearance>) {
   const target = selectedBlockTarget(editor);
   if (target?.node.type.name !== "summaryBox") return false;
-  const next = normalizeBlockAppearance({ ...target.node.attrs, ...values });
-  editor.view.dispatch(
-    editor.state.tr.setNodeMarkup(target.pos, undefined, { ...target.node.attrs, ...next }),
-  );
+  const normalized = normalizeBlockAppearance({ ...target.node.attrs, ...values });
+  const next = { ...target.node.attrs };
+  for (const key of ["tone", "alignment", "spacing"] as const) {
+    if (values[key] !== undefined) next[key] = normalized[key];
+  }
+  editor.view.dispatch(editor.state.tr.setNodeMarkup(target.pos, undefined, next));
   return true;
 }
 
