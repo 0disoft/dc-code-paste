@@ -58,6 +58,13 @@
         workspace.setPreviewVisible(view === "preview");
     }
 
+    async function onOutlineNavigate(index: number) {
+        selectWorkspaceView("editor");
+        if (compact) closeRails();
+        await tick();
+        workspace.navigateToBlock(index);
+    }
+
     function showHtmlSource() {
         workspace.previewMode = "source";
         selectWorkspaceView("preview");
@@ -138,7 +145,7 @@
     {/if}
 
     <div class="app-body">
-        <BlockSidebar open={leftRailOpen} {compact} onInsert={onPaletteInsert} />
+        <BlockSidebar open={leftRailOpen} {compact} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} />
 
         <section class="canvas" aria-label="글쓰기 작업 영역" inert={compact && (leftRailOpen || rightRailOpen)}>
             {#if workspace.isStoragePanelOpen ||

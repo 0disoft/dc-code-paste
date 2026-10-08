@@ -16,8 +16,11 @@ const labels: Record<string, string> = {
   comparisonBlock: "비교",
   tutorialBlock: "튜토리얼",
   referenceList: "자료목록",
-  ctaButton: "버튼",
-  ctaGroup: "버튼묶음",
+  ctaButton: "링크 버튼",
+  ctaGroup: "버튼 묶음",
+  bulletList: "목록",
+  orderedList: "번호 목록",
+  horizontalRule: "구분선",
   tipBox: "강조 상자",
   warningBox: "강조 상자",
   referenceBox: "강조 상자",
@@ -28,6 +31,10 @@ const labels: Record<string, string> = {
   conclusionBox: "강조 상자",
   rebuttalBox: "강조 상자",
 };
+
+export function blockTypeLabel(type: string) {
+  return labels[type] ?? "블록";
+}
 
 function targetAt(position: ResolvedPos): { node: Node; pos: number } | undefined {
   let result: { node: Node; pos: number } | undefined;

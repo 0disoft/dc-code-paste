@@ -21,6 +21,7 @@
     import TypeOutline from "@lucide/svelte/icons/type-outline";
     import Layers from "@lucide/svelte/icons/layers";
     import TemplateTab from "./TemplateTab.svelte";
+    import DocumentOutline from "./DocumentOutline.svelte";
 
     type PaletteRow = {
         key: string;
@@ -37,11 +38,13 @@
         open?: boolean;
         compact?: boolean;
         onInsert?: (kind?: PaletteBlockKind) => void;
+        onNavigate: (index: number) => void;
     };
 
-    let { open = true, compact = false, onInsert }: Props = $props();
+    let { open = true, compact = false, onInsert, onNavigate }: Props = $props();
 
-    let tab = $state<"blocks" | "templates">("blocks");
+    let tab = $state<"blocks" | "templates" | "outline">("blocks");
+    let query = $state("");
     let moreOpen = $state(false);
     let draggingKind = $state<string | null>(null);
 
@@ -61,7 +64,7 @@
         { key: "comparison", label: "비교", description: "좌우 비교 정리", icon: GitCompare, kind: "comparison" },
         { key: "references", label: "자료목록", description: "참고 자료 정리", icon: BookOpen, kind: "references" },
         { key: "cta", label: "링크 버튼", description: "행동 유도 버튼", icon: MousePointerClick, kind: "cta" },
-        { key: "ctaGroup", label: "버튼묶음", description: "버튼 여러 개 묶기", icon: Megaphone, kind: "ctaGroup" },
+        { key: "ctaGroup", label: "버튼 묶음", description: "버튼 여러 개 묶기", icon: Megaphone, kind: "ctaGroup" },
         { key: "divider", label: "구분선", description: "가로 구분선", icon: SeparatorHorizontal, kind: "divider" },
     ];
 
@@ -78,6 +81,10 @@
         event.dataTransfer.setData("application/x-dc-block", kind);
         event.dataTransfer.effectAllowed = "copy";
         draggingKind = kind;
+    }
+
+    function matches(row: PaletteRow) {
+        return `${row.label} ${row.description}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
     }
 
     function trigger(row: PaletteRow) {
@@ -118,13 +125,17 @@
             >
                 템플릿
             </button>
+            <button id="outline-tab" class:is-active={tab === "outline"} type="button" role="tab" aria-selected={tab === "outline"} aria-controls="outline-tabpanel" onclick={() => (tab = "outline")}>
+                글 구성
+            </button>
         </div>
     </div>
 
     {#if tab === "blocks"}
         <div id="blocks-tabpanel" class="rail-scroll" role="tabpanel" aria-labelledby="blocks-tab">
+            <input class="ui-input" type="search" aria-label="삽입 블록 검색" placeholder="블록 찾기" bind:value={query} />
             <ul class="palette-list">
-                {#each primaryRows as row (row.key)}
+                {#each primaryRows.filter(matches) as row (row.key)}
                     {@const Icon = row.icon}
                     <li>
                         <button
@@ -150,6 +161,7 @@
             </ul>
 
             <div class="palette-more">
+                {#if !query.trim()}
                 <button
                     class="palette-more-toggle"
                     type="button"
@@ -159,12 +171,13 @@
                     onclick={() => (moreOpen = !moreOpen)}
                 >
                     <Grip size={16} aria-hidden="true" />
-                    <span>끌어 놓거나 눌러서 추가</span>
+                    <span>더 많은 블록</span>
                     <ChevronDown class="palette-more-chevron" size={15} aria-hidden="true" />
                 </button>
-                {#if moreOpen}
+                {/if}
+                {#if moreOpen || query.trim()}
                     <ul id="more-blocks" class="palette-list palette-list-extra">
-                        {#each [...extraRows, sectionRow] as row (row.key)}
+                        {#each [...extraRows, sectionRow].filter(matches) as row (row.key)}
                             {@const Icon = row.icon}
                             <li>
                                 <button
@@ -190,8 +203,11 @@
                     </ul>
                 {/if}
             </div>
+            {#if query.trim() && ![...primaryRows, ...extraRows, sectionRow].some(matches)}
+                <p class="palette-empty" role="status">일치하는 블록이 없습니다.</p>
+            {/if}
         </div>
-    {:else}
+    {:else if tab === "templates"}
         <div
             id="templates-tabpanel"
             class="rail-scroll"
@@ -200,10 +216,15 @@
         >
             <TemplateTab />
         </div>
+    {:else}
+        <div id="outline-tabpanel" class="rail-scroll" role="tabpanel" aria-labelledby="outline-tab">
+            <DocumentOutline {onNavigate} />
+        </div>
     {/if}
 </aside>
 
 <style>
+    .palette-empty { color: var(--muted); font-size: 0.85rem; }
     .palette-list {
         display: grid;
         gap: 2px;

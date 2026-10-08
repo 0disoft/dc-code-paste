@@ -14,6 +14,11 @@ import {
   type BlockAction,
 } from "#lib/editor/block-actions.ts";
 import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
+import {
+  documentOutline,
+  activeOutlineIndex,
+  navigateToBlock,
+} from "#lib/editor/document-outline.ts";
 
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
 
@@ -2793,6 +2798,17 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get documentOutline() {
+      void documentJson;
+      return editor ? documentOutline(editor.state.doc) : [];
+    },
+    get activeOutlineIndex() {
+      void editorSignal;
+      return activeOutlineIndex(editor);
+    },
+    navigateToBlock(index: number) {
+      runEditorCommand((current) => navigateToBlock(current, index));
+    },
     get selectedBlockActions() {
       void editorSignal;
       return availableBlockActions(editor);
