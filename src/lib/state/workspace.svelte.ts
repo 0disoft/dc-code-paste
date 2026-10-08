@@ -45,6 +45,10 @@ import {
   type WritingTemplateId,
 } from "#lib/editor/writing-templates.ts";
 import { createDraftFile, readDraftFile } from "#lib/editor/draft-file.ts";
+import {
+  DocumentPreferencesStep,
+  replaceDocumentWithPreferences,
+} from "#lib/editor/document-replacement.ts";
 import { sampleDocument } from "#lib/editor/sample-document.ts";
 
 import {
@@ -454,8 +458,7 @@ export function createWorkspaceState() {
     cloneDocument: cloneDocumentContent,
     clonePreferences: cloneDraftPreferences,
     applySnapshot(value) {
-      applyDraftPreferences(value.preferences);
-      replaceEditorDocument(value.document);
+      replaceEditorDocument(value.document, value.preferences);
     },
     setHistory(value) {
       draftHistory = value;
@@ -472,8 +475,7 @@ export function createWorkspaceState() {
     clonePreferences: cloneDraftPreferences,
     checkpointBeforeReplacement: checkpointCurrentDraftBeforeReplacement,
     applySnapshot(preset) {
-      applyDraftPreferences(cloneDraftPreferences(preset.preferences));
-      replaceEditorDocument(preset.document);
+      replaceEditorDocument(preset.document, preset.preferences);
     },
     setPresets(value) {
       presets = value;
@@ -700,8 +702,7 @@ export function createWorkspaceState() {
           message: "현재 글을 초안 기록에 보관하지 못했습니다. 먼저 파일로 저장해 주세요.",
         };
       }
-      applyDraftPreferences(snapshot.preferences);
-      replaceEditorDocument(snapshot.document);
+      replaceEditorDocument(snapshot.document, snapshot.preferences);
       isLinkPanelOpen = false;
       linkDraft = "";
       linkError = false;
@@ -793,14 +794,23 @@ export function createWorkspaceState() {
     return cloneSerializableValue(preferences);
   }
 
-  function replaceEditorDocument(document: JSONContent) {
+  function replaceEditorDocument(document: JSONContent, preferences = currentDraftPreferences()) {
     const nextDocument = cloneDocumentContent(document);
-    documentJson = nextDocument;
-    editor?.commands.setContent(nextDocument);
-
     if (editor) {
+      if (
+        !replaceDocumentWithPreferences(
+          editor,
+          nextDocument,
+          cloneDraftPreferences(currentDraftPreferences()),
+          cloneDraftPreferences(preferences),
+        )
+      )
+        return;
       refreshEditorState(editor);
       documentReplacementVersion += 1;
+    } else {
+      documentJson = nextDocument;
+      applyDraftPreferences(preferences);
     }
   }
 
@@ -1153,11 +1163,10 @@ export function createWorkspaceState() {
     });
     const importedLanguage = firstCodeBlockLanguage(nextDocument);
 
-    if (importedLanguage) {
-      language = importedLanguage;
-    }
-
-    replaceEditorDocument(nextDocument);
+    replaceEditorDocument(nextDocument, {
+      ...currentDraftPreferences(),
+      language: importedLanguage ?? language,
+    });
 
     markdownImportError = "";
     markdownImportState = "imported";
@@ -1269,8 +1278,7 @@ export function createWorkspaceState() {
     }
 
     draftPersistence.acceptRemote(raw, remote);
-    applyDraftPreferences(cloneDraftPreferences(remote.preferences));
-    replaceEditorDocument(remote.document);
+    replaceEditorDocument(remote.document, remote.preferences);
   }
 
   function overwriteOtherTabDraft() {
@@ -2451,8 +2459,7 @@ export function createWorkspaceState() {
       return;
     }
 
-    applyDraftPreferences(defaultDraftPreferences());
-    replaceEditorDocument(emptyDocument);
+    replaceEditorDocument(emptyDocument, defaultDraftPreferences());
     isLinkPanelOpen = false;
     linkDraft = "";
     linkError = false;
@@ -2467,8 +2474,7 @@ export function createWorkspaceState() {
     if (!checkpointCurrentDraftBeforeReplacement()) {
       return;
     }
-    applyDraftPreferences(defaultDraftPreferences());
-    replaceEditorDocument(sampleDocument);
+    replaceEditorDocument(sampleDocument, defaultDraftPreferences());
     isLinkPanelOpen = false;
     linkDraft = "";
     linkError = false;
@@ -2479,8 +2485,7 @@ export function createWorkspaceState() {
     const template = writingTemplates.find((item) => item.id === id);
     if (!template || !window.confirm(`현재 글을 ${template.label} 템플릿으로 바꿀까요?`)) return;
     if (!checkpointCurrentDraftBeforeReplacement()) return;
-    applyDraftPreferences(defaultDraftPreferences());
-    replaceEditorDocument(createWritingTemplate(id));
+    replaceEditorDocument(createWritingTemplate(id), defaultDraftPreferences());
     isLinkPanelOpen = false;
     linkDraft = "";
     linkError = false;
@@ -2745,6 +2750,20 @@ export function createWorkspaceState() {
         },
         onUpdate: ({ editor: current }) => {
           refreshEditorState(current);
+        },
+        onTransaction: ({ editor: current, transaction, appendedTransactions }) => {
+          let restoredPreferences = false;
+          for (const tr of [transaction, ...appendedTransactions]) {
+            for (const step of tr.steps) {
+              if (step instanceof DocumentPreferencesStep) {
+                applyDraftPreferences(step.after);
+                restoredPreferences = true;
+              }
+            }
+          }
+          // Tiptap skips onUpdate when only preferences changed and the content stayed equal.
+          if (restoredPreferences && transaction.before.eq(current.state.doc))
+            refreshEditorState(current);
         },
         onSelectionUpdate: ({ editor: current }) => {
           syncBlockLabelDraft(current);

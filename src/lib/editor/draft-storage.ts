@@ -158,7 +158,7 @@ function isDocumentTheme(value: unknown): value is DcDocumentTheme {
   return value === "lightLecture" || value === "darkEditorial" || value === "cleanEditorial";
 }
 
-function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined {
+export function normalizeDraftPreferences(value: unknown): DraftPreferences | undefined {
   if (!isRecord(value)) {
     return undefined;
   }
