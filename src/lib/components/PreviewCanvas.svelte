@@ -79,9 +79,12 @@
                     class="ui-btn ui-btn--primary"
                     type="button"
                     onclick={workspace.copySourceHtml}
-                    disabled={!workspace.html || workspace.isRendering || !!workspace.previewError}
+                    data-copy-trigger="source"
+                    disabled={workspace.isCopying || !workspace.html || workspace.isRendering || !!workspace.previewError}
                 >
-                    {#if workspace.sourceCopyState === "copied"}
+                    {#if workspace.activeCopyChannel === "source"}
+                        <span class="spin-icon"><Loader2 size={15} aria-hidden="true" /></span>
+                    {:else if workspace.sourceCopyState === "copied"}
                         <Check size={15} aria-hidden="true" />
                     {:else}
                         <Clipboard size={15} aria-hidden="true" />

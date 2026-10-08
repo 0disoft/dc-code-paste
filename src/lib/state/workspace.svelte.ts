@@ -148,6 +148,8 @@ import {
   copyPlainTextWithState,
   copySourceHtml as copySourceHtmlText,
   createCopyFeedbackController,
+  createCopyTaskController,
+  type CopyChannel,
   createWorkspacePreviewRenderer,
 } from "#lib/state/workspace-export.ts";
 import { createLlmRequestController, type LlmGenerationState } from "#lib/state/llm-request.ts";
@@ -303,6 +305,7 @@ export function createWorkspaceState() {
 
   let copyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
   let manualCopyHtml = $state("");
+  let activeCopyChannel = $state<CopyChannel | null>(null);
 
   let sourceCopyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
 
@@ -389,6 +392,9 @@ export function createWorkspaceState() {
 
   const exportSession = createDcExportSession();
   const copyFeedback = createCopyFeedbackController();
+  const copyTasks = createCopyTaskController((channel) => {
+    activeCopyChannel = channel;
+  });
   const llmRequest = createLlmRequestController({
     getDraft: () => markdownDraft,
     applyResult(result) {
@@ -507,17 +513,26 @@ export function createWorkspaceState() {
 
   const htmlSize = $derived(html.length === 0 ? "0KB" : `${Math.ceil(html.length / 1024)}KB`);
 
-  const copyLabel = $derived(copyState === "copied" ? "복사됨" : "디씨 복사");
+  const copyLabel = $derived(
+    activeCopyChannel === "preview" ? "복사 중" : copyState === "copied" ? "복사됨" : "디씨 복사",
+  );
 
   const isCopyDisabled = $derived.by(() => {
-    if (editorMountState !== "ready" || (previewVisible && isRendering)) return true;
+    if (activeCopyChannel || editorMountState !== "ready" || (previewVisible && isRendering))
+      return true;
     const blocks = documentJson.content;
     if (!blocks?.length) return true;
     const onlyBlock = blocks[0];
     return blocks.length === 1 && onlyBlock.type === "paragraph" && !onlyBlock.content?.length;
   });
 
-  const sourceCopyLabel = $derived(sourceCopyState === "copied" ? "복사됨" : "원문 복사");
+  const sourceCopyLabel = $derived(
+    activeCopyChannel === "source"
+      ? "복사 중"
+      : sourceCopyState === "copied"
+        ? "복사됨"
+        : "원문 복사",
+  );
 
   const documentThemeLabel = $derived(
     documentThemes.find((item) => item.value === documentTheme)?.label ?? "밝은 글",
@@ -2464,52 +2479,58 @@ export function createWorkspaceState() {
   }
 
   async function copyPreview() {
-    const operation = copyFeedback.begin("preview", (value) => {
-      copyState = value;
-    });
-    if (!operation) return;
-    const currentDocument = documentJson;
-    const currentOptions = exportOptions();
-    const optionsFingerprint = JSON.stringify(currentOptions);
-    const isCurrent = () =>
-      operation.isCurrent() &&
-      documentJson === currentDocument &&
-      JSON.stringify(exportOptions()) === optionsFingerprint;
-    await copyDcPreview({
-      document: currentDocument,
-      exportOptions: currentOptions,
-      renderDocument: exportSession.exportDocument,
-      plainText: editor?.getText() ?? "",
-      isCurrent,
-      setManualHtml(value) {
-        if (isCurrent()) manualCopyHtml = value;
-      },
-      setState: operation.setState,
-      scheduleReset: operation.scheduleReset,
+    return copyTasks.run("preview", async () => {
+      const operation = copyFeedback.begin("preview", (value) => {
+        copyState = value;
+      });
+      if (!operation) return;
+      const currentDocument = documentJson;
+      const currentOptions = exportOptions();
+      const optionsFingerprint = JSON.stringify(currentOptions);
+      const isCurrent = () =>
+        operation.isCurrent() &&
+        documentJson === currentDocument &&
+        JSON.stringify(exportOptions()) === optionsFingerprint;
+      await copyDcPreview({
+        document: currentDocument,
+        exportOptions: currentOptions,
+        renderDocument: exportSession.exportDocument,
+        plainText: editor?.getText() ?? "",
+        isCurrent,
+        setManualHtml(value) {
+          if (isCurrent()) manualCopyHtml = value;
+        },
+        setState: operation.setState,
+        scheduleReset: operation.scheduleReset,
+      });
     });
   }
 
   async function copySourceHtml() {
-    const operation = copyFeedback.begin("source", (value) => {
-      sourceCopyState = value;
-    });
-    if (!operation) return;
-    await copySourceHtmlText({
-      html,
-      setState: operation.setState,
-      scheduleReset: operation.scheduleReset,
+    return copyTasks.run("source", async () => {
+      const operation = copyFeedback.begin("source", (value) => {
+        sourceCopyState = value;
+      });
+      if (!operation) return;
+      await copySourceHtmlText({
+        html,
+        setState: operation.setState,
+        scheduleReset: operation.scheduleReset,
+      });
     });
   }
 
   async function copyLlmAuthoringGuide() {
-    const operation = copyFeedback.begin("guide", (value) => {
-      llmPromptCopyState = value;
-    });
-    if (!operation) return;
-    await copyPlainTextWithState({
-      text: llmAuthoringPrompt,
-      setState: operation.setState,
-      scheduleReset: operation.scheduleReset,
+    return copyTasks.run("guide", async () => {
+      const operation = copyFeedback.begin("guide", (value) => {
+        llmPromptCopyState = value;
+      });
+      if (!operation) return;
+      await copyPlainTextWithState({
+        text: llmAuthoringPrompt,
+        setState: operation.setState,
+        scheduleReset: operation.scheduleReset,
+      });
     });
   }
 
@@ -2531,6 +2552,7 @@ export function createWorkspaceState() {
   }
 
   onDestroy(() => {
+    copyTasks.dispose();
     copyFeedback.dispose();
     llmRequest.dispose();
     llmModels.dispose();
@@ -3001,6 +3023,12 @@ export function createWorkspaceState() {
     },
     get copyState() {
       return copyState;
+    },
+    get isCopying() {
+      return activeCopyChannel !== null;
+    },
+    get activeCopyChannel() {
+      return activeCopyChannel;
     },
     get isCopyDisabled() {
       return isCopyDisabled;

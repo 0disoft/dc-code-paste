@@ -54,7 +54,30 @@ function scheduleCopiedStateReset({
   }, resetDelayMs);
 }
 
-type CopyChannel = "preview" | "source" | "guide";
+export type CopyChannel = "preview" | "source" | "guide";
+
+/** Clipboard writes from all entry points share one in-flight task. */
+export function createCopyTaskController(publish: (channel: CopyChannel | null) => void) {
+  let active = false;
+  let disposed = false;
+  return {
+    async run(channel: CopyChannel, task: () => Promise<void>) {
+      if (active || disposed) return false;
+      active = true;
+      publish(channel);
+      try {
+        await task();
+        return true;
+      } finally {
+        active = false;
+        if (!disposed) publish(null);
+      }
+    },
+    dispose() {
+      disposed = true;
+    },
+  };
+}
 
 export function createCopyFeedbackController() {
   const turns: Record<CopyChannel, number> = { preview: 0, source: 0, guide: 0 };

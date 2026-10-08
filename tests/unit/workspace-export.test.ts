@@ -5,8 +5,10 @@ import { copyDcHtmlWhenReady } from "#lib/dc/clipboard.ts";
 import {
   copyDcPreview,
   createCopyFeedbackController,
+  createCopyTaskController,
   createWorkspacePreviewRenderer,
   type WorkspaceCopyState,
+  type CopyChannel,
 } from "#lib/state/workspace-export.ts";
 
 vi.mock("#lib/dc/export-document.ts", () => ({
@@ -315,5 +317,52 @@ describe("copy feedback lifecycle", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(publish).toHaveBeenCalledTimes(3);
     expect(controller.begin("source", publish)).toBeUndefined();
+  });
+});
+
+describe("exclusive clipboard tasks", () => {
+  it("blocks another channel until the current clipboard write finishes", async () => {
+    const publish = vi.fn<(channel: CopyChannel | null) => void>();
+    const controller = createCopyTaskController(publish);
+    const gate = deferred();
+    const first = controller.run("preview", async () => {
+      await gate.promise;
+    });
+    const competing = vi.fn<() => Promise<void>>(async () => {});
+    expect(await controller.run("source", competing)).toBe(false);
+    expect(await controller.run("preview", competing)).toBe(false);
+    expect(competing).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenLastCalledWith("preview");
+    gate.resolve("done");
+    expect(await first).toBe(true);
+    expect(publish).toHaveBeenLastCalledWith(null);
+    expect(await controller.run("guide", competing)).toBe(true);
+    expect(competing).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the pending state after failure so the user can retry", async () => {
+    const publish = vi.fn<(channel: CopyChannel | null) => void>();
+    const controller = createCopyTaskController(publish);
+    await expect(
+      controller.run("source", async () => {
+        throw new Error("Denied");
+      }),
+    ).rejects.toThrow("Denied");
+    expect(publish).toHaveBeenLastCalledWith(null);
+    expect(await controller.run("source", async () => {})).toBe(true);
+  });
+
+  it("ignores completion after the workspace is disposed", async () => {
+    const publish = vi.fn<(channel: CopyChannel | null) => void>();
+    const controller = createCopyTaskController(publish);
+    const gate = deferred();
+    const pending = controller.run("preview", async () => {
+      await gate.promise;
+    });
+    controller.dispose();
+    gate.resolve("done");
+    await pending;
+    expect(publish).toHaveBeenCalledExactlyOnceWith("preview");
+    expect(await controller.run("source", async () => {})).toBe(false);
   });
 });

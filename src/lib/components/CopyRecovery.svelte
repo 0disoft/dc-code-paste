@@ -11,6 +11,7 @@
     let dialog: HTMLDialogElement;
     let source = $state<HTMLTextAreaElement>();
     let fileError = $state("");
+    let returnTo: "preview" | "source" = "preview";
     const previewFailed = $derived(workspace.copyState === "error" || workspace.copyState === "render-error");
     const failed = $derived(previewFailed || workspace.sourceCopyState === "error");
     const renderFailed = $derived(workspace.copyState === "render-error");
@@ -19,6 +20,7 @@
     $effect(() => {
         if (failed && !dialog.open) {
             fileError = "";
+            returnTo = previewFailed ? "preview" : "source";
             dialog.showModal();
         } else if (!failed && dialog.open) dialog.close();
     });
@@ -39,9 +41,14 @@
         if (preview) void workspace.copyPreview();
         else void workspace.copySourceHtml();
     }
+
+    function restoreFocus() {
+        const trigger = document.querySelector<HTMLButtonElement>(`[data-copy-trigger="${returnTo}"]`);
+        trigger?.focus();
+    }
 </script>
 
-<dialog class="copy-recovery" bind:this={dialog} aria-labelledby="copy-recovery-title" aria-describedby="copy-recovery-description" oncancel={() => workspace.dismissCopyErrors()} onkeydown={(event) => event.stopPropagation()}>
+<dialog class="copy-recovery" bind:this={dialog} aria-labelledby="copy-recovery-title" aria-describedby="copy-recovery-description" oncancel={() => workspace.dismissCopyErrors()} onclose={restoreFocus} onkeydown={(event) => event.stopPropagation()}>
     <div class="recovery-content">
         <header>
             <h2 id="copy-recovery-title">{renderFailed ? "글을 변환하지 못했습니다" : "자동 복사가 막혔습니다"}</h2>

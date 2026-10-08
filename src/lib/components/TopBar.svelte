@@ -262,6 +262,7 @@
                 type="button"
                 role="menuitem"
                 aria-label="LLM 가이드 복사"
+                disabled={workspace.isCopying}
                 onclick={workspace.copyLlmAuthoringGuide}
             >
                 {#if workspace.llmPromptCopyState === "copied"}
@@ -316,11 +317,12 @@
             title={workspace.copyLabel}
             aria-label={workspace.copyLabel}
             onclick={workspace.copyPreview}
+            data-copy-trigger="preview"
             disabled={workspace.isCopyDisabled}
         >
             {#if workspace.copyState === "copied"}
                 <Check size={17} aria-hidden="true" />
-            {:else if workspace.isRendering}
+            {:else if workspace.isCopying || workspace.isRendering}
                 <span class="spin-icon"><Loader2 size={17} /></span>
             {:else}
                 <Clipboard size={17} aria-hidden="true" />
