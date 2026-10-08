@@ -13,8 +13,8 @@ it.each(writingTemplates)(
     expect(() => node.check()).not.toThrow();
     const html = await exportDocumentToDcHtml(document, {
       theme: "github-light",
-    documentTheme: "cleanEditorial",
-    bodyFontFamily: "sans-serif",
+      documentTheme: "cleanEditorial",
+      bodyFontFamily: "sans-serif",
       bodyFontSize: "18px",
       codeFontSize: "15px",
       showLineNumbers: false,

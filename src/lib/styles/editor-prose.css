@@ -19,25 +19,7 @@
   max-width: 720px;
   margin: 0 auto;
   outline: none;
-  font-family:
-    Pretendard,
-    Noto Sans KR,
-    Noto Sans CJK KR,
-    본고딕,
-    Nanum Gothic,
-    NanumSquare Neo,
-    나눔고딕,
-    나눔스퀘어,
-    나눔바른고딕,
-    AppleGothic,
-    Segoe UI,
-    Malgun Gothic,
-    맑은 고딕,
-    Noto Sans,
-    Arial,
-    Helvetica Neue,
-    Helvetica,
-    sans-serif;
+  font-family: var(--editor-body-font-family, sans-serif);
   font-size: var(--editor-body-font-size, 17px);
   line-height: 1.8;
   overflow-wrap: break-word;

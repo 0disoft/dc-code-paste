@@ -2,6 +2,7 @@
     import { getContext } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
+    import { safeDcProseFontFamily } from "#lib/dc/font-stacks.ts";
     import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
 
     type Props = {
@@ -61,7 +62,8 @@
             class="editor-surface"
             class:editor-surface-dark={workspace.documentTheme === "darkEditorial"}
             class:editor-surface-clean={workspace.documentTheme === "cleanEditorial"}
-            style={`--editor-body-font-size:${workspace.bodyFontSize};` +
+            style={`--editor-body-font-family:${safeDcProseFontFamily(workspace.bodyFontFamily)};` +
+                `--editor-body-font-size:${workspace.bodyFontSize};` +
                 `--editor-code-font-size:${workspace.codeFontSize}`}
             bind:this={workspace.editorHost}
             role="group"

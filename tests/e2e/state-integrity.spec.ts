@@ -44,12 +44,16 @@ test("reports a failed autosave while keeping the editor usable", async ({ page 
   await page.goto("./");
   await waitForEditor(page);
 
-  await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
+  await expect(
+    page.getByRole("alert").getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요"),
+  ).toBeVisible();
   await page.locator(".article-editor").click();
   await page.keyboard.insertText("UNSAVED_TEXT");
   await expect(page.locator(".article-editor")).toContainText("UNSAVED_TEXT");
   await page.getByRole("button", { name: "다시 저장" }).click();
-  await expect(page.getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요")).toBeVisible();
+  await expect(
+    page.getByRole("alert").getByText("저장 실패 · 이 탭의 내용을 복사해 보관하세요"),
+  ).toBeVisible();
 });
 
 test("stops a stale tab from overwriting another tab's draft", async ({ page, context }) => {
@@ -57,7 +61,7 @@ test("stops a stale tab from overwriting another tab's draft", async ({ page, co
   await page.evaluate(() => localStorage.clear());
   await page.reload();
   await waitForEditor(page);
-  await expect(page.getByText(/저장됨/)).toBeVisible();
+  await expect(page.locator(".topbar-status")).toContainText("저장됨");
 
   const otherTab = await context.newPage();
   await otherTab.goto("./");
@@ -65,7 +69,9 @@ test("stops a stale tab from overwriting another tab's draft", async ({ page, co
   await openMarkdown(otherTab, "# OTHER_TAB_DRAFT");
   await expect.poll(() => storedDraftText(otherTab)).toContain("OTHER_TAB_DRAFT");
 
-  await expect(page.getByText("다른 탭에서 초안이 변경됐습니다 · 자동 저장 중지")).toBeVisible();
+  await expect(
+    page.getByRole("alert").getByText("다른 탭에서 초안이 변경됐습니다 · 자동 저장 중지"),
+  ).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pagehide")));
   expect(await storedDraftText(page)).toContain("OTHER_TAB_DRAFT");
   await page.getByRole("button", { name: "다른 탭 초안 불러오기" }).click();

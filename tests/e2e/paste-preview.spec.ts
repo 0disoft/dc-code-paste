@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 async function waitForEditor(page: Page) {
   await page.goto("./");
@@ -132,6 +133,47 @@ test("starts a news template and preserves the previous draft", async ({ page })
   expect(
     await page.evaluate(() => localStorage.getItem("dc-code-paste:draft-history:v1")),
   ).toContain("DC-CODE-PASTE");
+});
+
+test("backs up a draft to a file and restores it without losing summary formatting", async ({
+  page,
+}) => {
+  await waitForEditor(page);
+  await page.locator(".article-editor .dc-summary-item").first().click();
+  await page.getByRole("button", { name: "초록 테마", exact: true }).click();
+  await page.getByRole("tab", { name: "템플릿", exact: true }).click();
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "초안 파일 저장", exact: true }).click();
+  const download = await downloaded;
+  const backup = await readFile((await download.path())!);
+  const imported = JSON.parse(backup.toString("utf8"));
+  imported.preferences.bodyFontFamily = "Georgia";
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "새 글 시작", exact: true }).click();
+  await expect(page.locator(".article-editor .dc-summary-box")).toHaveCount(0);
+  const fileInput = page.getByLabel("초안 JSON 파일", { exact: true });
+  await fileInput.setInputFiles({
+    name: "broken.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{broken"),
+  });
+  await expect(page.getByRole("alert")).toContainText("올바른 초안 JSON");
+  await expect(page.locator(".article-editor .dc-summary-box")).toHaveCount(0);
+  page.once("dialog", (dialog) => dialog.accept());
+  await fileInput.setInputFiles({
+    name: "draft.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(imported)),
+  });
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+  await expect(page.locator(".article-editor .dc-summary-box").first()).toHaveAttribute(
+    "data-tone",
+    "green",
+  );
+  await expect(page.locator(".rail-left")).toContainText("파일의 글과 서식을 불러왔습니다.");
+  await expect(page.locator(".article-editor")).toHaveCSS("font-family", /Georgia/);
+  await page.reload();
+  await expect(page.locator(".article-editor")).toHaveCSS("font-family", /Georgia/);
 });
 
 for (const mobile of [false, true]) {

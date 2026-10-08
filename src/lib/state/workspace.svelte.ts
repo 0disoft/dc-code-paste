@@ -37,6 +37,7 @@ import {
   createWritingTemplate,
   type WritingTemplateId,
 } from "#lib/editor/writing-templates.ts";
+import { createDraftFile, readDraftFile } from "#lib/editor/draft-file.ts";
 import { sampleDocument } from "#lib/editor/sample-document.ts";
 
 import {
@@ -154,9 +155,9 @@ import { createDraftHistoryController, draftHistoryFingerprint } from "#lib/stat
 import { createPresetController } from "#lib/state/preset-controller.ts";
 
 export function createWorkspaceState() {
-  const bodyFontFamily = defaultProseFontFamily;
+  let bodyFontFamily = $state<string>(defaultProseFontFamily);
 
-  const selectionFontFamily = defaultProseFontFamily;
+  let selectionFontFamily = $state<string>(defaultProseFontFamily);
 
   const defaultBodyFontSize = "18px";
 
@@ -638,6 +639,60 @@ export function createWorkspaceState() {
     }
   }
 
+  function exportDraftFile() {
+    try {
+      const file = createDraftFile(documentJson, currentDraftPreferences());
+      const url = URL.createObjectURL(new Blob([file.content], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = file.filename;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+      return { error: false, message: "초안 파일 저장을 시작했습니다." };
+    } catch (error) {
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : "파일을 저장하지 못했습니다.",
+      };
+    }
+  }
+
+  async function importDraftFile(file: File) {
+    if (!editor) return { error: true, message: "편집기를 연 뒤 다시 시도해 주세요." };
+    const fingerprint = currentDraftHistoryFingerprint();
+    try {
+      const snapshot = await readDraftFile(file, editor.schema);
+      if (fingerprint !== currentDraftHistoryFingerprint()) {
+        return { error: true, message: "파일을 읽는 동안 글이 바뀌었습니다. 다시 불러와 주세요." };
+      }
+      if (
+        !window.confirm(
+          "현재 글을 초안 파일의 내용으로 바꿀까요? 이전 글은 초안 기록에 보관합니다.",
+        )
+      ) {
+        return { error: false, message: "불러오기를 취소했습니다." };
+      }
+      if (!checkpointCurrentDraftBeforeReplacement()) {
+        return {
+          error: true,
+          message: "현재 글을 초안 기록에 보관하지 못했습니다. 먼저 파일로 저장해 주세요.",
+        };
+      }
+      applyDraftPreferences(snapshot.preferences);
+      replaceEditorDocument(snapshot.document);
+      isLinkPanelOpen = false;
+      linkDraft = "";
+      linkError = false;
+      draftHistoryController.markBaseline();
+      return { error: false, message: "파일의 글과 서식을 불러왔습니다." };
+    } catch (error) {
+      return {
+        error: true,
+        message: error instanceof Error ? error.message : "초안 파일을 읽지 못했습니다.",
+      };
+    }
+  }
+
   function downloadInvalidDraft() {
     if (!invalidDraftRaw) {
       return;
@@ -678,9 +733,9 @@ export function createWorkspaceState() {
     return {
       language: defaultLanguage,
       theme: "github-light",
-      bodyFontFamily,
+      bodyFontFamily: defaultProseFontFamily,
       bodyFontSize: defaultBodyFontSize,
-      selectionFontFamily,
+      selectionFontFamily: defaultProseFontFamily,
       selectionFontSize: defaultBodyFontSize,
       codeFontSize: defaultCodeFontSize,
       showLineNumbers: false,
@@ -735,6 +790,8 @@ export function createWorkspaceState() {
   }
 
   function applyDraftPreferences(preferences: DraftPreferences) {
+    bodyFontFamily = preferences.bodyFontFamily;
+    selectionFontFamily = preferences.selectionFontFamily;
     language = preferences.language;
     theme = preferences.theme;
     bodyFontSize = isKnownBodySize(preferences.bodyFontSize)
@@ -2363,11 +2420,6 @@ export function createWorkspaceState() {
       return;
     }
 
-    const storage = draftStorage();
-    if (storage) {
-      clearDraftSnapshot(storage);
-    }
-
     applyDraftPreferences(defaultDraftPreferences());
     replaceEditorDocument(emptyDocument);
     isLinkPanelOpen = false;
@@ -2773,6 +2825,8 @@ export function createWorkspaceState() {
       return invalidDraftDownloaded;
     },
     downloadInvalidDraft,
+    exportDraftFile,
+    importDraftFile,
     resumeDraftSaving,
     get editorHost() {
       return editorHost;
@@ -3334,8 +3388,12 @@ export function createWorkspaceState() {
     copyLlmAuthoringGuide,
     generateMarkdownWithLlm,
     toggleToolPanel,
-    bodyFontFamily,
-    selectionFontFamily,
+    get bodyFontFamily() {
+      return bodyFontFamily;
+    },
+    get selectionFontFamily() {
+      return selectionFontFamily;
+    },
     defaultBodyFontSize,
     defaultCodeFontSize,
     bodySizes,

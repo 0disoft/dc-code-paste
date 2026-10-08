@@ -1,4 +1,5 @@
 <script lang="ts">
+    import DraftFileSection from "./DraftFileSection.svelte";
     import History from "@lucide/svelte/icons/rotate-ccw-clock";
     import Pencil from "@lucide/svelte/icons/pencil";
     import Save from "@lucide/svelte/icons/save";
@@ -116,6 +117,7 @@
     >
         <X size={16} />
     </button>
+    <DraftFileSection />
     <section class="preset-panel" aria-label="프리셋">
         <div class="preset-save">
             <label>

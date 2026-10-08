@@ -1,4 +1,5 @@
 <script lang="ts">
+    import DraftFileSection from "./DraftFileSection.svelte";
     import { getContext } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
@@ -63,6 +64,8 @@
     </button>
     <p class="ui-hint">템플릿은 현재 글을 바꿉니다. 바꾸기 전 글은 저장함의 초안에 보관합니다.</p>
 </section>
+
+<DraftFileSection />
 
 <section class="ui-section" aria-label="프리셋">
     <span class="ui-section-title"><Save size={15} aria-hidden="true" /> 프리셋</span>
