@@ -8,6 +8,7 @@
     import Bold from "@lucide/svelte/icons/bold";
     import Italic from "@lucide/svelte/icons/italic";
     import List from "@lucide/svelte/icons/list";
+    import ListOrdered from "@lucide/svelte/icons/list-ordered";
     import Quote from "@lucide/svelte/icons/quote";
     import TypeOutline from "@lucide/svelte/icons/type-outline";
     import Link2 from "@lucide/svelte/icons/link-2";
@@ -19,6 +20,16 @@
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
     const codeBlockActive = $derived(workspace.isActive("codeBlock"));
+    const headingLevels = [1, 2, 3, 4, 5, 6] as const;
+    const headingLevel = $derived(
+        headingLevels.find((level) => workspace.isActive("heading", { level })) ?? 1,
+    );
+
+    function setHeadingLevel(event: Event) {
+        const value = (event.currentTarget as HTMLSelectElement).value;
+        const level = headingLevels.find((item) => String(item) === value);
+        if (level) workspace.runEditorCommand((current) => current.chain().focus().setHeading({ level }).run());
+    }
     const linkSectionVisible = $derived(
         workspace.isLinkPanelOpen || workspace.isActive("link"),
     );
@@ -43,14 +54,14 @@
     <div class="format-grid" role="group" aria-label="블록과 글자 서식">
         <button
             class="ui-btn ui-btn--outline ui-btn--icon"
-            class:is-active={workspace.isActive("heading", { level: 1 })}
+            class:is-active={workspace.isActive("heading")}
             type="button"
             title="제목"
             aria-label="제목"
-            aria-pressed={workspace.isActive("heading", { level: 1 })}
+            aria-pressed={workspace.isActive("heading")}
             onclick={() =>
                 workspace.runEditorCommand((current) =>
-                    current.chain().focus().toggleHeading({ level: 1 }).run(),
+                    current.chain().focus().toggleHeading({ level: headingLevel }).run(),
                 )}
         >
             <Heading1 size={17} />
@@ -113,6 +124,17 @@
         </button>
         <button
             class="ui-btn ui-btn--outline ui-btn--icon"
+            class:is-active={workspace.isActive("orderedList")}
+            type="button"
+            title="번호 목록"
+            aria-label="번호 목록"
+            aria-pressed={workspace.isActive("orderedList")}
+            onclick={() => workspace.runEditorCommand((current) => current.chain().focus().toggleOrderedList().run())}
+        >
+            <ListOrdered size={17} />
+        </button>
+        <button
+            class="ui-btn ui-btn--outline ui-btn--icon"
             class:is-active={workspace.isActive("blockquote")}
             type="button"
             title="인용"
@@ -168,6 +190,17 @@
             <Code2 size={17} />
         </button>
     </div>
+
+    {#if workspace.isActive("heading")}
+        <label class="ui-field">
+            <span class="ui-label">제목 단계</span>
+            <select class="ui-select" aria-label="제목 단계" value={headingLevel} onchange={setHeadingLevel}>
+                {#each headingLevels as level (level)}
+                    <option value={level}>H{level}{level === 1 ? " · 큰 제목" : level === 2 ? " · 제목" : level === 3 ? " · 소제목" : ""}</option>
+                {/each}
+            </select>
+        </label>
+    {/if}
 
     <label class="ui-field">
         <span class="ui-label">인용 스타일</span>

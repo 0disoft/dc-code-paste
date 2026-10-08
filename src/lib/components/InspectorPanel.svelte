@@ -34,6 +34,8 @@
         summaryBox: "핵심 내용을 요약해 강조하는 블록입니다.",
         paragraph: "본문 문단입니다. 글자 서식과 블록 도구를 쓸 수 있습니다.",
         heading: "제목 블록입니다.",
+        bulletList: "글머리 목록입니다. 항목을 추가하거나 번호 목록으로 바꿀 수 있습니다.",
+        orderedList: "번호 목록입니다. 항목을 추가하거나 글머리 목록으로 바꿀 수 있습니다.",
         sectionHeading: "섹션 제목 블록입니다.",
         blockquote: "인용문 블록입니다. 인용 스타일을 고를 수 있습니다.",
         codeBlock: "코드블록입니다. 언어, 파일명, 줄 강조와 테마를 정합니다.",
@@ -56,7 +58,6 @@
     );
     const labelTarget = $derived(workspace.blockLabelTarget);
     const ctaGroupSelected = $derived(workspace.isActive("ctaGroup"));
-    const codeLabelActive = $derived(workspace.isActive("codeBlock"));
 
     function handleLabelKeydown(event: KeyboardEvent) {
         if (isComposingKeyEvent(event)) return;
@@ -177,25 +178,11 @@
                     </section>
                 {/if}
 
-                {#if blockInfo.type === "paragraph" || blockInfo.type === "heading"}
-                    <section class="ui-section" aria-label="빠른 작업">
-                        <span class="ui-section-title">빠른 작업</span>
-                        <button
-                            class="ui-btn ui-btn--outline"
-                            type="button"
-                            aria-label={codeLabelActive ? "코드블록 해제" : "코드블록 적용"}
-                            onclick={workspace.applyCodeBlock}
-                        >
-                            {codeLabelActive ? "코드블록 해제" : "코드블록 적용"}
-                        </button>
-                        <p class="ui-hint">문단을 코드블록으로 바꾸면 오른쪽에 코드 설정이 나타납니다.</p>
-                    </section>
-                {/if}
             {/if}
 
             <SelectionTextSection />
 
-            {#if blockInfo && blockInfo.type !== "paragraph" && blockInfo.type !== "heading" && !workspace.isLinkPanelOpen}
+            {#if blockInfo && !["paragraph", "heading", "bulletList", "orderedList"].includes(blockInfo.type) && !workspace.isLinkPanelOpen}
                 <details class="ui-disclosure">
                     <summary>글자 서식</summary>
                     <InlineFormatSection />
