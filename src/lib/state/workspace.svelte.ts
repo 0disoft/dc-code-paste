@@ -389,6 +389,8 @@ export function createWorkspaceState() {
 
   let editorSignal = $state(0);
 
+  let selectionControlsFingerprint = "";
+
   let canPersistDraft = $state(false);
   let draftSaveState = $state<DraftSaveState>("idle");
   let draftLastSavedAt = $state("");
@@ -1477,7 +1479,42 @@ export function createWorkspaceState() {
     syncBlockLabelDraft(nextEditor);
     syncTutorialBlockTarget(nextEditor);
     syncCalloutColorDraft(nextEditor);
+    syncSelectionControls(nextEditor);
     editorSignal += 1;
+  }
+
+  function syncSelectionControls(current: Editor, force = false) {
+    const attrs = current.getAttributes("codeBlock");
+    const blockquoteAttrs = current.getAttributes("blockquote");
+    const ctaGroupAttrs = current.getAttributes("ctaGroup");
+    const textStyleAttrs = current.getAttributes("textStyle");
+    const href = selectedLinkHref(current);
+    const fingerprint = JSON.stringify({
+      attrs,
+      blockquoteAttrs,
+      ctaGroupAttrs,
+      textStyleAttrs,
+      href,
+    });
+    // Preserve unfinished input when only the text or global appearance changed.
+    if (!force && fingerprint === selectionControlsFingerprint) return;
+    selectionControlsFingerprint = fingerprint;
+    if (typeof attrs.language === "string" && isSupportedLanguage(attrs.language)) {
+      language = attrs.language;
+    }
+    syncCodeLineMarkerDrafts(
+      normalizeCodeLineMarkers({
+        highlightLines: attrs.highlightLines,
+        additionLines: attrs.additionLines,
+        deletionLines: attrs.deletionLines,
+      }),
+    );
+    codeFilename = normalizeCodeFilename(attrs.filename);
+    quoteStyle = normalizeQuoteStyle(blockquoteAttrs.quoteStyle);
+    ctaGroupLayout = normalizeCtaGroupLayout(ctaGroupAttrs.layout);
+    linkDraft = href;
+    linkError = false;
+    if (typeof textStyleAttrs.fontSize === "string") selectionFontSize = textStyleAttrs.fontSize;
   }
 
   function isActive(name: string, attributes?: Record<string, unknown>) {
@@ -2789,29 +2826,8 @@ export function createWorkspaceState() {
           syncBlockLabelDraft(current);
           syncTutorialBlockTarget(current);
           syncCalloutColorDraft(current);
+          syncSelectionControls(current, true);
           editorSignal += 1;
-          const attrs = current.getAttributes("codeBlock");
-          if (typeof attrs.language === "string" && isSupportedLanguage(attrs.language)) {
-            language = attrs.language;
-          }
-          syncCodeLineMarkerDrafts(
-            normalizeCodeLineMarkers({
-              highlightLines: attrs.highlightLines,
-              additionLines: attrs.additionLines,
-              deletionLines: attrs.deletionLines,
-            }),
-          );
-          codeFilename = normalizeCodeFilename(attrs.filename);
-          const blockquoteAttrs = current.getAttributes("blockquote");
-          quoteStyle = normalizeQuoteStyle(blockquoteAttrs.quoteStyle);
-          linkDraft = selectedLinkHref(current);
-          linkError = false;
-          const ctaGroupAttrs = current.getAttributes("ctaGroup");
-          ctaGroupLayout = normalizeCtaGroupLayout(ctaGroupAttrs.layout);
-          const textStyleAttrs = current.getAttributes("textStyle");
-          if (typeof textStyleAttrs.fontSize === "string") {
-            selectionFontSize = textStyleAttrs.fontSize;
-          }
         },
       });
     }
