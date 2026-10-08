@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test";
+
+test("shows inherited text size instead of the previous selection's size", async ({ page }) => {
+  await page.goto("./");
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+  await page.getByLabel("Markdown 원문").fill("# 서식 확인\n\n**꾸밀 문단**\n\n일반 문단");
+  await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+  await expect(page.locator(".article-editor")).toBeFocused();
+  const paragraphs = page.locator(".article-editor > p");
+  await paragraphs.first().click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
+  await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe("꾸밀 문단");
+  const size = page.getByLabel("선택 글자 크기", { exact: true });
+  await size.selectOption("20px");
+  await expect(paragraphs.first().locator("span")).toHaveCSS("font-size", "20px");
+  await paragraphs.last().click();
+  await expect(size).toHaveValue("");
+  await expect(page.getByRole("button", { name: "글자 꾸밈 초기화", exact: true })).toBeDisabled();
+  await paragraphs.first().click();
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+End");
+  await expect(size).toHaveValue("20px");
+  await page.getByRole("button", { name: "글자 꾸밈 초기화", exact: true }).click();
+  await expect(size).toHaveValue("");
+  await expect(paragraphs.first().locator("span")).toHaveCount(0);
+  await expect(paragraphs.first().locator("strong")).toHaveText("꾸밀 문단");
+});

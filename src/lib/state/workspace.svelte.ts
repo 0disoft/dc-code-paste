@@ -14,6 +14,7 @@ import {
   type BlockAction,
 } from "#lib/editor/block-actions.ts";
 import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
+import { readSelectionTextStyle } from "#lib/editor/selection-text-style.ts";
 import {
   documentOutline,
   activeOutlineIndex,
@@ -2822,6 +2823,15 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get selectionTextStyle() {
+      void editorSignal;
+      return readSelectionTextStyle(editor?.state);
+    },
+    resetSelectionTextStyle() {
+      runEditorCommand((current) =>
+        current.chain().focus().unsetFontSize().unsetFontFamily().unsetColor().run(),
+      );
+    },
     get documentReplacementVersion() {
       return documentReplacementVersion;
     },

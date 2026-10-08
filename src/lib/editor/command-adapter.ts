@@ -393,7 +393,11 @@ export function createEditorCommandAdapter(options: {
   }
 
   function setFontSize(value: string) {
-    run((current) => current.chain().focus().setFontSize(value).run());
+    run((current) =>
+      value
+        ? current.chain().focus().setFontSize(value).run()
+        : current.chain().focus().unsetFontSize().run(),
+    );
   }
 
   function applyCallout(kind: CalloutKind, toneColor: string) {

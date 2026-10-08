@@ -3,21 +3,26 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import Type from "@lucide/svelte/icons/type";
+    import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
+    const style = $derived(workspace.selectionTextStyle);
 </script>
 
 <section class="ui-section" aria-label="선택 영역">
     <span class="ui-section-title"><Type size={15} aria-hidden="true" /> 선택 영역</span>
 
     <label class="ui-field">
-        <span class="ui-label">선택 글자</span>
+        <span class="ui-label">글자 크기</span>
         <select
             class="ui-select"
-            bind:value={workspace.selectionFontSize}
+            value={style.fontSizeMixed ? "mixed" : style.fontSize}
             aria-label="선택 글자 크기"
-            onchange={() => workspace.setFontSize(workspace.selectionFontSize)}
+            onchange={(event) => workspace.setFontSize(event.currentTarget.value)}
         >
+            <option value="">본문 따름</option>
+            {#if style.fontSizeMixed}<option value="mixed" disabled>여러 크기</option>{/if}
+            {#if style.fontSize && !workspace.bodySizes.includes(style.fontSize)}<option value={style.fontSize}>{style.fontSize} (가져온 서식)</option>{/if}
             {#each workspace.bodySizes as item (item)}
                 <option value={item}>{item}</option>
             {/each}
@@ -33,6 +38,7 @@
                     type="button"
                     title={`${swatch.label} 글자색`}
                     aria-label={`${swatch.label} 글자색`}
+                    aria-pressed={!style.colorMixed && style.color.toLowerCase() === swatch.color.toLowerCase()}
                     style={`--swatch:${swatch.color}`}
                     onclick={() => workspace.setTextColor(swatch.color)}
                 ></button>
@@ -40,5 +46,8 @@
         </div>
     </div>
 
-    <p class="ui-hint">글자 크기와 색은 지금 선택한 글자에만 적용됩니다.</p>
+    <button class="ui-btn ui-btn--outline" type="button" aria-label="글자 꾸밈 초기화" disabled={!style.hasOverrides} onclick={workspace.resetSelectionTextStyle}>
+        <RotateCcw size={14} aria-hidden="true" /> 글자 꾸밈 초기화
+    </button>
+    <p class="ui-hint">{style.empty ? "앞으로 입력할 글자에 적용됩니다." : "선택한 글자에 적용됩니다."} 초기화하면 글꼴·크기·색을 본문에 맞추고, 굵게·기울임·링크는 유지합니다.</p>
 </section>
