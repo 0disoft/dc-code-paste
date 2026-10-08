@@ -1,6 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import { escapeHtml } from "../escape-html";
 import { joinStyle, sanitizeReadableTextColor } from "../sanitize-style";
+import { documentTextColors } from "../document-colors";
 import { defaultLanguage, defaultTheme, isSupportedLanguage } from "#lib/highlighter/catalog.ts";
 import type { CalloutKind } from "#lib/editor/callout.ts";
 import { calloutKindFromNodeName, normalizeCalloutKind } from "#lib/editor/callout.ts";
@@ -73,7 +74,7 @@ export const dcExportSupportedMarkTypes = new Set([
   "textStyle",
 ]);
 
-const fallbackTextColor = "oklch(23.39% 0.012 255.51)";
+const fallbackTextColor = documentTextColors.lightLecture.fallback;
 const linkColor = "oklch(56.77% 0.154 252.96)";
 const articleBackground = "oklch(98.38% 0.01 97.33)";
 const articleSurfaceFallbackBackground = "#fbfaf4";
@@ -84,8 +85,8 @@ const quoteTextColor = "oklch(37.24% 0.026 77.36)";
 const quoteMarkColor = "oklch(74.61% 0.063 77.91)";
 const defaultBodyFontSize = "17px";
 const defaultCodeFontSize = "15px";
-const dcLightPageBackground = "#ffffff";
-const dcDarkPageBackground = "#151515";
+const dcLightPageBackground = documentTextColors.lightLecture.background;
+const dcDarkPageBackground = documentTextColors.darkEditorial.background;
 const dcDarkPanelBackground = "#1b1b1b";
 const attributionHref = "https://0disoft.github.io/dc-code-paste/";
 const attributionText = "Created with dc-code-paste";
@@ -130,7 +131,7 @@ function documentPalette(options: DcExportOptions): DocumentPalette {
     return {
       articleBackground: dcDarkPageBackground,
       fallbackBackground: dcDarkPageBackground,
-      text: "#e8e8e8",
+      text: documentTextColors.darkEditorial.fallback,
       mutedText: "#b8b8b8",
       heading: "#f4f4f4",
       link: "#8ab4f8",

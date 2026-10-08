@@ -30,6 +30,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import { defaultProseFontFamily } from "#lib/dc/font-stacks.ts";
 
 import { sanitizeReadableTextColor } from "#lib/dc/sanitize-style.ts";
+import { documentTextColors } from "#lib/dc/document-colors.ts";
 
 import {
   defaultDcExportStructure,
@@ -193,17 +194,7 @@ export function createWorkspaceState() {
     { label: "어두운 글", value: "darkEditorial" },
   ];
 
-  const editorThemeColorSafety = {
-    cleanEditorial: { background: "#ffffff", fallback: "#222222" },
-    lightLecture: {
-      background: "oklch(97.12% 0.012 97.41)",
-      fallback: "oklch(21.18% 0.012 255.31)",
-    },
-    darkEditorial: {
-      background: "oklch(7.2% 0.012 94.1)",
-      fallback: "oklch(94.12% 0.012 93.37)",
-    },
-  } satisfies Record<DcDocumentTheme, { background: string; fallback: string }>;
+  const editorThemeColorSafety = documentTextColors;
 
   const swatches = [
     { label: "짙은 회색", color: "oklch(23.39% 0.012 255.51)" },

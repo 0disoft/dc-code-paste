@@ -3,6 +3,8 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { safeDcProseFontFamily } from "#lib/dc/font-stacks.ts";
+    import { compositeColor } from "#lib/dc/sanitize-style.ts";
+    import { documentTextColors } from "#lib/dc/document-colors.ts";
     import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
 
     type Props = {
@@ -12,6 +14,7 @@
     let { hidden = false }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
+    const colors = $derived(documentTextColors[workspace.documentTheme]);
 
     const BLOCK_MIME = "application/x-dc-block";
 
@@ -62,7 +65,8 @@
             class="editor-surface"
             class:editor-surface-dark={workspace.documentTheme === "darkEditorial"}
             class:editor-surface-clean={workspace.documentTheme === "cleanEditorial"}
-            style={`--editor-body-font-family:${safeDcProseFontFamily(workspace.bodyFontFamily)};` +
+            style={`--editor-article-background:${colors.background};--editor-article-color:${compositeColor(colors.fallback, colors.background)};` +
+                `--editor-body-font-family:${safeDcProseFontFamily(workspace.bodyFontFamily)};` +
                 `--editor-body-font-size:${workspace.bodyFontSize};` +
                 `--editor-code-font-size:${workspace.codeFontSize}`}
             bind:this={workspace.editorHost}

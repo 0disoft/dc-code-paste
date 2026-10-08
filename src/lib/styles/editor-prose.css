@@ -5,13 +5,13 @@
 .editor-surface {
   min-height: 680px;
   padding: 46px 56px 72px;
-  background: var(--surface);
-  color: oklch(21.18% 0.012 255.31);
+  background: var(--editor-article-background, #ffffff);
+  color: var(--editor-article-color, #222222);
 }
 
 .editor-surface-dark {
-  background: oklch(7.2% 0.012 94.1);
-  color: oklch(94.12% 0.012 93.37);
+  background: var(--editor-article-background, #151515);
+  color: var(--editor-article-color, #e8e8e8);
 }
 
 .editor-surface .article-editor {
