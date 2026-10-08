@@ -1,4 +1,7 @@
 const hexColorPattern = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+const rgbPartsPattern = /^rgba?\(([^()]*)\)$/i;
+const rgbFunctionPattern = /\brgba?\([^()]*\)/gi;
+const colorNumberPattern = /^[+-]?(?:\d*\.\d+|\d+)(?:e[+-]?\d+)?%?$/i;
 const oklchColorPattern =
   /^oklch\(\s*(?:\d+(?:\.\d+)?%|\d*\.\d+|\d+)\s+\d*(?:\.\d+)?\s+\d+(?:\.\d+)?(?:deg)?(?:\s*\/\s*(?:\d+(?:\.\d+)?%?|0?\.\d+))?\s*\)$/i;
 const oklchPartsPattern =
@@ -50,6 +53,59 @@ function formatOklch(lightness: number, chroma: number, hue: number, alpha: numb
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function parseRgbComponent(value: string, scale: number, allowNone: boolean): number | undefined {
+  if (allowNone && value === "none") {
+    return 0;
+  }
+  if (!colorNumberPattern.test(value)) {
+    return undefined;
+  }
+  const number = Number.parseFloat(value);
+  return Number.isFinite(number)
+    ? clamp(number / (value.endsWith("%") ? 100 : scale), 0, 1)
+    : undefined;
+}
+
+function parseRgb(value: string): { rgb: SrgbColor; alpha: number } | undefined {
+  const match = rgbPartsPattern.exec(value.trim());
+  if (!match) {
+    return undefined;
+  }
+
+  const body = match[1].trim().toLowerCase();
+  const legacy = body.includes(",");
+  let channels: string[];
+  let alphaValue: string | undefined;
+  if (legacy) {
+    const components = body.split(",").map((component) => component.trim());
+    if (components.length !== 3 && components.length !== 4) {
+      return undefined;
+    }
+    channels = components.slice(0, 3);
+    alphaValue = components[3];
+    if (channels.some((channel) => channel.endsWith("%") !== channels[0].endsWith("%"))) {
+      return undefined;
+    }
+  } else {
+    const components = body.split("/");
+    if (components.length > 2) {
+      return undefined;
+    }
+    channels = components[0].trim().split(/\s+/);
+    alphaValue = components[1]?.trim();
+    if (channels.length !== 3) {
+      return undefined;
+    }
+  }
+
+  const [red, green, blue] = channels.map((channel) => parseRgbComponent(channel, 255, !legacy));
+  const alpha = alphaValue === undefined ? 1 : parseRgbComponent(alphaValue, 1, !legacy);
+  if (red === undefined || green === undefined || blue === undefined || alpha === undefined) {
+    return undefined;
+  }
+  return { rgb: { red, green, blue }, alpha };
 }
 
 function parseOklch(value: string): OklchColor | undefined {
@@ -128,6 +184,11 @@ function cssColorToSrgb(value: string): { rgb: SrgbColor; alpha: number } | unde
       rgb: { red: byte(0), green: byte(step), blue: byte(step * 2) },
       alpha: raw.length === 4 || raw.length === 8 ? byte(step * 3) : 1,
     };
+  }
+
+  const rgb = parseRgb(normalized);
+  if (rgb) {
+    return rgb;
   }
 
   const color = parseOklch(normalized);
@@ -237,20 +298,7 @@ function adjustReadableTextColor(
   return readableFallbackColor(background, backdrop);
 }
 
-function hexToOklch(value: string): string | undefined {
-  const raw = value.slice(1);
-  const step = raw.length <= 4 ? 1 : 2;
-  const red = Number.parseInt(expandHexPair(raw.slice(0, step)), 16) / 255;
-  const green = Number.parseInt(expandHexPair(raw.slice(step, step * 2)), 16) / 255;
-  const blue = Number.parseInt(expandHexPair(raw.slice(step * 2, step * 3)), 16) / 255;
-  const alphaText =
-    raw.length === 4 || raw.length === 8 ? raw.slice(step * 3, step * 4) : undefined;
-  const alpha = alphaText ? Number.parseInt(expandHexPair(alphaText), 16) / 255 : 1;
-
-  if (![red, green, blue, alpha].every(Number.isFinite)) {
-    return undefined;
-  }
-
+function srgbToOklch({ red, green, blue }: SrgbColor, alpha: number): string {
   const linearRed = srgbToLinear(red);
   const linearGreen = srgbToLinear(green);
   const linearBlue = srgbToLinear(blue);
@@ -283,11 +331,8 @@ export function sanitizeColor(value: string | undefined, fallback: string): stri
     return normalized;
   }
 
-  if (hexColorPattern.test(normalized)) {
-    return hexToOklch(normalized) ?? fallback;
-  }
-
-  return fallback;
+  const color = cssColorToSrgb(normalized);
+  return color ? srgbToOklch(color.rgb, color.alpha) : fallback;
 }
 
 export function sanitizeReadableTextColor(
@@ -318,6 +363,10 @@ export function sanitizeReadableTextColor(
 function pasteSafeStyleValue(value: string, background: SrgbColor): string {
   return value
     .replace(oklchFunctionPattern, (match) => oklchToHex(match, background) ?? match)
+    .replace(rgbFunctionPattern, (match) => {
+      const color = visibleSrgb(match, background);
+      return color ? srgbToHex(color) : match;
+    })
     .replace(/#[0-9a-f]{4}(?:[0-9a-f]{4})?\b/gi, (match) =>
       srgbToHex(visibleSrgb(match, background) ?? background),
     );

@@ -29,6 +29,47 @@ describe("sanitizeColor", () => {
     );
   });
 
+  it.each(["rgb(37, 99, 235)", "rgba(37, 99, 235, 1)", "rgb(37 99 235)", "rgb(37 99 235 / 100%)"])(
+    "preserves pasted RGB text colors in %s",
+    (color) => {
+      expect(sanitizeColor(color, "oklch(0% 0 0)")).toBe(sanitizeColor("#2563eb", "oklch(0% 0 0)"));
+    },
+  );
+
+  it.each([
+    ["rgb(100%, 0%, 0%)", "#ff0000"],
+    ["rgba(100% 0 0)", "#ff0000"],
+    ["RGB(+2.55e2 0 0)", "#ff0000"],
+    ["rgb(300 -10 0 / 200%)", "#ff0000"],
+    ["rgb(none 0 255)", "#0000ff"],
+  ])("normalizes CSS RGB components in %s", (color, hex) => {
+    expect(sanitizeColor(color, "fallback")).toBe(sanitizeColor(hex, "fallback"));
+  });
+
+  it.each(["rgba(37, 99, 235, .5)", "rgb(37 99 235 / 50%)"])(
+    "preserves RGB transparency in %s",
+    (color) => {
+      const normalized = sanitizeColor(color, "fallback");
+      expect(normalized).toMatch(/\/ 0\.5\)$/);
+      expect(compositeColor(normalized)).toBe("#92b1f5");
+    },
+  );
+
+  it.each([
+    "rgb(37, 99)",
+    "rgb(37, 99, 235,)",
+    "rgb(37 99 235 /)",
+    "rgb(37 99 235 / .5 / .5)",
+    "rgb(37, 99%, 235)",
+    "rgb(37, none, 235)",
+    "rgb(37, 99, 235 / .5)",
+    "rgb(37px 99 235)",
+    "rgb(1e999 99 235)",
+    "rgb(37 99 235);background:url(https://example.com)",
+  ])("rejects malformed RGB input in %s", (color) => {
+    expect(sanitizeColor(color, "fallback")).toBe("fallback");
+  });
+
   it("rejects non-color style input", () => {
     expect(sanitizeColor("url(javascript:alert(1))", "oklch(0% 0 0)")).toBe("oklch(0% 0 0)");
   });
@@ -61,6 +102,8 @@ describe("sanitizeColor", () => {
     ["#ffffff", "#ffffff"],
     ["#000000", "#000000"],
     ["oklch(0% 0 0 / 0.5)", "#ffffff"],
+    ["rgb(255, 255, 255)", "#ffffff"],
+    ["rgb(0 0 0 / 50%)", "#ffffff"],
   ])("checks contrast after compositing on %s", (background, backdrop) => {
     const candidate = sanitizeReadableTextColor(
       "oklch(50% 0 0 / 0.1)",
@@ -104,6 +147,17 @@ describe("joinStyle", () => {
     );
     expect(joinStyle({ color: "oklch(0% 0 0 / 0.5)" }, "#ffffff")).toBe("color:#808080");
     expect(joinStyle({ color: "oklch(100% 0 0 / 0.5)" }, "#000000")).toBe("color:#808080");
+  });
+
+  it("composites RGB colors against the emitted background", () => {
+    expect(
+      joinStyle({
+        "background-color": "rgba(0, 0, 0, 0.5)",
+        color: "rgb(255 255 255 / 50%)",
+        border: "1px solid rgba(0, 0, 0, .5)",
+      }),
+    ).toBe("background-color:#808080;color:#c0c0c0;border:1px solid #404040");
+    expect(compositeColor("rgb(255 0 0 / none)")).toBe("#ffffff");
   });
 
   it("drops non-finite style numbers and invalid color tokens", () => {
