@@ -390,6 +390,7 @@ export function createWorkspaceState() {
   let editorSignal = $state(0);
 
   let selectionControlsFingerprint = "";
+  let blockLabelFingerprint = "";
 
   let canPersistDraft = $state(false);
   let draftSaveState = $state<DraftSaveState>("idle");
@@ -1402,7 +1403,13 @@ export function createWorkspaceState() {
     return null;
   }
 
-  function syncBlockLabelTarget(target: (EditableBlockLabelTarget & { label: string }) | null) {
+  function syncBlockLabelTarget(
+    target: (EditableBlockLabelTarget & { label: string }) | null,
+    force = false,
+  ) {
+    const fingerprint = JSON.stringify(target);
+    if (!force && fingerprint === blockLabelFingerprint) return;
+    blockLabelFingerprint = fingerprint;
     if (!target) {
       blockLabelTarget = null;
       blockLabelDraft = "";
@@ -1422,13 +1429,14 @@ export function createWorkspaceState() {
     return findEditableBlockLabelTargetFromResolvedPos(current.state.selection.$from);
   }
 
-  function syncBlockLabelDraft(current: Editor) {
-    syncBlockLabelTarget(findEditableBlockLabelTarget(current));
+  function syncBlockLabelDraft(current: Editor, force = false) {
+    syncBlockLabelTarget(findEditableBlockLabelTarget(current), force);
   }
 
   function syncBlockLabelDraftFromPosition(current: Editor, pos: number) {
     syncBlockLabelTarget(
       findEditableBlockLabelTargetFromResolvedPos(current.state.doc.resolve(pos)),
+      true,
     );
   }
 
@@ -2823,7 +2831,7 @@ export function createWorkspaceState() {
             refreshEditorState(current);
         },
         onSelectionUpdate: ({ editor: current }) => {
-          syncBlockLabelDraft(current);
+          syncBlockLabelDraft(current, true);
           syncTutorialBlockTarget(current);
           syncCalloutColorDraft(current);
           syncSelectionControls(current, true);

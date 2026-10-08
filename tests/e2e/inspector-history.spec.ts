@@ -97,3 +97,36 @@ test("syncs the button group layout after undo and redo", async ({ page }) => {
   await expect(group).not.toHaveAttribute("data-layout");
   await expect(input).toHaveValue("horizontal");
 });
+
+for (const mobile of [false, true]) {
+  test(`keeps an unfinished block label while adjusting article settings on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("./");
+    const editor = page.locator(".article-editor");
+    await expect(editor).toContainText("DC-CODE-PASTE");
+    const callout = editor.locator(".dc-callout").first();
+    await callout.locator("p").first().click();
+    const panel = page.getByRole("button", { name: "블록 설정 패널", exact: true });
+    if (mobile) await panel.click();
+    const label = page.getByRole("textbox", { name: "블록 라벨", exact: true });
+    const original = await label.inputValue();
+    await label.fill("작성 중인 라벨");
+    await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+    await page.getByLabel("본문 글자 크기", { exact: true }).selectOption("20px");
+    await page.getByRole("tab", { name: "선택한 블록", exact: true }).click();
+    await expect(label).toHaveValue("작성 중인 라벨");
+    await expect(callout).toHaveAttribute("data-label", original);
+    await label.press("Enter");
+    await expect(callout).toHaveAttribute("data-label", "작성 중인 라벨");
+    if (mobile) await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    if (mobile) await panel.click();
+    await expect(label).toHaveValue(original);
+    if (mobile) await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "다시 실행", exact: true }).click();
+    if (mobile) await panel.click();
+    await expect(label).toHaveValue("작성 중인 라벨");
+  });
+}
