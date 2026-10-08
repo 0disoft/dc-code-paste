@@ -1,5 +1,23 @@
 import { expect, test } from "@playwright/test";
 
+test("finds text at the end of a long block", async ({ page }) => {
+  await page.setViewportSize({ width: 1487, height: 900 });
+  await page.goto("./");
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+  await page
+    .getByLabel("Markdown 원문")
+    .fill(`# 검색 확인\n\n${"긴 본문 ".repeat(30)}끝부분 검색어`);
+  await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+  await page.getByRole("tab", { name: "글 구성", exact: true }).click();
+  await page.getByRole("searchbox", { name: "글 구성 검색" }).fill("끝부분 검색어");
+  const result = page.getByRole("navigation", { name: "글 구성", exact: true }).getByRole("button");
+  await expect(result).toHaveCount(1);
+  await result.click();
+  await expect(page.locator(".article-editor .dc-selected-block")).toContainText("끝부분 검색어");
+});
+
 for (const mobile of [false, true]) {
   test(`finds blocks and navigates from preview on ${mobile ? "mobile" : "desktop"}`, async ({
     page,
@@ -35,6 +53,11 @@ for (const mobile of [false, true]) {
     await expect(editor.locator(".dc-selected-block")).toHaveClass(/dc-summary-box/);
     await expect(editor).toBeFocused();
     expect((await editor.innerText()).trim()).toBe(before);
+    if (!mobile) {
+      await expect(page.getByLabel("요약 블록 제목", { exact: true })).toHaveValue(
+        (await editor.locator(".dc-selected-block").getAttribute("data-label")) ?? "",
+      );
+    }
     if (mobile) {
       await expect(
         page.getByRole("button", { name: "블록 삽입 패널", exact: true }),

@@ -26,7 +26,7 @@ export function documentOutline(doc: Node) {
       index,
       position,
       label,
-      text: text.length > 80 ? `${text.slice(0, 80)}…` : text,
+      text,
     });
   });
   return entries;
@@ -41,9 +41,10 @@ export function navigateToBlock(editor: Editor, index: number) {
   let position = 0;
   for (let i = 0; i < index; i++) position += editor.state.doc.child(i).nodeSize;
   const node = editor.state.doc.child(index);
-  const selection = NodeSelection.isSelectable(node)
-    ? NodeSelection.create(editor.state.doc, position)
-    : Selection.near(editor.state.doc.resolve(position));
+  const selection =
+    node.isLeaf && NodeSelection.isSelectable(node)
+      ? NodeSelection.create(editor.state.doc, position)
+      : Selection.near(editor.state.doc.resolve(position + 1));
   editor.view.dispatch(
     editor.state.tr.setSelection(selection).setMeta("addToHistory", false).scrollIntoView(),
   );

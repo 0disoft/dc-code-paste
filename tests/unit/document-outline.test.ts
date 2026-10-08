@@ -1,5 +1,5 @@
 import { getSchema, type Editor } from "@tiptap/core";
-import { EditorState, NodeSelection, type Transaction } from "@tiptap/pm/state";
+import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
 import { expect, it } from "vitest";
 import { createEditorExtensions } from "../../src/lib/editor/extensions";
 import {
@@ -7,6 +7,16 @@ import {
   activeOutlineIndex,
   navigateToBlock,
 } from "../../src/lib/editor/document-outline";
+
+it("keeps the full block text searchable beyond the visible two-line excerpt", () => {
+  const schema = getSchema(createEditorExtensions());
+  const text = `${"긴 본문 ".repeat(30)}끝부분 검색어`;
+  const doc = schema.nodeFromJSON({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+  });
+  expect(documentOutline(doc)[0]?.text).toContain("끝부분 검색어");
+});
 
 it("keeps nested blocks as one entry and navigates without changing content", () => {
   const schema = getSchema(createEditorExtensions());
@@ -49,7 +59,7 @@ it("keeps nested blocks as one entry and navigates without changing content", ()
     },
   ]);
   expect(navigateToBlock(editor, 1)).toBe(true);
-  expect(state.selection).toBeInstanceOf(NodeSelection);
+  expect(state.selection).toBeInstanceOf(TextSelection);
   expect(activeOutlineIndex(editor)).toBe(1);
   expect(state.doc.eq(doc)).toBe(true);
   expect(navigateToBlock(editor, 2)).toBe(true);

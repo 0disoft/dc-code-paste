@@ -10,8 +10,10 @@
     const filtered = $derived(entries.filter((entry) => `${entry.label} ${entry.text}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
 </script>
 
-<input class="ui-input" type="search" aria-label="글 구성 검색" placeholder="내용이나 블록 이름으로 찾기" bind:value={query} />
-<p class="outline-count" role="status">{query.trim() ? `${filtered.length}개 찾음 / ` : ""}총 {entries.length}개 블록</p>
+<div class="outline-search">
+    <input class="ui-input" type="search" aria-label="글 구성 검색" placeholder="내용이나 블록 이름으로 찾기" bind:value={query} />
+    <p class="outline-count" role="status">{query.trim() ? `${filtered.length}개 찾음 / ` : ""}총 {entries.length}개 블록</p>
+</div>
 <nav aria-label="글 구성">
     <ol class="outline-list">
         {#each filtered as entry (entry.index)}
@@ -27,6 +29,7 @@
 {#if filtered.length === 0}<p class="outline-count">일치하는 블록이 없습니다.</p>{/if}
 
 <style>
+    .outline-search { position: sticky; top: 0; z-index: 1; display: grid; gap: 8px; padding-bottom: 8px; background: var(--rail); }
     .outline-count { margin: 0; color: var(--muted); font-size: 0.78rem; }
     .outline-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
     .outline-item { display: grid; gap: 5px; width: 100%; min-height: 56px; padding: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); text-align: left; cursor: pointer; }
