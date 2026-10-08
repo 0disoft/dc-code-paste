@@ -5,6 +5,8 @@
     import Check from "@lucide/svelte/icons/check";
     import Loader2 from "@lucide/svelte/icons/loader-circle";
     import Clipboard from "@lucide/svelte/icons/clipboard";
+    import Monitor from "@lucide/svelte/icons/monitor";
+    import Smartphone from "@lucide/svelte/icons/smartphone";
 
     type Props = {
         hidden?: boolean;
@@ -13,6 +15,13 @@
     let { hidden = false }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
+    let previewWidth = $state<"fit" | "desktop" | "mobile">("fit");
+    const widths = [
+        { value: "fit", label: "맞춤", width: "100%" },
+        { value: "desktop", label: "PC", width: "960px" },
+        { value: "mobile", label: "모바일", width: "390px" },
+    ] as const;
+    const selectedWidth = $derived(widths.find((item) => item.value === previewWidth)!);
 
     const renderStatusLabel = $derived(
         workspace.isRendering
@@ -35,6 +44,16 @@
         </div>
 
         <div class="preview-tools">
+            {#if workspace.previewMode === "rendered"}
+                <div class="ui-segmented" role="group" aria-label="미리보기 폭">
+                    {#each widths as item (item.value)}
+                        <button type="button" class:is-active={previewWidth === item.value} aria-pressed={previewWidth === item.value} title={item.value === "fit" ? "작업 영역에 맞춤" : `${item.label} ${item.width} 폭으로 확인`} onclick={() => (previewWidth = item.value)}>
+                            {#if item.value === "desktop"}<Monitor size={14} aria-hidden="true" />{:else if item.value === "mobile"}<Smartphone size={14} aria-hidden="true" />{/if}
+                            {item.label}
+                        </button>
+                    {/each}
+                </div>
+            {/if}
             <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>
             <span class="status-pill" aria-label="현재 글 배경">{workspace.documentThemeLabel}</span>
             <div class="ui-segmented" aria-label="미리보기 형식">
@@ -85,13 +104,17 @@
 
     <div class="canvas-scroll">
         {#if workspace.previewMode === "rendered"}
+            <div class="preview-stage">
+                <p class="preview-width-note">{previewWidth === "fit" ? "작업 영역에 맞춤" : `${selectedWidth.label} · ${selectedWidth.width} · 좁은 화면에서는 가로로 스크롤하세요`}</p>
             <div
                 class="preview-surface"
                 class:preview-surface-dark={workspace.documentTheme === "darkEditorial"}
+                style:width={selectedWidth.width}
             >
                 {#if workspace.html}
                     {@html workspace.html}
                 {/if}
+            </div>
             </div>
         {:else}
             <textarea
@@ -106,6 +129,30 @@
 </div>
 
 <style>
+    .preview-stage {
+        min-height: 100%;
+        padding: 16px;
+        background: var(--panel-2);
+        min-width: 100%;
+    }
+
+    .preview-width-note {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 0.74rem;
+    }
+
+    .preview-surface {
+        margin: 0 auto;
+        padding: 0;
+        overflow: auto;
+    }
+
+    .html-source:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: -2px;
+    }
+
     .preview-head {
         display: flex;
         align-items: center;
