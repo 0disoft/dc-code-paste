@@ -92,7 +92,7 @@
                     <span>{workspace.sourceCopyLabel}</span>
                 </button>
             {/if}
-            <span class="preview-size">HTML {workspace.htmlSize}</span>
+            <span class="preview-size" title="HTML 원문의 UTF-8 기준 용량">{workspace.isRendering ? "HTML 생성 중" : `HTML ${workspace.htmlSize}`}</span>
         </div>
     </div>
 

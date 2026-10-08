@@ -26,12 +26,14 @@ for (const mobile of [false, true]) {
       await expect(source).toBeDisabled();
       await expect(source).toHaveValue("");
       await expect(source).toHaveAttribute("aria-label", "HTML 원문 생성 중");
+      await expect(page.locator(".preview-size")).toHaveText("HTML 생성 중");
       await expect(page.getByRole("button", { name: "원문 복사", exact: true })).toBeDisabled();
       await page.clock.runFor(1000);
       await expect(source).toBeEnabled();
       await expect(source).toHaveValue(/FRESH_EXPORT/);
       await expect(source).not.toHaveValue(/DC-CODE-PASTE/);
       await expect(source).toHaveAttribute("aria-label", "복사용 HTML 원문");
+      await expect(page.locator(".preview-size")).toHaveText(/^HTML \d+KB$/);
       await expect(page.getByRole("button", { name: "원문 복사", exact: true })).toBeEnabled();
     } finally {
       await page.clock.resume();

@@ -512,7 +512,7 @@ export function createWorkspaceState() {
     },
   });
 
-  const htmlSize = $derived(html.length === 0 ? "0KB" : `${Math.ceil(html.length / 1024)}KB`);
+  const htmlSize = $derived(`${Math.ceil(new TextEncoder().encode(html).byteLength / 1024)}KB`);
 
   const copyLabel = $derived(
     activeCopyChannel === "preview" ? "복사 중" : copyState === "copied" ? "복사됨" : "디씨 복사",
