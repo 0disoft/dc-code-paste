@@ -74,6 +74,16 @@ export function editableHrefNodeTargetFromResolvedPos(resolvedPos: ResolvedPos) 
   return undefined;
 }
 
+export function selectedLinkHref(current: Editor): string {
+  const selection = current.state.selection;
+  if (selection instanceof NodeSelection && isEditableHrefNodeName(selection.node.type.name)) {
+    return hrefFromAttributes(selection.node.attrs) ?? "";
+  }
+  const target = editableHrefNodeTargetFromResolvedPos(selection.$from);
+  if (target) return target.href;
+  return hrefFromAttributes(current.getAttributes("link")) ?? "";
+}
+
 function nextTutorialStepNumber(node: ProseMirrorNode) {
   let maxNumber = 0;
   let stepCount = 0;

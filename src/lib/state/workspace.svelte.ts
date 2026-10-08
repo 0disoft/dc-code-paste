@@ -77,6 +77,7 @@ import {
   findTutorialBlockTargetFromResolvedPos,
   hrefFromAttributes,
   isEditableHrefNodeName,
+  selectedLinkHref,
 } from "#lib/editor/command-adapter.ts";
 import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
 
@@ -2353,7 +2354,7 @@ export function createWorkspaceState() {
         if (!isActive("codeBlock")) applyCodeBlock();
         break;
       case "link":
-        isLinkPanelOpen = true;
+        openLinkPanel();
         break;
       case "hero":
         applyHeroBlock();
@@ -2404,15 +2405,22 @@ export function createWorkspaceState() {
     editorCommands.unsetLink();
   }
 
-  function toggleLinkPanel() {
+  function openLinkPanel() {
     if (!editor) {
       return;
     }
-
-    const existing = editor.getAttributes("link").href;
-    linkDraft = typeof existing === "string" ? existing : linkDraft;
+    linkDraft = selectedLinkHref(editor);
     linkError = false;
-    isLinkPanelOpen = !isLinkPanelOpen;
+    isLinkPanelOpen = true;
+  }
+
+  function toggleLinkPanel() {
+    if (isLinkPanelOpen) {
+      isLinkPanelOpen = false;
+    } else {
+      openLinkPanel();
+      void focusLinkInput();
+    }
   }
 
   function setTextColor(color: string) {
@@ -2585,6 +2593,8 @@ export function createWorkspaceState() {
 
       if (
         target.closest(".toolbar-shell") ||
+        target.closest(".link-editor") ||
+        target.closest("[data-link-panel-toggle]") ||
         target.closest(".code-line-context-menu") ||
         target.closest(".markdown-panel") ||
         target.closest(".llm-panel") ||
@@ -2752,18 +2762,8 @@ export function createWorkspaceState() {
           codeFilename = normalizeCodeFilename(attrs.filename);
           const blockquoteAttrs = current.getAttributes("blockquote");
           quoteStyle = normalizeQuoteStyle(blockquoteAttrs.quoteStyle);
-          const linkAttrs = current.getAttributes("link");
-          if (typeof linkAttrs.href === "string") {
-            linkDraft = linkAttrs.href;
-          }
-          const linkBoxAttrs = current.getAttributes("linkBox");
-          if (typeof linkBoxAttrs.href === "string") {
-            linkDraft = linkBoxAttrs.href;
-          }
-          const ctaButtonAttrs = current.getAttributes("ctaButton");
-          if (typeof ctaButtonAttrs.href === "string") {
-            linkDraft = ctaButtonAttrs.href;
-          }
+          linkDraft = selectedLinkHref(current);
+          linkError = false;
           const ctaGroupAttrs = current.getAttributes("ctaGroup");
           ctaGroupLayout = normalizeCtaGroupLayout(ctaGroupAttrs.layout);
           const textStyleAttrs = current.getAttributes("textStyle");

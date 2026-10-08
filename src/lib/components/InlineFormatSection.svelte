@@ -150,6 +150,7 @@
             type="button"
             title="링크"
             aria-label="링크"
+            data-link-panel-toggle
             aria-pressed={workspace.isActive("link") || workspace.isLinkPanelOpen}
             onclick={workspace.toggleLinkPanel}
         >
@@ -193,11 +194,16 @@
                     bind:this={workspace.linkInput}
                     bind:value={workspace.linkDraft}
                     aria-label="링크 주소"
+                    aria-invalid={workspace.linkError}
+                    aria-describedby={workspace.linkError ? "link-address-error" : undefined}
                     placeholder="https://example.com"
                     oninput={() => (workspace.linkError = false)}
                     onkeydown={handleLinkKeydown}
                 />
             </label>
+            {#if workspace.linkError}
+                <p id="link-address-error" class="ui-hint is-error" role="alert">주소를 확인해 주세요. 웹 주소나 이메일 링크(mailto:)를 입력할 수 있습니다.</p>
+            {/if}
             <div class="ui-inline-group">
                 <button
                     class="ui-btn ui-btn--primary"
