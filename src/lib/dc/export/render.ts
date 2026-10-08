@@ -10,6 +10,11 @@ import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts";
 import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 import {
+  normalizeBlockAppearance,
+  summaryToneColors,
+  summarySpacing,
+} from "#lib/editor/block-appearance.ts";
+import {
   defaultProseFontFamily,
   safeDcInlineCodeFontFamily as safeInlineCodeFontFamily,
   safeDcProseFontFamily as safeProseFontFamily,
@@ -1604,7 +1609,7 @@ async function renderSummaryBox(node: JSONContent, options: DcExportOptions): Pr
     return "";
   }
 
-  return renderSummaryBoxTable(items, options, label);
+  return renderSummaryBoxTable(items, options, label, node.attrs);
 }
 
 function renderSummaryItemContent(
@@ -1623,8 +1628,19 @@ function renderSummaryBoxTable(
   items: JSONContent[],
   options: DcExportOptions,
   label: string,
+  attrs: Record<string, unknown> = {},
 ): string {
+  const appearance = normalizeBlockAppearance(attrs);
   const palette = summaryBoxPalette(options);
+  if (attrs.tone) {
+    const tone = summaryToneColors[appearance.tone];
+    Object.assign(palette, tone, {
+      fallbackBackground: tone.background,
+      bulletBackground: tone.accent,
+      text: "#222222",
+    });
+  }
+  const spacing = summarySpacing[appearance.spacing];
   const tableStyle = joinStyle({
     width: "100%",
     margin: "0 0 18px",
@@ -1634,7 +1650,8 @@ function renderSummaryBoxTable(
     "border-top": `4px solid ${palette.accent}`,
   });
   const labelCellStyle = joinStyle({
-    padding: "12px 16px 5px",
+    padding: `${spacing.top}px ${spacing.horizontal}px ${spacing.row}px`,
+    "text-align": appearance.alignment,
     color: palette.label,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": "12px",
@@ -1642,7 +1659,8 @@ function renderSummaryBoxTable(
     "line-height": 1.2,
   });
   const itemCellStyle = joinStyle({
-    padding: "5px 16px",
+    padding: `${spacing.row}px ${spacing.horizontal}px`,
+    "text-align": appearance.alignment,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeBodyFontSize(options),
@@ -1650,7 +1668,8 @@ function renderSummaryBoxTable(
     "vertical-align": "top",
   });
   const lastItemCellStyle = joinStyle({
-    padding: "5px 16px 13px",
+    padding: `${spacing.row}px ${spacing.horizontal}px ${spacing.bottom}px`,
+    "text-align": appearance.alignment,
     color: palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeBodyFontSize(options),

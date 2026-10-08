@@ -1,0 +1,74 @@
+.editor-surface .article-editor .dc-summary-box[data-tone="blue"] {
+  --summary-background: #eef2ff;
+  --summary-accent: #315dfb;
+  --summary-border: #c7d2fe;
+  --summary-label: #263f9a;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone="green"] {
+  --summary-background: #ecfdf5;
+  --summary-accent: #059669;
+  --summary-border: #a7f3d0;
+  --summary-label: #065f46;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone="amber"] {
+  --summary-background: #fffbeb;
+  --summary-accent: #d97706;
+  --summary-border: #fde68a;
+  --summary-label: #92400e;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone="rose"] {
+  --summary-background: #fff1f2;
+  --summary-accent: #e11d48;
+  --summary-border: #fecdd3;
+  --summary-label: #9f1239;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone="violet"] {
+  --summary-background: #f5f3ff;
+  --summary-accent: #7c3aed;
+  --summary-border: #ddd6fe;
+  --summary-label: #5b21b6;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone] {
+  background: var(--summary-background);
+  border-color: var(--summary-border);
+  border-top-color: var(--summary-accent);
+  color: #222;
+}
+.editor-surface .article-editor .dc-summary-box[data-tone]::before {
+  color: var(--summary-label);
+}
+.editor-surface .article-editor .dc-summary-box[data-tone] .dc-summary-item::before {
+  background: var(--summary-accent);
+}
+.editor-surface .article-editor .dc-summary-box[data-alignment="left"] {
+  text-align: left;
+}
+.editor-surface .article-editor .dc-summary-box[data-alignment="center"] {
+  text-align: center;
+}
+.editor-surface .article-editor .dc-summary-box[data-alignment="right"] {
+  text-align: right;
+}
+.editor-surface .article-editor .dc-summary-box[data-spacing="compact"] {
+  padding: 8px 12px 9px;
+  --summary-row-gap: 3px;
+}
+.editor-surface .article-editor .dc-summary-box[data-spacing="normal"] {
+  padding: 12px 16px 13px;
+  --summary-row-gap: 5px;
+}
+.editor-surface .article-editor .dc-summary-box[data-spacing="spacious"] {
+  padding: 20px 24px;
+  --summary-row-gap: 8px;
+}
+.editor-surface .article-editor .dc-summary-box[data-spacing]::before,
+.editor-surface .article-editor .dc-summary-box[data-spacing] .dc-summary-item {
+  margin-bottom: var(--summary-row-gap);
+}
+.editor-surface .article-editor .dc-summary-box[data-spacing] .dc-summary-item:last-child {
+  margin-bottom: 0;
+}
+.editor-surface .article-editor .dc-selected-block {
+  outline: 1px solid #315dfb;
+  outline-offset: 3px;
+}

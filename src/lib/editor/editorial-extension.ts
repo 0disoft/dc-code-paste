@@ -3,6 +3,7 @@ import { normalizeCtaGroupLayout } from "./cta-group";
 import { normalizeEditableLinkHref } from "./link";
 import { defaultSummaryBoxLabel } from "./summary-box";
 import { normalizeTutorialStepNumber } from "./tutorial-block";
+import { normalizeBlockAppearance } from "./block-appearance";
 
 export const SectionHeading = Node.create({
   name: "sectionHeading",
@@ -193,6 +194,24 @@ export const SummaryBox = Node.create({
 
   addAttributes() {
     return {
+      tone: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-tone"),
+        renderHTML: (attrs) =>
+          attrs.tone ? { "data-tone": normalizeBlockAppearance(attrs).tone } : {},
+      },
+      alignment: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-alignment"),
+        renderHTML: (attrs) =>
+          attrs.alignment ? { "data-alignment": normalizeBlockAppearance(attrs).alignment } : {},
+      },
+      spacing: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-spacing"),
+        renderHTML: (attrs) =>
+          attrs.spacing ? { "data-spacing": normalizeBlockAppearance(attrs).spacing } : {},
+      },
       label: {
         default: defaultSummaryBoxLabel,
         parseHTML: (element) => element.getAttribute("data-label") ?? defaultSummaryBoxLabel,

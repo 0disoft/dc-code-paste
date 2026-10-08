@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import '#lib/styles/block-appearance.css';
 
   let { children } = $props();
 </script>

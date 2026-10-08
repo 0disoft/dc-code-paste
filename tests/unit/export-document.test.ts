@@ -1069,6 +1069,29 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toMatch(/\son[a-z]+=/i);
   });
 
+  it("preserves summary appearance in DC HTML, including a dark article", async () => {
+    const document: JSONContent = {
+      type: "doc",
+      content: [
+        {
+          type: "summaryBox",
+          attrs: { label: "중요 내용", tone: "green", alignment: "center", spacing: "spacious" },
+          content: [{ type: "summaryItem", content: [{ type: "text", text: "내보낸 요약" }] }],
+        },
+      ],
+    };
+    for (const documentTheme of ["lightLecture", "darkEditorial"] as const) {
+      const html = await exportDocumentToDcHtml(document, { ...exportOptions, documentTheme });
+      expect(html).toContain('bgcolor="#ecfdf5"');
+      expect(html).toContain("border-top:4px solid #059669");
+      expect(html).toContain("padding:20px 24px 8px;text-align:center");
+      expect(html).toContain("padding:8px 24px 20px;text-align:center;color:#222222");
+      expect(html).toContain("중요 내용");
+      expect(html).toContain("내보낸 요약");
+      expect(html).not.toMatch(/\sdata-[\w-]+=/);
+    }
+  });
+
   it("exports custom summary and callout labels", async () => {
     const document: JSONContent = {
       type: "doc",

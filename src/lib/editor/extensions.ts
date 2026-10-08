@@ -13,6 +13,7 @@ import { LinkBox } from "./link-box-extension";
 import { createCodeBlockHighlightPlugin } from "./code-block-highlight";
 import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
 import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
+import { SelectedBlockDecoration } from "./block-inspector";
 
 const DcCodeBlock = CodeBlock.extend({
   addProseMirrorPlugins() {
@@ -92,6 +93,7 @@ export function createEditorExtensions() {
       link: false,
     }),
     QuoteStyleAttributes,
+    SelectedBlockDecoration,
     DcCodeBlock.configure({
       defaultLanguage,
       enableTabIndentation: true,

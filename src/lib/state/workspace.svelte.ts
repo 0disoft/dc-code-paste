@@ -2,6 +2,13 @@ import { onDestroy, onMount, tick, untrack } from "svelte";
 import { createEditorMountController } from "#lib/state/editor-mount.ts";
 
 import type { Editor, JSONContent } from "@tiptap/core";
+import {
+  selectedBlockInfo,
+  setSelectedBlockAppearance as updateBlockAppearance,
+  isPaletteBlockKind,
+  type PaletteBlockKind,
+} from "#lib/editor/block-inspector.ts";
+import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
 
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
 
@@ -2232,6 +2239,64 @@ export function createWorkspaceState() {
     editorCommands.applyComparisonBlock();
   }
 
+  function setSelectedBlockAppearance(values: Partial<BlockAppearance>) {
+    runEditorCommand((current) => updateBlockAppearance(current, values));
+  }
+
+  function insertPaletteBlock(kind: PaletteBlockKind, point?: { x: number; y: number }) {
+    if (!editor || !isPaletteBlockKind(kind)) return;
+    if (point) {
+      const position = editor.view.posAtCoords({ left: point.x, top: point.y });
+      if (!position) return;
+      editor.commands.setTextSelection(position.pos);
+    }
+    activeToolPanel = kind === "code" ? "code" : "blocks";
+    switch (kind) {
+      case "heading":
+        runEditorCommand((current) => current.chain().focus().setHeading({ level: 1 }).run());
+        break;
+      case "paragraph":
+        runEditorCommand((current) => current.chain().focus().setParagraph().run());
+        break;
+      case "summary":
+        applySummaryBox();
+        break;
+      case "quote":
+        applyQuote();
+        break;
+      case "code":
+        if (!isActive("codeBlock")) applyCodeBlock();
+        break;
+      case "link":
+        isLinkPanelOpen = true;
+        break;
+      case "hero":
+        applyHeroBlock();
+        break;
+      case "callout":
+        applySelectedCallout();
+        break;
+      case "comparison":
+        applyComparisonBlock();
+        break;
+      case "tutorial":
+        applyTutorialBlock();
+        break;
+      case "references":
+        applyReferenceList();
+        break;
+      case "cta":
+        applyCtaButton();
+        break;
+      case "ctaGroup":
+        applyCtaGroup();
+        break;
+      case "divider":
+        runEditorCommand((current) => current.chain().focus().setHorizontalRule().run());
+        break;
+    }
+  }
+
   function setLink() {
     if (!editor) {
       return;
@@ -2504,6 +2569,14 @@ export function createWorkspaceState() {
         extensions,
         content: documentJson,
         editorProps: {
+          handleDrop: (_view, event) => {
+            const kind = event.dataTransfer?.getData("application/x-dc-block") ?? "";
+            if (!isPaletteBlockKind(kind)) return false;
+            event.preventDefault();
+            event.stopPropagation();
+            insertPaletteBlock(kind, { x: event.clientX, y: event.clientY });
+            return true;
+          },
           attributes: {
             class: "article-editor",
             spellcheck: "false",
@@ -2643,6 +2716,12 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get selectedBlockInfo() {
+      void editorSignal;
+      return selectedBlockInfo(editor);
+    },
+    setSelectedBlockAppearance,
+    insertPaletteBlock,
     loadOtherTabDraft,
     overwriteOtherTabDraft,
     get draftSaveState() {
