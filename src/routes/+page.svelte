@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount, setContext, tick } from "svelte";
+    import { onMount, setContext, tick, untrack } from "svelte";
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
     import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
@@ -20,6 +20,19 @@
     let leftRailOpen = $state(false);
     let rightRailOpen = $state(false);
     let compact = $state(false);
+
+    $effect(() => {
+        const version = workspace.documentReplacementVersion;
+        if (!version) return;
+        untrack(() => {
+            selectWorkspaceView("editor");
+            closeRails();
+            workspace.isStoragePanelOpen = false;
+            void tick().then(() => {
+                if (workspace.documentReplacementVersion === version) workspace.editor?.commands.focus("start");
+            });
+        });
+    });
 
     onMount(() => {
         const query = window.matchMedia("(max-width: 1100px)");

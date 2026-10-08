@@ -251,6 +251,7 @@ export function createWorkspaceState() {
   let editorHost = $state<HTMLDivElement>();
 
   let editor = $state<Editor>();
+  let documentReplacementVersion = $state(0);
 
   let blockLabelInput = $state<HTMLInputElement>();
 
@@ -783,6 +784,7 @@ export function createWorkspaceState() {
 
     if (editor) {
       refreshEditorState(editor);
+      documentReplacementVersion += 1;
     }
   }
 
@@ -2798,6 +2800,9 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get documentReplacementVersion() {
+      return documentReplacementVersion;
+    },
     get documentOutline() {
       void documentJson;
       return editor ? documentOutline(editor.state.doc) : [];
