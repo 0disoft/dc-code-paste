@@ -686,11 +686,18 @@ export function createWorkspaceState() {
     }
   }
 
-  async function importDraftFile(file: File) {
-    if (!editor) return { error: true, message: "편집기를 연 뒤 다시 시도해 주세요." };
+  async function importDraftFile(file: File, signal?: AbortSignal) {
+    const currentEditor = editor;
+    if (!currentEditor || currentEditor.isDestroyed)
+      return { error: true, message: "편집기를 연 뒤 다시 시도해 주세요." };
+    const cancelled = { error: false, message: "불러오기를 취소했습니다." };
+    const isCancelled = () =>
+      signal?.aborted || currentEditor.isDestroyed || editor !== currentEditor;
+    if (isCancelled()) return cancelled;
     const fingerprint = currentDraftHistoryFingerprint();
     try {
-      const snapshot = await readDraftFile(file, editor.schema);
+      const snapshot = await readDraftFile(file, currentEditor.schema);
+      if (isCancelled()) return cancelled;
       if (fingerprint !== currentDraftHistoryFingerprint()) {
         return { error: true, message: "파일을 읽는 동안 글이 바뀌었습니다. 다시 불러와 주세요." };
       }
@@ -714,6 +721,7 @@ export function createWorkspaceState() {
       draftHistoryController.markBaseline();
       return { error: false, message: "파일의 글과 서식을 불러왔습니다." };
     } catch (error) {
+      if (isCancelled()) return cancelled;
       return {
         error: true,
         message: error instanceof Error ? error.message : "초안 파일을 읽지 못했습니다.",

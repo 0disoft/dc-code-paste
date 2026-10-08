@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getContext } from "svelte";
+    import { getContext, onDestroy } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import Download from "@lucide/svelte/icons/download";
@@ -9,6 +9,8 @@
     let busy = $state(false);
     let message = $state("");
     let failed = $state(false);
+    let pending: AbortController | undefined;
+    onDestroy(() => pending?.abort());
     function download() {
         const result = workspace.exportDraftFile();
         message = result.message;
@@ -21,11 +23,14 @@
         busy = true;
         message = "파일을 읽는 중입니다.";
         failed = false;
+        const request = new AbortController();
+        pending = request;
         try {
-            const result = await workspace.importDraftFile(file);
+            const result = await workspace.importDraftFile(file, request.signal);
+            if (request.signal.aborted) return;
             message = result.message;
             failed = result.error;
-        } finally { busy = false; target.value = ""; }
+        } finally { pending = undefined; busy = false; target.value = ""; }
     }
 </script>
 
