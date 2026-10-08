@@ -32,6 +32,11 @@ import {
   type DcExportOptions,
 } from "#lib/dc/export-document.ts";
 
+import {
+  writingTemplates,
+  createWritingTemplate,
+  type WritingTemplateId,
+} from "#lib/editor/writing-templates.ts";
 import { sampleDocument } from "#lib/editor/sample-document.ts";
 
 import {
@@ -2387,6 +2392,18 @@ export function createWorkspaceState() {
     draftHistoryController.markBaseline();
   }
 
+  function applyWritingTemplate(id: WritingTemplateId) {
+    const template = writingTemplates.find((item) => item.id === id);
+    if (!template || !window.confirm(`현재 글을 ${template.label} 템플릿으로 바꿀까요?`)) return;
+    if (!checkpointCurrentDraftBeforeReplacement()) return;
+    applyDraftPreferences(defaultDraftPreferences());
+    replaceEditorDocument(createWritingTemplate(id));
+    isLinkPanelOpen = false;
+    linkDraft = "";
+    linkError = false;
+    draftHistoryController.markBaseline();
+  }
+
   async function copyPreview() {
     const operation = copyFeedback.begin("preview", (value) => {
       copyState = value;
@@ -3310,6 +3327,8 @@ export function createWorkspaceState() {
     setFontSize,
     resetDraft,
     applyExampleTemplate,
+    writingTemplates,
+    applyWritingTemplate,
     copyPreview,
     copySourceHtml,
     copyLlmAuthoringGuide,

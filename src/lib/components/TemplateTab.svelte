@@ -45,6 +45,13 @@
 
 <section class="ui-section" aria-label="예시 템플릿">
     <span class="ui-section-title"><LayoutTemplate size={15} aria-hidden="true" /> 템플릿</span>
+    <button class="ui-btn ui-btn--outline template-button" type="button" onclick={workspace.resetDraft}>새 글 시작</button>
+    {#each workspace.writingTemplates as template (template.id)}
+        <button class="ui-btn ui-btn--outline template-button writing-template" type="button"
+            aria-label={`${template.label} 템플릿`} onclick={() => workspace.applyWritingTemplate(template.id)}>
+            <strong>{template.label}</strong><small>{template.description}</small>
+        </button>
+    {/each}
     <button
         class="ui-btn ui-btn--outline template-button"
         type="button"
@@ -52,9 +59,9 @@
         onclick={workspace.applyExampleTemplate}
     >
         <LayoutTemplate size={16} aria-hidden="true" />
-        <span>예시 템플릿</span>
+        <span>코드·서식 예시</span>
     </button>
-    <p class="ui-hint">코드블록과 서식이 들어간 예시 글을 문서 전체에 적용합니다.</p>
+    <p class="ui-hint">템플릿은 현재 글을 바꿉니다. 바꾸기 전 글은 저장함의 초안에 보관합니다.</p>
 </section>
 
 <section class="ui-section" aria-label="프리셋">
@@ -163,6 +170,8 @@
 </section>
 
 <style>
+    .writing-template { height: auto; min-height: 58px; align-items: flex-start; flex-direction: column; gap: 5px; padding-block: 10px; white-space: normal; }
+    .writing-template small { color: var(--muted); font-weight: 400; }
     .template-button {
         width: 100%;
         justify-content: flex-start;

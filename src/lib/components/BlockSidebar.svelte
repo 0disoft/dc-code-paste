@@ -55,12 +55,12 @@
     ];
 
     const extraRows: PaletteRow[] = [
-        { key: "hero", label: "히어로", description: "글 머리 요약", icon: Layers, kind: "hero" },
-        { key: "callout", label: "콜아웃", description: "팁과 주의 강조 박스", icon: StickyNote, kind: "callout" },
+        { key: "hero", label: "글 머리", description: "글 머리 요약", icon: Layers, kind: "hero" },
+        { key: "callout", label: "강조 상자", description: "팁과 주의 강조 박스", icon: StickyNote, kind: "callout" },
         { key: "tutorial", label: "튜토리얼", description: "단계별 안내", icon: ListOrdered, kind: "tutorial" },
         { key: "comparison", label: "비교", description: "좌우 비교 정리", icon: GitCompare, kind: "comparison" },
         { key: "references", label: "자료목록", description: "참고 자료 정리", icon: BookOpen, kind: "references" },
-        { key: "cta", label: "CTA", description: "행동 유도 버튼", icon: MousePointerClick, kind: "cta" },
+        { key: "cta", label: "링크 버튼", description: "행동 유도 버튼", icon: MousePointerClick, kind: "cta" },
         { key: "ctaGroup", label: "버튼묶음", description: "버튼 여러 개 묶기", icon: Megaphone, kind: "ctaGroup" },
         { key: "divider", label: "구분선", description: "가로 구분선", icon: SeparatorHorizontal, kind: "divider" },
     ];

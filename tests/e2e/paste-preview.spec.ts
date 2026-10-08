@@ -121,6 +121,19 @@ test("duplicates, moves and deletes a block with undo support", async ({ page })
   await expect(summaries).toHaveCount(count + 1);
 });
 
+test("starts a news template and preserves the previous draft", async ({ page }) => {
+  await waitForEditor(page);
+  await page.getByRole("tab", { name: "템플릿", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "뉴스 정리 템플릿", exact: true }).click();
+  await expect(page.locator(".article-editor")).toContainText("뉴스 제목을 입력하세요");
+  await expect(page.locator(".article-editor .dc-summary-box")).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "칼럼 템플릿", exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => localStorage.getItem("dc-code-paste:draft-history:v1")),
+  ).toContain("DC-CODE-PASTE");
+});
+
 for (const mobile of [false, true]) {
   test(`adds a link to summary text on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
