@@ -1,5 +1,7 @@
 <script lang="ts">
-    import { FileText, Trash2, X } from "lucide-svelte";
+    import FileText from "@lucide/svelte/icons/file-text";
+    import Trash2 from "@lucide/svelte/icons/trash";
+    import X from "@lucide/svelte/icons/x";
 
     let {
         markdownDraft = $bindable(""),

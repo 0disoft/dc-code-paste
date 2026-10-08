@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { History, Pencil, Save, Trash2, X } from "lucide-svelte";
+    import History from "@lucide/svelte/icons/rotate-ccw-clock";
+    import Pencil from "@lucide/svelte/icons/pencil";
+    import Save from "@lucide/svelte/icons/save";
+    import Trash2 from "@lucide/svelte/icons/trash";
+    import X from "@lucide/svelte/icons/x";
     import type { DraftHistorySnapshot } from "#lib/editor/draft-storage.ts";
     import type { PresetSnapshot } from "#lib/editor/preset-storage.ts";
     import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";

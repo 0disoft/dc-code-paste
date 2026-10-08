@@ -98,7 +98,7 @@ bun run dev
 
 ```sh
 bun run check          # Svelte 타입 검사
-bun run typecheck:go   # tsgo 네이티브 타입 검사
+bun run typecheck:go   # TypeScript 7 네이티브 타입 검사
 bun run lint           # Oxlint
 bun run format:check   # Oxfmt
 bun run test           # Vitest 단위 테스트

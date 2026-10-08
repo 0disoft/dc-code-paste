@@ -3,7 +3,33 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
-    import { Undo2, Redo2, RotateCcw, LayoutTemplate, Check, Loader2, Clipboard, FileText, Sparkles, Save, Heading1, Rows3, Bold, Italic, Link2, LinkIcon, Code2, Paintbrush, List, Quote, SeparatorHorizontal, Type, BookOpen, Highlighter, Unlink, ChevronDown, SlidersHorizontal } from "lucide-svelte";
+    import Undo2 from "@lucide/svelte/icons/undo-2";
+    import Redo2 from "@lucide/svelte/icons/redo-2";
+    import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+    import LayoutTemplate from "@lucide/svelte/icons/layout-template";
+    import Check from "@lucide/svelte/icons/check";
+    import Loader2 from "@lucide/svelte/icons/loader-circle";
+    import Clipboard from "@lucide/svelte/icons/clipboard";
+    import FileText from "@lucide/svelte/icons/file-text";
+    import Sparkles from "@lucide/svelte/icons/sparkles";
+    import Save from "@lucide/svelte/icons/save";
+    import Heading1 from "@lucide/svelte/icons/heading-1";
+    import Rows3 from "@lucide/svelte/icons/rows-3";
+    import Bold from "@lucide/svelte/icons/bold";
+    import Italic from "@lucide/svelte/icons/italic";
+    import Link2 from "@lucide/svelte/icons/link-2";
+    import LinkIcon from "@lucide/svelte/icons/link";
+    import Code2 from "@lucide/svelte/icons/code-xml";
+    import Paintbrush from "@lucide/svelte/icons/paintbrush";
+    import List from "@lucide/svelte/icons/list";
+    import Quote from "@lucide/svelte/icons/quote";
+    import SeparatorHorizontal from "@lucide/svelte/icons/separator-horizontal";
+    import Type from "@lucide/svelte/icons/type";
+    import BookOpen from "@lucide/svelte/icons/book-open";
+    import Highlighter from "@lucide/svelte/icons/highlighter";
+    import Unlink from "@lucide/svelte/icons/unlink";
+    import ChevronDown from "@lucide/svelte/icons/chevron-down";
+    import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 </script>

@@ -1,6 +1,9 @@
 <script lang="ts">
     import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
-    import { Loader2, RotateCcw, Sparkles, X } from "lucide-svelte";
+    import Loader2 from "@lucide/svelte/icons/loader-circle";
+    import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+    import Sparkles from "@lucide/svelte/icons/sparkles";
+    import X from "@lucide/svelte/icons/x";
 
     type LlmModelOption = { id: string; name: string };
 

@@ -1,5 +1,10 @@
 <script lang="ts">
-    import { Check, Clipboard, Eye, Github, Loader2, Type } from "lucide-svelte";
+    import Check from "@lucide/svelte/icons/check";
+    import Clipboard from "@lucide/svelte/icons/clipboard";
+    import Eye from "@lucide/svelte/icons/eye";
+    import SquareArrowOutUpRight from "@lucide/svelte/icons/square-arrow-out-up-right";
+    import Loader2 from "@lucide/svelte/icons/loader-circle";
+    import Type from "@lucide/svelte/icons/type";
     import { setContext } from "svelte";
     import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
@@ -354,7 +359,7 @@
         title="GitHub 저장소"
         aria-label="GitHub 저장소 새 탭으로 열기"
     >
-        <Github size={21} />
+        <SquareArrowOutUpRight size={21} />
     </a>
 </main>
 

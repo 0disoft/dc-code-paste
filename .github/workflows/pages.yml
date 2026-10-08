@@ -37,7 +37,7 @@ jobs:
       - name: Check Svelte
         run: bun run check
 
-      - name: Check TypeScript with tsgo
+      - name: Check TypeScript 7
         run: bun run typecheck:go
 
       - name: Lint
