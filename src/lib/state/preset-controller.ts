@@ -7,8 +7,8 @@ import {
   renamePresetSnapshot,
   writePresetSnapshots,
   type PresetSnapshot,
-} from "$lib/editor/preset-storage";
-import type { DraftPreferences } from "$lib/editor/draft-storage";
+} from "#lib/editor/preset-storage.ts";
+import type { DraftPreferences } from "#lib/editor/draft-storage.ts";
 
 type PresetState = "idle" | "saved" | "error";
 

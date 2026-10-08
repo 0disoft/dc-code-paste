@@ -3,13 +3,13 @@ import {
   normalizeDcExportStructure,
   type DcDocumentTheme,
   type DcExportStructure,
-} from "$lib/dc/export-document";
+} from "#lib/dc/export-document.ts";
 import {
   isSupportedLanguage,
   isSupportedTheme,
   type DcLanguageId,
   type DcThemeId,
-} from "$lib/highlighter/catalog";
+} from "#lib/highlighter/catalog.ts";
 
 export const draftStorageKey = "dc-code-paste:draft:v1";
 export const invalidDraftBackupKey = "dc-code-paste:draft-invalid-backup:v1";

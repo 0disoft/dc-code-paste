@@ -5,8 +5,8 @@ import {
   type ThemeInput,
 } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
-import { renderDcHtml, type DcLineDecoration } from "$lib/dc/render-dc-html";
-import { highlightedLineIndexes } from "$lib/highlighter/highlight-lines";
+import { renderDcHtml, type DcLineDecoration } from "#lib/dc/render-dc-html.ts";
+import { highlightedLineIndexes } from "#lib/highlighter/highlight-lines.ts";
 import { shikiLanguageFor, type DcLanguageId, type DcThemeId } from "./catalog";
 
 const languageInputs: Record<DcLanguageId, LanguageInput> = {

@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { parseMarkdownInline } from "$lib/editor/markdown-inline";
+import { parseMarkdownInline } from "#lib/editor/markdown-inline.ts";
 
 const defaultTutorialSteps = [
   {

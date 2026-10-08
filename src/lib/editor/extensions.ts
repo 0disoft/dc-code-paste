@@ -5,14 +5,14 @@ import Link from "@tiptap/extension-link";
 import { FontSize, TextStyle } from "@tiptap/extension-text-style";
 import { Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import { defaultLanguage } from "$lib/highlighter/catalog";
-import { normalizeQuoteStyle } from "$lib/editor/quote-style";
+import { defaultLanguage } from "#lib/highlighter/catalog.ts";
+import { normalizeQuoteStyle } from "#lib/editor/quote-style.ts";
 import { calloutExtensions } from "./callout-extension";
 import { editorialExtensions } from "./editorial-extension";
 import { LinkBox } from "./link-box-extension";
 import { createCodeBlockHighlightPlugin } from "./code-block-highlight";
-import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
-import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
+import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 
 const DcCodeBlock = CodeBlock.extend({
   addProseMirrorPlugins() {

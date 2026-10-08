@@ -1,5 +1,5 @@
 import { onDestroy, onMount, tick, untrack } from "svelte";
-import { createEditorMountController } from "$lib/state/editor-mount";
+import { createEditorMountController } from "#lib/state/editor-mount.ts";
 
 import type { Editor, JSONContent } from "@tiptap/core";
 
@@ -9,18 +9,18 @@ import { NodeSelection, TextSelection } from "@tiptap/pm/state";
 
 import type { EditorView } from "@tiptap/pm/view";
 
-import { defaultProseFontFamily } from "$lib/dc/font-stacks";
+import { defaultProseFontFamily } from "#lib/dc/font-stacks.ts";
 
-import { sanitizeReadableTextColor } from "$lib/dc/sanitize-style";
+import { sanitizeReadableTextColor } from "#lib/dc/sanitize-style.ts";
 
 import {
   defaultDcExportStructure,
   createDcExportSession,
   type DcDocumentTheme,
   type DcExportOptions,
-} from "$lib/dc/export-document";
+} from "#lib/dc/export-document.ts";
 
-import { sampleDocument } from "$lib/editor/sample-document";
+import { sampleDocument } from "#lib/editor/sample-document.ts";
 
 import {
   defaultLanguage,
@@ -31,7 +31,7 @@ import {
   supportedThemes,
   type DcLanguageId,
   type DcThemeId,
-} from "$lib/highlighter/catalog";
+} from "#lib/highlighter/catalog.ts";
 
 import {
   calloutKindFromNodeName,
@@ -39,13 +39,13 @@ import {
   defaultCalloutLabel,
   calloutNodeNames,
   type CalloutKind,
-} from "$lib/editor/callout";
+} from "#lib/editor/callout.ts";
 
 import {
   defaultCalloutToneColor,
   defaultCalloutToneColors,
   normalizeCalloutToneColor,
-} from "$lib/editor/callout-palette";
+} from "#lib/editor/callout-palette.ts";
 
 import {
   createEditorCommandAdapter,
@@ -53,8 +53,8 @@ import {
   findTutorialBlockTargetFromResolvedPos,
   hrefFromAttributes,
   isEditableHrefNodeName,
-} from "$lib/editor/command-adapter";
-import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
+} from "#lib/editor/command-adapter.ts";
+import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
 
 import {
   clearDraftSnapshot,
@@ -65,17 +65,17 @@ import {
   readDraftSnapshotWithRecovery,
   type DraftHistorySnapshot,
   type DraftPreferences,
-} from "$lib/editor/draft-storage";
+} from "#lib/editor/draft-storage.ts";
 
 import {
   ctaGroupLayoutOptions,
   normalizeCtaGroupLayout,
   type CtaGroupLayout,
-} from "$lib/editor/cta-group";
+} from "#lib/editor/cta-group.ts";
 
-import { normalizeEditableLinkHref } from "$lib/editor/link";
+import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 
-import { llmAuthoringPrompt } from "$lib/editor/llm-authoring-prompt";
+import { llmAuthoringPrompt } from "#lib/editor/llm-authoring-prompt.ts";
 
 import {
   defaultLlmProviderId,
@@ -83,26 +83,33 @@ import {
   providerDefinition,
   type OpenRouterModelOption,
   type LlmProviderId,
-} from "$lib/editor/llm-generation";
+} from "#lib/editor/llm-generation.ts";
 
-import { hasUnclosedCustomBlock, parseMarkdownToDocument } from "$lib/editor/markdown-import";
+import { hasUnclosedCustomBlock, parseMarkdownToDocument } from "#lib/editor/markdown-import.ts";
 
 import {
   codeLineRangeContains,
   codeLineRangeLabel,
   selectedCodeLineRangeFromOffsets,
   type CodeLineRange,
-} from "$lib/editor/code-line-range";
+} from "#lib/editor/code-line-range.ts";
 
-import { normalizeQuoteStyle, quoteStyleOptions, type QuoteStyle } from "$lib/editor/quote-style";
+import {
+  normalizeQuoteStyle,
+  quoteStyleOptions,
+  type QuoteStyle,
+} from "#lib/editor/quote-style.ts";
 
-import { defaultSummaryBoxLabel } from "$lib/editor/summary-box";
+import { defaultSummaryBoxLabel } from "#lib/editor/summary-box.ts";
 
-import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
+import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 
-import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
+import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
 
-import { maxHighlightLineNumber, normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+import {
+  maxHighlightLineNumber,
+  normalizeHighlightLines,
+} from "#lib/highlighter/highlight-lines.ts";
 
 import {
   createPresetSnapshot,
@@ -111,7 +118,7 @@ import {
   renamePresetSnapshot,
   writePresetSnapshots,
   type PresetSnapshot,
-} from "$lib/editor/preset-storage";
+} from "#lib/editor/preset-storage.ts";
 
 import {
   copyDcPreview,
@@ -119,15 +126,15 @@ import {
   copySourceHtml as copySourceHtmlText,
   createCopyFeedbackController,
   createWorkspacePreviewRenderer,
-} from "$lib/state/workspace-export";
-import { createLlmRequestController, type LlmGenerationState } from "$lib/state/llm-request";
-import { createLlmModelController, type OpenRouterModelState } from "$lib/state/llm-models";
+} from "#lib/state/workspace-export.ts";
+import { createLlmRequestController, type LlmGenerationState } from "#lib/state/llm-request.ts";
+import { createLlmModelController, type OpenRouterModelState } from "#lib/state/llm-models.ts";
 import {
   createDraftPersistenceController,
   type DraftSaveState,
-} from "$lib/state/draft-persistence";
-import { createDraftHistoryController, draftHistoryFingerprint } from "$lib/state/draft-history";
-import { createPresetController } from "$lib/state/preset-controller";
+} from "#lib/state/draft-persistence.ts";
+import { createDraftHistoryController, draftHistoryFingerprint } from "#lib/state/draft-history.ts";
+import { createPresetController } from "#lib/state/preset-controller.ts";
 
 export function createWorkspaceState() {
   const bodyFontFamily = defaultProseFontFamily;
@@ -2457,7 +2464,7 @@ export function createWorkspaceState() {
     async function mountEditor() {
       const [{ Editor, getSchema }, { createEditorExtensions }] = await Promise.all([
         import("@tiptap/core"),
-        import("$lib/editor/extensions"),
+        import("#lib/editor/extensions.ts"),
       ]);
 
       if (editorMountController.isDisposed || !editorHost) {

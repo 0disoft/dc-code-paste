@@ -4,8 +4,8 @@ import {
   draftHistoryStorageKey,
   type DraftHistorySnapshot,
   type DraftPreferences,
-} from "$lib/editor/draft-storage";
-import { createDraftHistoryController } from "$lib/state/draft-history";
+} from "#lib/editor/draft-storage.ts";
+import { createDraftHistoryController } from "#lib/state/draft-history.ts";
 
 const preferences: DraftPreferences = {
   language: "cpp",

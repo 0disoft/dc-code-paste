@@ -7,7 +7,7 @@ import {
   renameDraftHistorySnapshot,
   type DraftHistorySnapshot,
   type DraftPreferences,
-} from "$lib/editor/draft-storage";
+} from "#lib/editor/draft-storage.ts";
 
 type DraftData = { document: JSONContent; preferences: DraftPreferences };
 type DraftHistoryState = "idle" | "saved" | "error";

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LlmMarkdownResult, LlmRequestInput } from "$lib/editor/llm-generation";
-import { createLlmRequestController, type LlmGenerationState } from "$lib/state/llm-request";
+import type { LlmMarkdownResult, LlmRequestInput } from "#lib/editor/llm-generation.ts";
+import { createLlmRequestController, type LlmGenerationState } from "#lib/state/llm-request.ts";
 
 const input = {
   provider: "openrouter",

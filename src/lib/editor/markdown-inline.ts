@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { normalizeEditableLinkHref } from "$lib/editor/link";
+import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 
 type InlineMark = {
   type: string;

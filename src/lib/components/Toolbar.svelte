@@ -1,8 +1,8 @@
 <script lang="ts">
     import { getContext } from "svelte";
-    import { WORKSPACE_CONTEXT_KEY } from "$lib/state/workspace-context";
-    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
-    import type { WorkspaceState } from "$lib/state/workspace.svelte";
+    import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
+    import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
+    import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { Undo2, Redo2, RotateCcw, LayoutTemplate, Check, Loader2, Clipboard, FileText, Sparkles, Save, Heading1, Rows3, Bold, Italic, Link2, LinkIcon, Code2, Paintbrush, List, Quote, SeparatorHorizontal, Type, BookOpen, Highlighter, Unlink, ChevronDown, SlidersHorizontal } from "lucide-svelte";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);

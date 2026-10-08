@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
+    import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
     import { Loader2, RotateCcw, Sparkles, X } from "lucide-svelte";
 
     type LlmModelOption = { id: string; name: string };

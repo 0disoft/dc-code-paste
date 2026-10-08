@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createEditorMountController, type EditorMountState } from "$lib/state/editor-mount";
+import { createEditorMountController, type EditorMountState } from "#lib/state/editor-mount.ts";
 
 function deferred() {
   let resolve!: () => void;

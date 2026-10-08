@@ -6,7 +6,7 @@ import {
   type LlmProviderId,
   type OpenRouterModelOption,
   type OpenRouterModelRequestOptions,
-} from "$lib/editor/llm-generation";
+} from "#lib/editor/llm-generation.ts";
 
 export type OpenRouterModelState = "idle" | "loading" | "loaded" | "fallback" | "error";
 

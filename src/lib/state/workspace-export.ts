@@ -1,7 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 
-import { copyDcHtmlWhenReady, copyPlainText } from "$lib/dc/clipboard";
-import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
+import { copyDcHtmlWhenReady, copyPlainText } from "#lib/dc/clipboard.ts";
+import { exportDocumentToDcHtml, type DcExportOptions } from "#lib/dc/export-document.ts";
 
 type RenderDocument = (document: JSONContent, options: DcExportOptions) => Promise<string>;
 

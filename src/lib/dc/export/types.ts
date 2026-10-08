@@ -1,4 +1,4 @@
-import type { DcThemeId } from "$lib/highlighter/catalog";
+import type { DcThemeId } from "#lib/highlighter/catalog.ts";
 
 export type DcExportStructure = "dcTable";
 export type DcDocumentTheme = "lightLecture" | "darkEditorial";

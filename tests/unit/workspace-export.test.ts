@@ -1,18 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JSONContent } from "@tiptap/core";
-import { exportDocumentToDcHtml, type DcExportOptions } from "$lib/dc/export-document";
-import { copyDcHtmlWhenReady } from "$lib/dc/clipboard";
+import { exportDocumentToDcHtml, type DcExportOptions } from "#lib/dc/export-document.ts";
+import { copyDcHtmlWhenReady } from "#lib/dc/clipboard.ts";
 import {
   copyDcPreview,
   createCopyFeedbackController,
   createWorkspacePreviewRenderer,
   type WorkspaceCopyState,
-} from "$lib/state/workspace-export";
+} from "#lib/state/workspace-export.ts";
 
-vi.mock("$lib/dc/export-document", () => ({
+vi.mock("#lib/dc/export-document.ts", () => ({
   exportDocumentToDcHtml: vi.fn<typeof exportDocumentToDcHtml>(),
 }));
-vi.mock("$lib/dc/clipboard", () => ({
+vi.mock("#lib/dc/clipboard.ts", () => ({
   copyDcHtml: vi.fn<(html: string, plainText: string) => Promise<void>>(),
   copyDcHtmlWhenReady: vi.fn<(htmlPromise: Promise<string>, plainText: string) => Promise<void>>(),
   copyPlainText: vi.fn<(text: string) => Promise<void>>(),

@@ -2,7 +2,7 @@ import {
   requestLlmMarkdown,
   type LlmMarkdownResult,
   type LlmRequestInput,
-} from "$lib/editor/llm-generation";
+} from "#lib/editor/llm-generation.ts";
 
 export type LlmGenerationState = "idle" | "loading" | "stale" | "ready" | "incomplete" | "error";
 

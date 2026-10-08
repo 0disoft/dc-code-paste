@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   OpenRouterModelOption,
   OpenRouterModelRequestOptions,
-} from "$lib/editor/llm-generation";
-import { createLlmModelController, type OpenRouterModelState } from "$lib/state/llm-models";
+} from "#lib/editor/llm-generation.ts";
+import { createLlmModelController, type OpenRouterModelState } from "#lib/state/llm-models.ts";
 
 type RequestModels = (
   apiKey: string,

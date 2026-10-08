@@ -7,35 +7,35 @@ import {
   selectedInlineRangeToCtaButtonCommand,
   selectedInlineRangeToLinkBoxCommand,
   selectedInlineRangeToSectionHeadingCommand,
-} from "$lib/editor/selection-commands";
-import type { DcLanguageId } from "$lib/highlighter/catalog";
-import { createDefaultCtaGroup, type CtaGroupLayout } from "$lib/editor/cta-group";
+} from "#lib/editor/selection-commands.ts";
+import type { DcLanguageId } from "#lib/highlighter/catalog.ts";
+import { createDefaultCtaGroup, type CtaGroupLayout } from "#lib/editor/cta-group.ts";
 import {
   createDefaultReferenceList,
   createReferenceListFromText,
-} from "$lib/editor/reference-list";
-import { createDefaultSummaryBox, createSummaryBoxFromText } from "$lib/editor/summary-box";
-import { createDefaultHeroBlock, createHeroBlockFromText } from "$lib/editor/hero-block";
+} from "#lib/editor/reference-list.ts";
+import { createDefaultSummaryBox, createSummaryBoxFromText } from "#lib/editor/summary-box.ts";
+import { createDefaultHeroBlock, createHeroBlockFromText } from "#lib/editor/hero-block.ts";
 import {
   createComparisonBlockFromText,
   createDefaultComparisonBlock,
-} from "$lib/editor/comparison-block";
-import type { QuoteStyle } from "$lib/editor/quote-style";
+} from "#lib/editor/comparison-block.ts";
+import type { QuoteStyle } from "#lib/editor/quote-style.ts";
 import {
   calloutKindFromNodeName,
   calloutNodeNameByKind,
   defaultCalloutLabel,
   isCalloutNodeName,
   type CalloutKind,
-} from "$lib/editor/callout";
-import { normalizeCalloutToneColor } from "$lib/editor/callout-palette";
-import { normalizeEditableLinkHref } from "$lib/editor/link";
+} from "#lib/editor/callout.ts";
+import { normalizeCalloutToneColor } from "#lib/editor/callout-palette.ts";
+import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 import {
   createDefaultTutorialBlock,
   createTutorialBlockFromText,
   createTutorialStep,
   normalizeTutorialStepNumber,
-} from "$lib/editor/tutorial-block";
+} from "#lib/editor/tutorial-block.ts";
 
 type CodeBlockOptions = {
   language: DcLanguageId;

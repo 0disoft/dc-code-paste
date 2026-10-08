@@ -6,7 +6,7 @@ import {
   writeDraftSnapshot,
   type DraftPreferences,
   type DraftSnapshot,
-} from "$lib/editor/draft-storage";
+} from "#lib/editor/draft-storage.ts";
 
 export type DraftSaveState = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict";
 

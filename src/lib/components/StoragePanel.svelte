@@ -1,8 +1,8 @@
 <script lang="ts">
     import { History, Pencil, Save, Trash2, X } from "lucide-svelte";
-    import type { DraftHistorySnapshot } from "$lib/editor/draft-storage";
-    import type { PresetSnapshot } from "$lib/editor/preset-storage";
-    import { isComposingKeyEvent } from "$lib/editor/keyboard-shortcuts";
+    import type { DraftHistorySnapshot } from "#lib/editor/draft-storage.ts";
+    import type { PresetSnapshot } from "#lib/editor/preset-storage.ts";
+    import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
 
     type RenameTarget =
         | { kind: "preset"; id: string }

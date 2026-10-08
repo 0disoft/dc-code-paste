@@ -1,8 +1,8 @@
 import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
-import { highlightedLineIndexes } from "$lib/highlighter/highlight-lines";
+import { isSupportedLanguage, type DcLanguageId } from "#lib/highlighter/catalog.ts";
+import { highlightedLineIndexes } from "#lib/highlighter/highlight-lines.ts";
 
 export type EditorCodeTokenKind = "comment" | "string" | "keyword" | "number" | "function";
 

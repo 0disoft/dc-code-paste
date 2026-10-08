@@ -1,12 +1,12 @@
 <script lang="ts">
     import { Check, Clipboard, Eye, Github, Loader2, Type } from "lucide-svelte";
     import { setContext } from "svelte";
-    import { createWorkspaceState } from "$lib/state/workspace.svelte";
-    import { WORKSPACE_CONTEXT_KEY } from "$lib/state/workspace-context";
-    import StoragePanel from "$lib/components/StoragePanel.svelte";
-    import MarkdownPanel from "$lib/components/MarkdownPanel.svelte";
-    import LLMPanel from "$lib/components/LLMPanel.svelte";
-    import Toolbar from "$lib/components/Toolbar.svelte";
+    import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
+    import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
+    import StoragePanel from "#lib/components/StoragePanel.svelte";
+    import MarkdownPanel from "#lib/components/MarkdownPanel.svelte";
+    import LLMPanel from "#lib/components/LLMPanel.svelte";
+    import Toolbar from "#lib/components/Toolbar.svelte";
 
     type WorkspaceView = "editor" | "preview";
 

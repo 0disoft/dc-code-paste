@@ -4,19 +4,26 @@ import {
   defaultCalloutLabel,
   isCalloutKind,
   type CalloutKind,
-} from "$lib/editor/callout";
-import { normalizeCalloutToneColor } from "$lib/editor/callout-palette";
-import { createComparisonBlockFromText } from "$lib/editor/comparison-block";
-import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
-import { createHeroBlockFromText } from "$lib/editor/hero-block";
-import { normalizeEditableLinkHref } from "$lib/editor/link";
-import { createReferenceListFromText } from "$lib/editor/reference-list";
-import { createSummaryBoxFromText } from "$lib/editor/summary-box";
-import { createTutorialBlockFromText } from "$lib/editor/tutorial-block";
-import { compactContent, parseMarkdownInline, textNode } from "$lib/editor/markdown-inline";
-import { defaultLanguage, isSupportedLanguage, type DcLanguageId } from "$lib/highlighter/catalog";
-import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
-import { highlightedLineIndexes, normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+} from "#lib/editor/callout.ts";
+import { normalizeCalloutToneColor } from "#lib/editor/callout-palette.ts";
+import { createComparisonBlockFromText } from "#lib/editor/comparison-block.ts";
+import { normalizeCtaGroupLayout, type CtaGroupLayout } from "#lib/editor/cta-group.ts";
+import { createHeroBlockFromText } from "#lib/editor/hero-block.ts";
+import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
+import { createReferenceListFromText } from "#lib/editor/reference-list.ts";
+import { createSummaryBoxFromText } from "#lib/editor/summary-box.ts";
+import { createTutorialBlockFromText } from "#lib/editor/tutorial-block.ts";
+import { compactContent, parseMarkdownInline, textNode } from "#lib/editor/markdown-inline.ts";
+import {
+  defaultLanguage,
+  isSupportedLanguage,
+  type DcLanguageId,
+} from "#lib/highlighter/catalog.ts";
+import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
+import {
+  highlightedLineIndexes,
+  normalizeHighlightLines,
+} from "#lib/highlighter/highlight-lines.ts";
 
 type ListMarker = {
   indent: number;
@@ -71,7 +78,7 @@ const linkBoxLabelPattern = /^(?:linkbox|link box|링크박스|link|링크)$/i;
 const customBlockStartPattern = /^:::\s*([a-zA-Z가-힣_-]+)(?:\s+(.+))?\s*$/;
 const customBlockEndPattern = /^:::\s*$/;
 
-export { parseMarkdownInline } from "$lib/editor/markdown-inline";
+export { parseMarkdownInline } from "#lib/editor/markdown-inline.ts";
 
 function normalizeLanguage(value: string | undefined, fallback: DcLanguageId): DcLanguageId {
   const normalized = value?.trim().toLowerCase();

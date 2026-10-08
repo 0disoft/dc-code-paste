@@ -1,21 +1,21 @@
 import type { JSONContent } from "@tiptap/core";
 import { escapeHtml } from "../escape-html";
 import { joinStyle, sanitizeReadableTextColor } from "../sanitize-style";
-import { defaultLanguage, defaultTheme, isSupportedLanguage } from "$lib/highlighter/catalog";
-import type { CalloutKind } from "$lib/editor/callout";
-import { calloutKindFromNodeName, normalizeCalloutKind } from "$lib/editor/callout";
-import { createCalloutColorPalette, parseCalloutToneColor } from "$lib/editor/callout-palette";
-import { normalizeCtaGroupLayout, type CtaGroupLayout } from "$lib/editor/cta-group";
-import { normalizeEditableLinkHref } from "$lib/editor/link";
-import { normalizeQuoteStyle, type QuoteStyle } from "$lib/editor/quote-style";
-import { normalizeTutorialStepNumber } from "$lib/editor/tutorial-block";
+import { defaultLanguage, defaultTheme, isSupportedLanguage } from "#lib/highlighter/catalog.ts";
+import type { CalloutKind } from "#lib/editor/callout.ts";
+import { calloutKindFromNodeName, normalizeCalloutKind } from "#lib/editor/callout.ts";
+import { createCalloutColorPalette, parseCalloutToneColor } from "#lib/editor/callout-palette.ts";
+import { normalizeCtaGroupLayout, type CtaGroupLayout } from "#lib/editor/cta-group.ts";
+import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
+import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts";
+import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 import {
   defaultProseFontFamily,
   safeDcInlineCodeFontFamily as safeInlineCodeFontFamily,
   safeDcProseFontFamily as safeProseFontFamily,
 } from "../font-stacks";
-import { normalizeCodeFilename } from "$lib/highlighter/code-block-metadata";
-import { normalizeHighlightLines } from "$lib/highlighter/highlight-lines";
+import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
+import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 import type { DcExportOptions, DcDocumentTheme } from "./types";
 import { createBlockRenderCache, type BlockRenderCache } from "./block-cache";
 
@@ -1105,7 +1105,7 @@ async function renderLinkBox(node: JSONContent, options: DcExportOptions): Promi
 }
 
 async function renderCodeBlock(node: JSONContent, options: DcExportOptions): Promise<string> {
-  const { highlightForDcHtml } = await import("$lib/highlighter/shiki-client");
+  const { highlightForDcHtml } = await import("#lib/highlighter/shiki-client.ts");
   const language =
     typeof node.attrs?.language === "string" && isSupportedLanguage(node.attrs.language)
       ? node.attrs.language

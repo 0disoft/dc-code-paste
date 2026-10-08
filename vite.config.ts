@@ -1,4 +1,6 @@
 import { sveltekit } from "@sveltejs/kit/vite";
+import adapter from "@sveltejs/adapter-static";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vitest/config";
 
 function shikiGrammarChunk(id: string): string | undefined {
@@ -19,12 +21,30 @@ function shikiGrammarChunk(id: string): string | undefined {
   return undefined;
 }
 
-export default defineConfig({
-  plugins: [sveltekit()],
+export default defineConfig(({ command, isPreview }) => ({
+  plugins: [
+    sveltekit({
+      preprocess: vitePreprocess(),
+      adapter: adapter({ fallback: "404.html" }),
+      paths: {
+        base: (command === "serve" && !isPreview ? "" : process.env.BASE_PATH || "") as
+          | ""
+          | `/${string}`,
+      },
+    }),
+  ],
   build: {
-    rollupOptions: {
+    rolldownOptions: {
       output: {
-        manualChunks: shikiGrammarChunk,
+        codeSplitting: {
+          groups: [
+            {
+              debugName: "shiki-grammars",
+              name: shikiGrammarChunk,
+              test: (id) => shikiGrammarChunk(id) !== undefined,
+            },
+          ],
+        },
       },
     },
   },
@@ -32,4 +52,4 @@ export default defineConfig({
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
   },
-});
+}));

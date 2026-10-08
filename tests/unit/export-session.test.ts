@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { JSONContent } from "@tiptap/core";
-import { createDcExportSession, type DcExportOptions } from "$lib/dc/export-document";
-import { createBlockRenderCache } from "$lib/dc/export/block-cache";
+import { createDcExportSession, type DcExportOptions } from "#lib/dc/export-document.ts";
+import { createBlockRenderCache } from "#lib/dc/export/block-cache.ts";
 
 const options: DcExportOptions = {
   theme: "github-dark",

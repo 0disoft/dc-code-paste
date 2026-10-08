@@ -4,11 +4,11 @@ import {
   createDraftSnapshot,
   draftStorageKey,
   type DraftPreferences,
-} from "$lib/editor/draft-storage";
+} from "#lib/editor/draft-storage.ts";
 import {
   createDraftPersistenceController,
   type DraftSaveState,
-} from "$lib/state/draft-persistence";
+} from "#lib/state/draft-persistence.ts";
 
 const preferences: DraftPreferences = {
   language: "cpp",

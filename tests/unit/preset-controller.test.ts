@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { sampleDocument } from "$lib/editor/sample-document";
-import type { DraftPreferences } from "$lib/editor/draft-storage";
-import { createPresetController } from "$lib/state/preset-controller";
-import type { PresetSnapshot } from "$lib/editor/preset-storage";
+import { sampleDocument } from "#lib/editor/sample-document.ts";
+import type { DraftPreferences } from "#lib/editor/draft-storage.ts";
+import { createPresetController } from "#lib/state/preset-controller.ts";
+import type { PresetSnapshot } from "#lib/editor/preset-storage.ts";
 
 const preferences: DraftPreferences = {
   language: "cpp",

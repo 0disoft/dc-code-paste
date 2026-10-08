@@ -38,7 +38,7 @@ describe("Shiki initialization recovery", () => {
     createHighlighterCoreMock
       .mockRejectedValueOnce(new Error("engine load failed"))
       .mockResolvedValueOnce(highlighter);
-    const { highlightForDcHtml } = await import("$lib/highlighter/shiki-client");
+    const { highlightForDcHtml } = await import("#lib/highlighter/shiki-client.ts");
 
     const first = highlightForDcHtml("code", options);
     const concurrent = highlightForDcHtml("code", options);
@@ -54,7 +54,7 @@ describe("Shiki initialization recovery", () => {
     const highlighter = fakeHighlighter();
     highlighter.loadLanguage.mockRejectedValueOnce(new Error("language chunk failed"));
     createHighlighterCoreMock.mockResolvedValue(highlighter);
-    const { highlightForDcHtml } = await import("$lib/highlighter/shiki-client");
+    const { highlightForDcHtml } = await import("#lib/highlighter/shiki-client.ts");
 
     await expect(highlightForDcHtml("code", options)).rejects.toThrow("language chunk failed");
     await expect(highlightForDcHtml("code", options)).resolves.toContain("code");
@@ -65,7 +65,7 @@ describe("Shiki initialization recovery", () => {
     const highlighter = fakeHighlighter();
     highlighter.loadTheme.mockRejectedValueOnce(new Error("theme chunk failed"));
     createHighlighterCoreMock.mockResolvedValue(highlighter);
-    const { highlightForDcHtml } = await import("$lib/highlighter/shiki-client");
+    const { highlightForDcHtml } = await import("#lib/highlighter/shiki-client.ts");
 
     await expect(highlightForDcHtml("code", options)).rejects.toThrow("theme chunk failed");
     await expect(highlightForDcHtml("code", options)).resolves.toContain("code");
