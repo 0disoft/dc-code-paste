@@ -7,6 +7,7 @@
     import Copy from "@lucide/svelte/icons/copy";
     import Trash2 from "@lucide/svelte/icons/trash";
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
+    let { onAction }: { onAction?: () => void } = $props();
     const actions = [
         {id: "up", label: "위로 이동", icon: ArrowUp},
         {id: "down", label: "아래로 이동", icon: ArrowDown},
@@ -21,7 +22,7 @@
             {@const Icon = action.icon}
             <button class="ui-btn ui-btn--outline" type="button" aria-label={action.label}
                 disabled={!workspace.selectedBlockActions[action.id]}
-                onclick={() => workspace.runBlockAction(action.id)}>
+                onclick={() => { workspace.runBlockAction(action.id); onAction?.(); }}>
                 <Icon size={15} aria-hidden="true" /> {action.label}
             </button>
         {/each}

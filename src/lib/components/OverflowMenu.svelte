@@ -29,7 +29,7 @@
         open = !open;
         if (open) {
             await tick();
-            wrap?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+            wrap?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])')?.focus();
         }
     }
 
@@ -55,7 +55,8 @@
             trigger?.focus();
         } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
             event.preventDefault();
-            const items = Array.from(wrap?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+            const items = Array.from(wrap?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])') ?? []);
+            if (!items.length) return;
             const active = items.findIndex((item) => item === document.activeElement);
             const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (active + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
             items[next]?.focus();

@@ -28,3 +28,21 @@ test("keeps the duplicated summary editable after moving it", async ({ page }) =
     originalLabel!,
   );
 });
+
+test("returns to the edited block after a mobile inspector action", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("./");
+  const editor = page.locator(".article-editor");
+  await expect(editor).toContainText("DC-CODE-PASTE");
+  const summaries = editor.locator(".dc-summary-box");
+  const count = await summaries.count();
+  await summaries.first().locator(".dc-summary-item").first().click();
+  const toggle = page.getByRole("button", { name: "블록 설정 패널", exact: true });
+  await toggle.click();
+  await page.getByRole("button", { name: "블록 복제", exact: true }).click();
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+  await expect(editor).toBeFocused();
+  await page.keyboard.insertText("모바일에서 추가 ");
+  await expect(summaries).toHaveCount(count + 1);
+  await expect(editor.locator(".dc-selected-block")).toContainText("모바일에서 추가");
+});

@@ -35,7 +35,13 @@ for (const mobile of [false, true]) {
     await expect(
       page.getByRole("menuitem", { name: "LLM 가이드 복사", exact: true }),
     ).toBeDisabled();
-    await page.getByRole("menuitem", { name: "HTML 원문 보기", exact: true }).click();
+    const htmlMenu = page.getByRole("menuitem", { name: "HTML 원문 보기", exact: true });
+    await htmlMenu.focus();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "예시 템플릿", exact: true })).toBeFocused();
+    await page.keyboard.press("ArrowUp");
+    await expect(htmlMenu).toBeFocused();
+    await htmlMenu.click();
     const source = page.getByRole("button", { name: "원문 복사", exact: true });
     await expect(page.getByLabel("복사용 HTML 원문", { exact: true })).not.toHaveValue("");
     await expect(source).toBeDisabled();

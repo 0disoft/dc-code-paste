@@ -17,9 +17,10 @@
     type Props = {
         open?: boolean;
         compact?: boolean;
+        onBlockAction?: () => void;
     };
 
-    let { open = true, compact = false }: Props = $props();
+    let { open = true, compact = false, onBlockAction }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -112,7 +113,7 @@
                     <p class="ui-section-note">{blockDescription}</p>
                 </div>
 
-                <BlockActionsSection />
+                <BlockActionsSection onAction={onBlockAction} />
 
                 {#if blockInfo.type === "summaryBox"}
                     <SummaryAppearanceSection />

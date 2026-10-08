@@ -79,6 +79,13 @@
         workspace.navigateToBlock(index);
     }
 
+    async function onInspectorBlockAction() {
+        selectWorkspaceView("editor");
+        if (compact) closeRails();
+        await tick();
+        workspace.editor?.commands.focus();
+    }
+
     function showHtmlSource() {
         workspace.previewMode = "source";
         selectWorkspaceView("preview");
@@ -281,7 +288,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} {compact} />
+        <InspectorPanel open={rightRailOpen} {compact} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />
