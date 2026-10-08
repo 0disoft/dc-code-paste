@@ -7,6 +7,7 @@
     import CodeBlockSection from "./CodeBlockSection.svelte";
     import CalloutSection from "./CalloutSection.svelte";
     import InlineFormatSection from "./InlineFormatSection.svelte";
+    import SelectionTextSection from "./SelectionTextSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
     import Megaphone from "@lucide/svelte/icons/megaphone";
     import Type from "@lucide/svelte/icons/type";
@@ -187,6 +188,8 @@
                     </section>
                 {/if}
             {/if}
+
+            <SelectionTextSection />
 
             {#if blockInfo && blockInfo.type !== "paragraph" && blockInfo.type !== "heading" && !workspace.isLinkPanelOpen}
                 <details class="ui-disclosure">

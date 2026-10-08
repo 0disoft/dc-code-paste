@@ -10,6 +10,33 @@ async function openTool(page: Page, name: string) {
   await page.getByRole("menuitem", { name, exact: true }).click();
 }
 
+for (const mobile of [false, true]) {
+  test(`keeps editing tools reachable while scrolling on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1280, height: 720 });
+    await waitForEditor(page);
+    await page
+      .locator(".canvas-scroll")
+      .first()
+      .evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+    await expect(page.getByRole("button", { name: "디씨 복사", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    if (mobile) {
+      await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeVisible();
+      await expect(page.locator(".mobile-editing-bar")).toContainText("이 브라우저에 저장됨");
+      await page.getByRole("button", { name: "블록 설정 패널", exact: true }).click();
+    }
+    await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+    await expect(page.getByLabel("본문 글자 크기", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("선택 글자 크기", { exact: true })).not.toBeVisible();
+    await page.getByRole("tab", { name: "선택한 블록", exact: true }).click();
+    await expect(page.getByLabel("선택 글자 크기", { exact: true })).toBeVisible();
+  });
+}
+
 test("shows the block desk and keeps copy and import reachable", async ({ page }) => {
   await waitForEditor(page);
   await expect(page.getByRole("complementary", { name: "블록 삽입", exact: true })).toBeVisible();

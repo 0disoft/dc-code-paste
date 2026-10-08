@@ -319,6 +319,9 @@
     }
 
     .copy-error {
+        max-height: 35dvh;
+        overflow-y: auto;
+        flex: 0 0 auto;
         margin: 14px 12px 0;
         color: var(--danger);
         font-weight: 700;

@@ -20,6 +20,7 @@
     import PanelLeft from "@lucide/svelte/icons/panel-left";
     import PanelRight from "@lucide/svelte/icons/panel-right";
     import SquareArrowOutUpRight from "@lucide/svelte/icons/square-arrow-out-up-right";
+    import MobileEditingBar from "./MobileEditingBar.svelte";
     import OverflowMenu from "./OverflowMenu.svelte";
 
     type WorkspaceView = "editor" | "preview";
@@ -61,7 +62,7 @@
             : workspace.draftSaveState === "saving"
               ? "저장 중"
               : workspace.draftSaveState === "saved"
-                ? `저장됨${savedAtLabel ? ` · ${savedAtLabel}` : ""}`
+                ? `이 브라우저에 저장됨${savedAtLabel ? ` · ${savedAtLabel}` : ""}`
                 : workspace.draftSaveState === "error"
                   ? "저장 실패 · 이 탭의 내용을 복사해 보관하세요"
                   : workspace.draftSaveState === "conflict"
@@ -328,6 +329,8 @@
         </button>
     </div>
 </header>
+
+<MobileEditingBar status={draftStatusLabel} />
 
 {#if workspace.draftSaveState === "error" || workspace.draftSaveState === "conflict"}
     <div class="save-warning" role="alert">

@@ -16,7 +16,9 @@
 
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   flex-direction: column;
   background: var(--bg);
 }
@@ -619,6 +621,7 @@ a.ui-menu-item {
 /* ------------------------------------------------------------------ shell */
 
 .app-body {
+  overflow: hidden;
   display: flex;
   flex: 1 1 auto;
   align-items: stretch;
@@ -626,9 +629,8 @@ a.ui-menu-item {
 }
 
 .rail {
-  position: sticky;
-  top: var(--topbar-height);
-  height: calc(100dvh - var(--topbar-height));
+  position: relative;
+  height: auto;
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
@@ -698,6 +700,9 @@ a.ui-menu-item {
 }
 
 .panel-dock {
+  max-height: 45dvh;
+  overflow-y: auto;
+  flex: 0 1 auto;
   display: grid;
   gap: 8px;
   margin: 10px 12px 0;
@@ -884,4 +889,13 @@ a.ui-menu-item {
   outline: 1.5px solid var(--accent);
   outline-offset: 0;
   box-shadow: none;
+}
+
+@media (max-width: 600px) {
+  .rail {
+    top: calc(var(--topbar-height) + 40px);
+  }
+  .rail-backdrop {
+    top: calc(var(--topbar-height) + 40px);
+  }
 }
