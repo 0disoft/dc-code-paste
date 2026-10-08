@@ -702,7 +702,7 @@ a.ui-menu-item {
 .panel-dock {
   max-height: 45dvh;
   overflow-y: auto;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   display: grid;
   gap: 8px;
   margin: 10px 12px 0;

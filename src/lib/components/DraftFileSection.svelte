@@ -42,7 +42,7 @@
             <Upload size={15} aria-hidden="true" /> 불러오기
         </button>
     </div>
-    <input class="ua-sr" bind:this={input} type="file" accept=".json,application/json"
+    <input hidden bind:this={input} type="file" accept=".json,application/json"
         aria-label="초안 JSON 파일" tabindex="-1" onchange={upload} />
     {#if message}<p class="ui-hint" class:is-error={failed} role={failed ? "alert" : "status"}>{message}</p>{/if}
 </section>

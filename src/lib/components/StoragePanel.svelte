@@ -123,6 +123,7 @@
             <label>
                 <span><Save size={15} /> 프리셋</span>
                 <input
+                    class="ui-input"
                     type="text"
                     bind:value={presetName}
                     aria-label="프리셋 이름"
@@ -303,6 +304,8 @@
         grid-column: 1 / -1;
         position: relative;
         display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
         gap: 5px;
         margin: 0;
         padding-right: 38px;
@@ -327,6 +330,7 @@
     .preset-panel,
     .draft-history-panel {
         display: flex;
+        min-width: 0;
         flex-wrap: wrap;
         gap: 10px;
         align-items: center;
@@ -355,6 +359,24 @@
         font-size: 13px;
         font-weight: 850;
         white-space: nowrap;
+    }
+
+    .preset-save label {
+        display: flex;
+        flex: 1 1 220px;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+
+    .preset-save label span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 850;
     }
 
     .preset-save-button,
@@ -477,6 +499,7 @@
         align-items: center;
         justify-content: center;
         width: 34px;
+        flex: 0 0 34px;
         border: 0;
         background: transparent;
         color: var(--muted);
