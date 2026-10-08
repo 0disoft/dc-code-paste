@@ -158,6 +158,24 @@ describe("draft history lifecycle", () => {
     expect(controller.checkpointBeforeReplacement()).toBe(false);
   });
 
+  it("reports a rejected recovery point and prevents replacing the current document", () => {
+    const { controller, current, history, states } = harness();
+    expect(controller.save({ automatic: false })).toBe(true);
+    const original = history()[0]!;
+    current().document = {
+      type: "doc",
+      content: Array.from({ length: 10_000 }, () => ({
+        type: "paragraph",
+        content: [{ type: "text", text: "줄" }],
+      })),
+    };
+    expect(controller.save({ automatic: false })).toBe(false);
+    expect(controller.checkpointBeforeReplacement()).toBe(false);
+    expect(states.at(-1)).toBe("error");
+    expect(history()).toEqual([original]);
+    controller.dispose();
+  });
+
   it("keeps a later error from being reset by an old saved-state timer", () => {
     const { controller, states } = harness();
     expect(controller.save({ automatic: false })).toBe(true);

@@ -66,6 +66,46 @@ const throwingStorage = {
 };
 
 describe("draft storage", () => {
+  it("keeps the readable draft when a schema-valid document exceeds the recovery node limit", () => {
+    const storage = new MemoryStorage();
+    const original = createDraftSnapshot(sampleDocument, preferences);
+    expect(writeDraftSnapshot(storage, original)).toBe(true);
+    const originalRaw = storage.getItem(draftStorageKey);
+    const document = {
+      type: "doc",
+      content: Array.from({ length: 10_000 }, () => ({
+        type: "paragraph",
+        content: [{ type: "text", text: "줄" }],
+      })),
+    };
+    getSchema(createEditorExtensions()).nodeFromJSON(document).check();
+    const snapshot = createDraftSnapshot(document, preferences);
+    expect(JSON.stringify(snapshot).length).toBeLessThan(2_000_000);
+    expect(parseDraftSnapshot(JSON.stringify(snapshot))).toBeUndefined();
+    expect(writeDraftSnapshot(storage, snapshot)).toBe(false);
+    expect(storage.getItem(draftStorageKey)).toBe(originalRaw);
+    expect(readDraftSnapshot(storage)).toEqual(original);
+  });
+
+  it("refuses an unreadable history entry without changing previous recovery points", () => {
+    const storage = new MemoryStorage();
+    const original = createDraftHistorySnapshot(sampleDocument, preferences);
+    expect(writeDraftHistorySnapshots(storage, [original])).toBe(true);
+    const raw = storage.getItem(draftHistoryStorageKey);
+    const document = {
+      type: "doc",
+      content: Array.from({ length: 10_000 }, () => ({
+        type: "paragraph",
+        content: [{ type: "text", text: "줄" }],
+      })),
+    };
+    const invalid = createDraftHistorySnapshot(document, preferences);
+    expect(writeDraftHistorySnapshots(storage, [invalid, original])).toBe(false);
+    expect(appendDraftHistorySnapshot(storage, invalid)).toEqual([original]);
+    expect(storage.getItem(draftHistoryStorageKey)).toBe(raw);
+    expect(readDraftHistorySnapshots(storage)).toEqual([original]);
+  });
+
   it("round-trips the clean editorial theme while preserving legacy themes", () => {
     for (const documentTheme of ["cleanEditorial", "lightLecture", "darkEditorial"] as const) {
       const snapshot = createDraftSnapshot(sampleDocument, { ...preferences, documentTheme });

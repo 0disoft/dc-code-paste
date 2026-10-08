@@ -418,7 +418,7 @@ export function readDraftHistorySnapshots(storage: DraftStorage): DraftHistorySn
 export function writeDraftSnapshot(storage: DraftStorage, snapshot: DraftSnapshot): boolean {
   try {
     const raw = JSON.stringify(snapshot);
-    if (raw.length > maxDraftChars) return false;
+    if (!parseDraftSnapshot(raw)) return false;
     storage.setItem(draftStorageKey, raw);
     return true;
   } catch {
@@ -431,10 +431,10 @@ export function writeDraftHistorySnapshots(
   snapshots: DraftHistorySnapshot[],
 ): boolean {
   try {
-    storage.setItem(
-      draftHistoryStorageKey,
-      JSON.stringify(snapshots.slice(0, maxDraftHistoryCount)),
-    );
+    const next = snapshots.slice(0, maxDraftHistoryCount);
+    const raw = JSON.stringify(next);
+    if (parseDraftHistorySnapshots(raw).length !== next.length) return false;
+    storage.setItem(draftHistoryStorageKey, raw);
     return true;
   } catch {
     return false;

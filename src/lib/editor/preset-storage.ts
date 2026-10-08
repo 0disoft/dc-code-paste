@@ -123,13 +123,10 @@ export function writePresetSnapshots(
   presets: readonly PresetSnapshot[],
 ): boolean {
   try {
-    storage.setItem(
-      presetStorageKey,
-      JSON.stringify({
-        version: 1,
-        presets: presets.slice(0, maxPresetCount),
-      }),
-    );
+    const next = presets.slice(0, maxPresetCount);
+    const raw = JSON.stringify({ version: 1, presets: next });
+    if (parsePresetSnapshots(raw).length !== next.length) return false;
+    storage.setItem(presetStorageKey, raw);
     return true;
   } catch {
     return false;

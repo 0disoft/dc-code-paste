@@ -55,6 +55,24 @@ const throwingStorage = {
 };
 
 describe("preset storage", () => {
+  it("does not replace readable presets with a document that cannot be restored", () => {
+    const storage = new MemoryStorage();
+    const original = createPresetSnapshot("기존 프리셋", sampleDocument, preferences);
+    expect(writePresetSnapshots(storage, [original])).toBe(true);
+    const raw = storage.getItem(presetStorageKey);
+    const document = {
+      type: "doc",
+      content: Array.from({ length: 10_000 }, () => ({
+        type: "paragraph",
+        content: [{ type: "text", text: "줄" }],
+      })),
+    };
+    const invalid = createPresetSnapshot("새 프리셋", document, preferences);
+    expect(writePresetSnapshots(storage, [invalid, original])).toBe(false);
+    expect(storage.getItem(presetStorageKey)).toBe(raw);
+    expect(readPresetSnapshots(storage)).toEqual([original]);
+  });
+
   it("round-trips named document presets", () => {
     const storage = new MemoryStorage();
     const preset = createPresetSnapshot("  강의글   구조  ", sampleDocument, preferences);
