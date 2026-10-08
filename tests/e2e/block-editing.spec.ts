@@ -46,3 +46,30 @@ test("returns to the edited block after a mobile inspector action", async ({ pag
   await expect(summaries).toHaveCount(count + 1);
   await expect(editor.locator(".dc-selected-block")).toContainText("모바일에서 추가");
 });
+
+for (const mobile of [false, true]) {
+  test(`undoes typing after duplicating a block separately on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("./");
+    const editor = page.locator(".article-editor");
+    await expect(editor).toContainText("DC-CODE-PASTE");
+    await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+    await page.getByLabel("Markdown 원문").fill("앞 문단\n\n선택 문단\n\n뒤 문단");
+    await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+    await editor.locator("p").nth(1).click();
+    if (mobile) await page.getByRole("button", { name: "블록 설정 패널", exact: true }).click();
+    await page.getByRole("button", { name: "블록 복제", exact: true }).click();
+    await page.keyboard.insertText("후속 입력 ");
+    await editor.press("Control+z");
+    await expect(editor.locator("p")).toHaveText(["앞 문단", "선택 문단", "선택 문단", "뒤 문단"]);
+    await editor.press("Control+z");
+    await expect(editor.locator("p")).toHaveText(["앞 문단", "선택 문단", "뒤 문단"]);
+    await editor.press("Control+y");
+    await expect(editor.locator("p")).toHaveText(["앞 문단", "선택 문단", "선택 문단", "뒤 문단"]);
+    await editor.press("Control+y");
+    await expect(editor.locator("p").nth(2)).toHaveText("후속 입력 선택 문단");
+  });
+}

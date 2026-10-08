@@ -67,5 +67,7 @@ export function applyBlockAction(editor: Editor, action: BlockAction) {
   );
   editor.view.dispatch(closeHistory(tr).scrollIntoView());
   editor.commands.focus();
+  // Keep immediate typing in its own undo event.
+  editor.view.dispatch(closeHistory(editor.state.tr));
   return true;
 }

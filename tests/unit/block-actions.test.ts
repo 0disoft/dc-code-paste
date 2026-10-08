@@ -1,5 +1,6 @@
 import { getSchema, type Editor, type JSONContent } from "@tiptap/core";
 import { EditorState, TextSelection, type Transaction } from "@tiptap/pm/state";
+import { history, redo, undo } from "@tiptap/pm/history";
 import { expect, it } from "vitest";
 import { createEditorExtensions } from "../../src/lib/editor/extensions";
 import { applyBlockAction, availableBlockActions } from "../../src/lib/editor/block-actions";
@@ -7,7 +8,11 @@ import { applyBlockAction, availableBlockActions } from "../../src/lib/editor/bl
 function harness(content: JSONContent[], position = 1) {
   const schema = getSchema(createEditorExtensions());
   const doc = schema.nodeFromJSON({ type: "doc", content });
-  let state = EditorState.create({ doc, selection: TextSelection.create(doc, position) });
+  let state = EditorState.create({
+    doc,
+    selection: TextSelection.create(doc, position),
+    plugins: [history()],
+  });
   return {
     get state() {
       return state;
@@ -82,3 +87,22 @@ it("refuses to delete a required final child in a nested block", () => {
   expect(applyBlockAction(editor, "delete")).toBe(false);
   expect(editor.state.doc.textContent).toBe("자료");
 });
+
+for (const action of ["up", "down", "duplicate", "delete"] as const) {
+  it(`undoes typing immediately after ${action} separately from the block action`, () => {
+    const editor = harness([paragraph("앞"), paragraph("선택"), paragraph("뒤")], 4);
+    const original = editor.state.doc.toJSON();
+    expect(applyBlockAction(editor, action)).toBe(true);
+    const arranged = editor.state.doc.toJSON();
+    editor.view.dispatch(editor.state.tr.insertText("후속 입력"));
+    const typed = editor.state.doc.toJSON();
+    expect(undo(editor.state, editor.view.dispatch)).toBe(true);
+    expect(editor.state.doc.toJSON()).toEqual(arranged);
+    expect(undo(editor.state, editor.view.dispatch)).toBe(true);
+    expect(editor.state.doc.toJSON()).toEqual(original);
+    expect(redo(editor.state, editor.view.dispatch)).toBe(true);
+    expect(editor.state.doc.toJSON()).toEqual(arranged);
+    expect(redo(editor.state, editor.view.dispatch)).toBe(true);
+    expect(editor.state.doc.toJSON()).toEqual(typed);
+  });
+}
