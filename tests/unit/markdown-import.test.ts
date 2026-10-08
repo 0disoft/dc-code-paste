@@ -6,6 +6,60 @@ import {
 } from "../../src/lib/editor/markdown-import";
 
 describe("markdown import", () => {
+  it.each(["첫째  \n둘째", "첫째\\\n둘째"])(
+    "keeps explicit paragraph line breaks in %s",
+    (markdown) => {
+      expect(parseMarkdownToDocument(markdown).content?.[0]?.content).toEqual([
+        { type: "text", text: "첫째" },
+        { type: "hardBreak" },
+        { type: "text", text: "둘째" },
+      ]);
+    },
+  );
+
+  it("keeps line breaks inside inline emphasis and links", () => {
+    const content = parseMarkdownToDocument("**첫째  \n둘째** [셋째\\\n넷째](https://example.com)")
+      .content?.[0]?.content;
+    expect(content?.map((node) => node.type)).toEqual([
+      "text",
+      "hardBreak",
+      "text",
+      "text",
+      "text",
+      "hardBreak",
+      "text",
+    ]);
+    expect(content?.[0]?.marks).toEqual([{ type: "bold" }]);
+    expect(content?.[2]?.marks).toEqual([{ type: "bold" }]);
+    expect(content?.[4]?.marks?.[0]?.attrs?.href).toBe("https://example.com/");
+    expect(content?.[6]?.marks?.[0]?.attrs?.href).toBe("https://example.com/");
+  });
+
+  it("keeps explicit line breaks inside lists, quotes and callouts", () => {
+    const content = parseMarkdownToDocument(
+      "- 첫째  \n  둘째\n\n> 셋째\\\n> 넷째\n\n:::tip\n다섯째  \n여섯째\n:::",
+    ).content;
+    for (const paragraph of [
+      content?.[0]?.content?.[0]?.content?.[0],
+      content?.[1]?.content?.[0],
+      content?.[2]?.content?.[0],
+    ]) {
+      expect(paragraph?.content?.map((node) => node.type)).toEqual(["text", "hardBreak", "text"]);
+    }
+  });
+
+  it("keeps soft wraps and code span line endings from becoming explicit breaks", () => {
+    expect(parseMarkdownToDocument("첫째 \n  둘째").content?.[0]?.content).toEqual([
+      { type: "text", text: "첫째 둘째" },
+    ]);
+    expect(parseMarkdownToDocument("`첫째\\\n둘째`").content?.[0]?.content).toEqual([
+      { type: "text", text: "첫째\\ 둘째", marks: [{ type: "code" }] },
+    ]);
+    expect(parseMarkdownToDocument("끝\\\n\n다음").content?.[0]?.content).toEqual([
+      { type: "text", text: "끝\\" },
+    ]);
+  });
+
   it("keeps literal underscores and escaped delimiters while parsing nested emphasis", () => {
     expect(parseMarkdownInline("foo_bar_baz \\*literal\\*")).toEqual([
       { type: "text", text: "foo_bar_baz *literal*" },

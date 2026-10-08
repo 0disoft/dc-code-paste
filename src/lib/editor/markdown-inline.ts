@@ -39,8 +39,12 @@ function findMatchingBracket(value: string, start: number, open: string, close: 
 
 function appendNodes(content: JSONContent[], nodes: JSONContent[], mark?: InlineMark) {
   for (const node of nodes) {
-    if (node.type !== "text" || !node.text) continue;
     const marks = mark ? [mark, ...(node.marks ?? [])] : node.marks;
+    if (node.type === "hardBreak") {
+      content.push(marks?.length ? { ...node, marks } : node);
+      continue;
+    }
+    if (node.type !== "text" || !node.text) continue;
     const previous = content.at(-1);
     if (previous?.type === "text" && JSON.stringify(previous.marks) === JSON.stringify(marks)) {
       previous.text = `${previous.text ?? ""}${node.text}`;
@@ -84,6 +88,28 @@ function parseInlineSegment(
       }
     }
 
+    if (char === "\\" && next === "\n") {
+      flush();
+      content.push({ type: "hardBreak" });
+      index += 2;
+      while (/[ \t]/.test(value[index] ?? "")) index += 1;
+      continue;
+    }
+
+    if (char === "\n") {
+      const hardBreak = plain.endsWith("  ");
+      plain = plain.replace(/[ \t]+$/, "");
+      if (hardBreak) {
+        flush();
+        content.push({ type: "hardBreak" });
+      } else {
+        plain += " ";
+      }
+      index += 1;
+      while (/[ \t]/.test(value[index] ?? "")) index += 1;
+      continue;
+    }
+
     if (char === "\\" && next && /[\\`*_[\]()]/.test(next)) {
       plain += next;
       index += 2;
@@ -98,9 +124,13 @@ function parseInlineSegment(
       }
       if (end > index + run.length) {
         flush();
-        appendNodes(content, [{ type: "text", text: value.slice(index + run.length, end) }], {
-          type: "code",
-        });
+        appendNodes(
+          content,
+          [{ type: "text", text: value.slice(index + run.length, end).replace(/\n/g, " ") }],
+          {
+            type: "code",
+          },
+        );
         index = end + run.length;
         continue;
       }

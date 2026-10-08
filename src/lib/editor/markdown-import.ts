@@ -674,7 +674,7 @@ function collectList(
       if (!line.trim()) break;
       const indent = /^(\s*)/.exec(line)?.[1]?.replace(/\t/g, "    ").length ?? 0;
       if (indent <= first.indent || isBlockStarter(line)) break;
-      itemText += ` ${line.trim()}`;
+      itemText += `\n${line.trimStart()}`;
       index += 1;
     }
 
@@ -725,11 +725,11 @@ function collectParagraph(lines: string[], start: number): { text: string; nextI
       break;
     }
 
-    paragraphLines.push(line.trim());
+    paragraphLines.push(line.trimStart());
     index += 1;
   }
 
-  return { text: paragraphLines.join(" "), nextIndex: index };
+  return { text: paragraphLines.join("\n"), nextIndex: index };
 }
 
 export function parseMarkdownToDocument(
@@ -879,7 +879,7 @@ export function parseMarkdownToDocument(
       const quoteLines: string[] = [];
 
       while (index < lines.length && lines[index]?.trim().startsWith(">")) {
-        quoteLines.push((lines[index] ?? "").trim().replace(/^>\s?/, ""));
+        quoteLines.push((lines[index] ?? "").trimStart().replace(/^>\s?/, ""));
         index += 1;
       }
 
