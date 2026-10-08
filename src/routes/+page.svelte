@@ -11,6 +11,7 @@
     import InspectorPanel from "#lib/components/InspectorPanel.svelte";
     import EditorCanvas from "#lib/components/EditorCanvas.svelte";
     import PreviewCanvas from "#lib/components/PreviewCanvas.svelte";
+    import CopyRecovery from "#lib/components/CopyRecovery.svelte";
 
     type WorkspaceView = "editor" | "preview";
 
@@ -283,29 +284,7 @@
         <InspectorPanel open={rightRailOpen} {compact} />
     </div>
 
-    {#if workspace.copyState === "render-error"}
-        <div class="copy-error" role="alert">
-            HTML 생성에 실패했습니다. 다시 시도해 주세요.
-            <button type="button" onclick={workspace.copyPreview}>다시 시도</button>
-        </div>
-    {:else if workspace.copyState === "error"}
-        <div class="copy-error" role="alert">
-            자동 복사가 실패했습니다. 브라우저 권한을 확인해 주세요.
-            {#if workspace.manualCopyHtml}
-                <p>아래 원문을 복사해 DCInside HTML 모드에 붙여넣으세요.</p>
-                <textarea
-                    class="html-source"
-                    readonly
-                    aria-label="수동 복사용 HTML 원문"
-                    value={workspace.manualCopyHtml}
-                ></textarea>
-            {/if}
-        </div>
-    {/if}
-
-    {#if workspace.sourceCopyState === "error"}
-        <p class="copy-error">원문 복사가 막혔어. HTML 원문을 직접 선택해서 복사해줘.</p>
-    {/if}
+    <CopyRecovery />
 </div>
 
 <style>
@@ -336,16 +315,6 @@
     .draft-recovery-banner button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-    }
-
-    .copy-error {
-        max-height: 35dvh;
-        overflow-y: auto;
-        flex: 0 0 auto;
-        margin: 14px 12px 0;
-        color: var(--danger);
-        font-weight: 700;
-        font-size: 0.84rem;
     }
 
     .code-line-context-menu {

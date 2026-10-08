@@ -3008,6 +3008,11 @@ export function createWorkspaceState() {
     get manualCopyHtml() {
       return manualCopyHtml;
     },
+    dismissCopyErrors() {
+      copyState = "idle";
+      sourceCopyState = "idle";
+      manualCopyHtml = "";
+    },
     set copyState(value) {
       copyState = value;
     },
