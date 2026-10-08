@@ -616,13 +616,19 @@ function customBlockNode(
 }
 
 function standaloneLinkBoxNode(line: string): JSONContent | undefined {
-  const markdownLink = standaloneMarkdownLinkPattern.exec(line.trim());
+  const trimmed = line.trim();
+  const markdownLink = standaloneMarkdownLinkPattern.exec(trimmed);
 
   if (markdownLink) {
     return linkBoxNode(markdownLink[1] ?? "", markdownLink[2] ?? "");
   }
 
-  const normalizedHref = normalizeEditableLinkHref(line);
+  // URL validation accepts bare hostnames for the explicit link editor. Prose
+  // needs an explicit link prefix before it can be converted automatically.
+  if (!/^(?:https?:\/\/|mailto:|www\.)/i.test(trimmed)) {
+    return undefined;
+  }
+  const normalizedHref = normalizeEditableLinkHref(trimmed);
   return normalizedHref ? linkBoxNode(normalizedHref, normalizedHref) : undefined;
 }
 
