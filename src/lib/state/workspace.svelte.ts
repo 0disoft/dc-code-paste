@@ -2426,6 +2426,11 @@ export function createWorkspaceState() {
     editorCommands.setFontSize(value);
   }
 
+  function setFontFamily(value: string) {
+    selectionFontFamily = value;
+    editorCommands.setFontFamily(value);
+  }
+
   function resetDraft() {
     if (!window.confirm("현재 글을 모두 지우고 빈 문서로 초기화할까?")) {
       return;
@@ -3435,6 +3440,7 @@ export function createWorkspaceState() {
     toggleLinkPanel,
     setTextColor,
     setFontSize,
+    setFontFamily,
     resetDraft,
     applyExampleTemplate,
     writingTemplates,
@@ -3446,6 +3452,9 @@ export function createWorkspaceState() {
     toggleToolPanel,
     get bodyFontFamily() {
       return bodyFontFamily;
+    },
+    set bodyFontFamily(value) {
+      bodyFontFamily = value;
     },
     get selectionFontFamily() {
       return selectionFontFamily;

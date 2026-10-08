@@ -417,6 +417,14 @@ export function createEditorCommandAdapter(options: {
     );
   }
 
+  function setFontFamily(value: string) {
+    run((current) =>
+      value
+        ? current.chain().focus().setFontFamily(value).run()
+        : current.chain().focus().unsetFontFamily().run(),
+    );
+  }
+
   function applyCallout(kind: CalloutKind, toneColor: string) {
     run((current) => {
       if (retargetActiveCallout(current, kind, toneColor)) return true;
@@ -460,5 +468,6 @@ export function createEditorCommandAdapter(options: {
     setTextColor,
     updateCodeBlockAttributes,
     setFontSize,
+    setFontFamily,
   };
 }

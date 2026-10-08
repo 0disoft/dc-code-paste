@@ -181,6 +181,8 @@ test("backs up a draft to a file and restores it without losing summary formatti
   );
   await expect(page.locator(".rail-left")).toContainText("파일의 글과 서식을 불러왔습니다.");
   await expect(page.locator(".article-editor")).toHaveCSS("font-family", /Georgia/);
+  await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+  await expect(page.getByLabel("본문 글꼴", { exact: true })).toHaveValue("Georgia");
   await page.reload();
   await expect(page.locator(".article-editor")).toHaveCSS("font-family", /Georgia/);
 });

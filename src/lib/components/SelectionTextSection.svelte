@@ -4,6 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import Type from "@lucide/svelte/icons/type";
     import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+    import { proseFontOptions } from "#lib/editor/text-fonts.ts";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const style = $derived(workspace.selectionTextStyle);
@@ -11,6 +12,25 @@
 
 <section class="ui-section" aria-label="선택 영역">
     <span class="ui-section-title"><Type size={15} aria-hidden="true" /> 선택 영역</span>
+
+    <label class="ui-field">
+        <span class="ui-label">글꼴</span>
+        <select
+            class="ui-select"
+            value={style.fontFamilyMixed ? "mixed" : style.fontFamily}
+            aria-label="선택 글꼴"
+            onchange={(event) => workspace.setFontFamily(event.currentTarget.value)}
+        >
+            <option value="">본문 따름</option>
+            {#if style.fontFamilyMixed}<option value="mixed" disabled>여러 글꼴</option>{/if}
+            {#if style.fontFamily && !proseFontOptions.some((item) => item.value === style.fontFamily)}
+                <option value={style.fontFamily}>가져온 글꼴 · {style.fontFamily.split(",")[0]}</option>
+            {/if}
+            {#each proseFontOptions as item (item.value)}
+                <option value={item.value}>{item.label}</option>
+            {/each}
+        </select>
+    </label>
 
     <label class="ui-field">
         <span class="ui-label">글자 크기</span>
