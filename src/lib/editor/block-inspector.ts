@@ -84,7 +84,7 @@ export const SelectedBlockDecoration = Extension.create({
               state.selection instanceof NodeSelection
                 ? { node: state.selection.node, pos: state.selection.from }
                 : targetAt(state.selection.$from);
-            if (!target || target.node.type.name !== "summaryBox") return DecorationSet.empty;
+            if (!target || !target.node.isBlock) return DecorationSet.empty;
             return DecorationSet.create(state.doc, [
               Decoration.node(target.pos, target.pos + target.node.nodeSize, {
                 class: "dc-selected-block",

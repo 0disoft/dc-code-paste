@@ -8,6 +8,11 @@ import {
   isPaletteBlockKind,
   type PaletteBlockKind,
 } from "#lib/editor/block-inspector.ts";
+import {
+  availableBlockActions,
+  applyBlockAction,
+  type BlockAction,
+} from "#lib/editor/block-actions.ts";
 import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
 
 import type { Node as ProseMirrorNode, ResolvedPos } from "@tiptap/pm/model";
@@ -2719,6 +2724,13 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get selectedBlockActions() {
+      void editorSignal;
+      return availableBlockActions(editor);
+    },
+    runBlockAction(action: BlockAction) {
+      runEditorCommand((current) => applyBlockAction(current, action));
+    },
     get selectedBlockInfo() {
       void editorSignal;
       return selectedBlockInfo(editor);

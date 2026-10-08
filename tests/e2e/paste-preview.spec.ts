@@ -107,6 +107,20 @@ test("inserts a summary by dragging from the palette", async ({ page }) => {
   await expect(editor.locator(".dc-summary-box")).toHaveCount(before + 1);
 });
 
+test("duplicates, moves and deletes a block with undo support", async ({ page }) => {
+  await waitForEditor(page);
+  const summaries = page.locator(".article-editor .dc-summary-box");
+  const count = await summaries.count();
+  await summaries.first().locator(".dc-summary-item").first().click();
+  await page.getByRole("button", { name: "블록 복제", exact: true }).click();
+  await expect(summaries).toHaveCount(count + 1);
+  await page.getByRole("button", { name: "위로 이동", exact: true }).click();
+  await page.getByRole("button", { name: "블록 삭제", exact: true }).click();
+  await expect(summaries).toHaveCount(count);
+  await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+  await expect(summaries).toHaveCount(count + 1);
+});
+
 for (const mobile of [false, true]) {
   test(`adds a link to summary text on ${mobile ? "mobile" : "desktop"}`, async ({ page }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });

@@ -3,6 +3,7 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
+    import BlockActionsSection from "./BlockActionsSection.svelte";
     import SummaryAppearanceSection from "./SummaryAppearanceSection.svelte";
     import CodeBlockSection from "./CodeBlockSection.svelte";
     import CalloutSection from "./CalloutSection.svelte";
@@ -110,6 +111,8 @@
                     <h2 class="inspector-title">{blockInfo.label}</h2>
                     <p class="ui-section-note">{blockDescription}</p>
                 </div>
+
+                <BlockActionsSection />
 
                 {#if blockInfo.type === "summaryBox"}
                     <SummaryAppearanceSection />
