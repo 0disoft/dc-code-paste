@@ -123,9 +123,12 @@
             <textarea
                 class="html-source"
                 readonly
+                disabled={workspace.isRendering}
                 spellcheck="false"
-                aria-label={workspace.previewError ? "이전 미리보기 HTML 원문" : "복사용 HTML 원문"}
-                value={workspace.html}
+                aria-busy={workspace.isRendering}
+                aria-label={workspace.isRendering ? "HTML 원문 생성 중" : workspace.previewError ? "이전 미리보기 HTML 원문" : "복사용 HTML 원문"}
+                placeholder={workspace.isRendering ? "글에 맞는 HTML 원문을 만드는 중입니다." : ""}
+                value={workspace.isRendering ? "" : workspace.html}
             ></textarea>
         {/if}
     </div>
