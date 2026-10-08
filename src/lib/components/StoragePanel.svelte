@@ -21,6 +21,7 @@
         draftHistory: DraftHistorySnapshot[];
         draftHistoryState: "idle" | "saved" | "error";
         draftHistoryStateLabel: string;
+        loadError: string;
         renameTarget: RenameTarget | null;
         renameDraft: string;
         onClose: () => void;
@@ -49,6 +50,7 @@
         draftHistory,
         draftHistoryState,
         draftHistoryStateLabel,
+        loadError,
         renameTarget,
         renameDraft = $bindable(""),
         onClose,
@@ -118,6 +120,7 @@
         <X size={16} />
     </button>
     <DraftFileSection />
+    {#if loadError}<p class="ui-hint is-error" role="alert">{loadError}</p>{/if}
     <section class="preset-panel" aria-label="프리셋">
         <div class="preset-save">
             <label>

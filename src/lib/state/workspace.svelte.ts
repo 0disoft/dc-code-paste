@@ -358,6 +358,7 @@ export function createWorkspaceState() {
   let llmGenerationError = $state("");
 
   let isStoragePanelOpen = $state(false);
+  let storageLoadError = $state("");
 
   let activeToolPanel = $state<ToolPanelId | null>(null);
 
@@ -1008,6 +1009,7 @@ export function createWorkspaceState() {
     isStoragePanelOpen = !isStoragePanelOpen;
 
     if (isStoragePanelOpen) {
+      storageLoadError = "";
       cancelLlmGeneration();
       llmModels.cancel();
       isMarkdownPanelOpen = false;
@@ -1143,7 +1145,9 @@ export function createWorkspaceState() {
   }
 
   function restoreDraftHistorySnapshot(snapshot: DraftHistorySnapshot) {
-    draftHistoryController.restore(snapshot);
+    if (!validateStoredDocument(snapshot.document)) return;
+    if (!draftHistoryController.restore(snapshot))
+      storageLoadError = "현재 글을 초안 기록에 보관하지 못했습니다. 현재 글은 그대로 유지됩니다.";
   }
 
   function saveDraftHistoryRename(id: string) {
@@ -1209,7 +1213,24 @@ export function createWorkspaceState() {
   }
 
   function applyPreset(preset: PresetSnapshot) {
-    presetController.apply(preset);
+    if (!validateStoredDocument(preset.document)) return;
+    if (!presetController.apply(preset))
+      storageLoadError = "현재 글을 초안 기록에 보관하지 못했습니다. 현재 글은 그대로 유지됩니다.";
+  }
+
+  function validateStoredDocument(document: JSONContent) {
+    storageLoadError = "";
+    if (!editor) {
+      storageLoadError = "편집기를 연 뒤 다시 시도해 주세요.";
+      return false;
+    }
+    try {
+      editor.schema.nodeFromJSON(document).check();
+      return true;
+    } catch {
+      storageLoadError = "저장된 글의 문서 구조를 읽을 수 없습니다. 현재 글은 그대로 유지됩니다.";
+      return false;
+    }
   }
 
   function savePresetRename(id: string) {
@@ -3218,6 +3239,10 @@ export function createWorkspaceState() {
     },
     set isStoragePanelOpen(value) {
       isStoragePanelOpen = value;
+      storageLoadError = "";
+    },
+    get storageLoadError() {
+      return storageLoadError;
     },
     get activeToolPanel() {
       return activeToolPanel;

@@ -183,6 +183,7 @@
                             draftHistory={workspace.draftHistory}
                             draftHistoryState={workspace.draftHistoryState}
                             draftHistoryStateLabel={workspace.draftHistoryStateLabel}
+                            loadError={workspace.storageLoadError}
                             renameTarget={workspace.renameTarget}
                             onClose={() => (workspace.isStoragePanelOpen = false)}
                             onPresetNameInput={workspace.clearPresetState}
