@@ -144,7 +144,7 @@ test("starts a news template and preserves the previous draft", async ({ page })
   ).toContain("DC-CODE-PASTE");
 });
 
-test("backs up a draft to a file and restores it without losing summary formatting", async ({
+test("backs up a draft and restores whitespace-heavy JSON without losing summary formatting", async ({
   page,
 }) => {
   await waitForEditor(page);
@@ -172,7 +172,7 @@ test("backs up a draft to a file and restores it without losing summary formatti
   await fileInput.setInputFiles({
     name: "draft.json",
     mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify(imported)),
+    buffer: Buffer.from(`${" ".repeat(2_000_001)}${JSON.stringify(imported)}`),
   });
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
   await expect(page.locator(".article-editor .dc-summary-box").first()).toHaveAttribute(

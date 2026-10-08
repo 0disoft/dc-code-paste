@@ -316,8 +316,11 @@ export function createDraftHistorySnapshot(
   };
 }
 
-export function parseDraftSnapshot(value: string): DraftSnapshot | undefined {
-  if (value.length > maxDraftChars) {
+export function parseDraftSnapshot(
+  value: string,
+  maxChars = maxDraftChars,
+): DraftSnapshot | undefined {
+  if (value.length > maxChars) {
     return undefined;
   }
   let parsed: unknown;
