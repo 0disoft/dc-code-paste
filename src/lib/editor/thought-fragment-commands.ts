@@ -35,6 +35,15 @@ export function addThoughtFragmentTransaction(state: EditorState, input: unknown
   return { transaction: closeHistory(state.tr).setDocAttribute("thoughtFragments", next) };
 }
 
+export function captureThoughtFragmentSelectionTransaction(state: EditorState): Result {
+  const { from, to, empty } = state.selection;
+  if (empty) return { error: "보관할 글이나 코드를 먼저 선택해 주세요." };
+  // Keep indentation and hard breaks. Capturing is a private snapshot, not a cut or
+  // an insertion: partial selections must not acquire whole-block usage anchors.
+  const text = state.doc.textBetween(from, to, "\n", "\n");
+  return addThoughtFragmentTransaction(state, text);
+}
+
 export function updateThoughtFragmentTransaction(
   state: EditorState,
   id: string,

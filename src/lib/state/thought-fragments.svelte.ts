@@ -4,6 +4,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { thoughtFragmentCatalog } from "#lib/editor/thought-fragments.ts";
 import {
   addThoughtFragmentTransaction,
+  captureThoughtFragmentSelectionTransaction,
   updateThoughtFragmentTransaction,
   removeThoughtFragmentTransaction,
   insertThoughtFragmentTransaction,
@@ -45,6 +46,9 @@ export function createThoughtFragmentsState(options: {
     },
     add(text: string) {
       return run((editor) => addThoughtFragmentTransaction(editor.state, text));
+    },
+    captureSelection() {
+      return run((editor) => captureThoughtFragmentSelectionTransaction(editor.state));
     },
     update(id: string, text: string, expected: string) {
       return run((editor) => updateThoughtFragmentTransaction(editor.state, id, text, expected));

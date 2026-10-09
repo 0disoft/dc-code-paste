@@ -5,6 +5,7 @@ import { history, closeHistory, undo, redo } from "@tiptap/pm/history";
 import { createEditorExtensions } from "#lib/editor/extensions.ts";
 import {
   addThoughtFragmentTransaction,
+  captureThoughtFragmentSelectionTransaction,
   updateThoughtFragmentTransaction,
   removeThoughtFragmentTransaction,
   insertThoughtFragmentTransaction,
@@ -66,6 +67,75 @@ it("stores unfinished material verbatim without changing existing prose or selec
   });
   expect(normalizeThoughtFragmentText(" ")).toBeNull();
   expect(normalizeThoughtFragmentText("x".repeat(8001))).toBeNull();
+});
+
+it("captures selected text including hard breaks without changing its marks or selection", () => {
+  let state = initial([
+    {
+      type: "paragraph",
+      content: [
+        { type: "text", text: "  첫 줄", marks: [{ type: "bold" }] },
+        { type: "hardBreak" },
+        {
+          type: "text",
+          text: "둘째 줄  ",
+          marks: [{ type: "link", attrs: { href: "https://example.com/" } }],
+        },
+      ],
+    },
+    paragraph("선택 밖"),
+  ]);
+  state = state.apply(
+    state.tr.setSelection(TextSelection.create(state.doc, 1, state.doc.child(0).nodeSize - 1)),
+  );
+  const captured = apply(state, captureThoughtFragmentSelectionTransaction(state));
+  expect(captured.doc.content.eq(state.doc.content)).toBe(true);
+  expect(captured.selection.eq(state.selection)).toBe(true);
+  expect(thoughtFragmentCatalog(captured.doc)[0].fragment).toMatchObject({
+    text: "  첫 줄\n둘째 줄  ",
+    uses: [],
+  });
+  expect(captureThoughtFragmentSelectionTransaction(initial())).toHaveProperty("error");
+});
+
+it("captures a partial range across paragraphs and a code node with exact whitespace", () => {
+  let state = initial([paragraph("앞 문장"), paragraph("뒷 문장")]);
+  state = state.apply(
+    state.tr.setSelection(TextSelection.create(state.doc, 3, state.doc.child(0).nodeSize + 2)),
+  );
+  const captured = apply(state, captureThoughtFragmentSelectionTransaction(state));
+  expect(thoughtFragmentCatalog(captured.doc)[0].fragment.text).toBe("문장\n뒷");
+  const text = "  const x = 1;\n\treturn x;\n";
+  let code = initial([
+    { type: "codeBlock", attrs: { language: "javascript" }, content: [{ type: "text", text }] },
+  ]);
+  code = code.apply(code.tr.setSelection(NodeSelection.create(code.doc, 0)));
+  const stored = apply(code, captureThoughtFragmentSelectionTransaction(code));
+  expect(thoughtFragmentCatalog(stored.doc)[0].fragment.text).toBe(text);
+  expect(stored.doc.content.eq(code.doc.content)).toBe(true);
+});
+
+it("undoes capturing separately from preceding typing and restores the snapshot with redo", () => {
+  let state = initial();
+  state = state.apply(state.tr.insertText("입력 ", 1));
+  state = state.apply(state.tr.setSelection(TextSelection.create(state.doc, 1, 4)));
+  state = apply(state, captureThoughtFragmentSelectionTransaction(state));
+  undo(state, (tr) => {
+    state = state.apply(tr);
+  });
+  expect(thoughtFragmentCatalog(state.doc)).toEqual([]);
+  expect(state.doc.child(0).textContent).toBe("입력 원래 문장");
+  redo(state, (tr) => {
+    state = state.apply(tr);
+  });
+  expect(thoughtFragmentCatalog(state.doc)[0].fragment.text).toBe("입력 ");
+  undo(state, (tr) => {
+    state = state.apply(tr);
+  });
+  undo(state, (tr) => {
+    state = state.apply(tr);
+  });
+  expect(state.doc.child(0).textContent).toBe("원래 문장");
 });
 
 it("inserts prose after the caret's block without replacing a selected range, and undoes the usage with its content", () => {

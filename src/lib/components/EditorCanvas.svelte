@@ -19,6 +19,7 @@
         hidden?: boolean;
         onSourceRequest?: () => void;
         onRelationRequest?: () => void;
+        onStoreThoughtFragment?: () => void;
         relationReview?: SentenceRelationEntry;
         readingNoteReview?: ReadingNoteEntry;
         onReadingNoteClose: () => void;
@@ -29,7 +30,7 @@
         layoutRevision?: number;
     };
 
-    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, readingNoteReview, onReadingNoteClose, onRead, onEditPurpose, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
+    let { hidden = false, onSourceRequest, onRelationRequest, onStoreThoughtFragment, relationReview, readingNoteReview, onReadingNoteClose, onRead, onEditPurpose, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
@@ -68,7 +69,7 @@
 </script>
 
 <div class="canvas-view" hidden={hidden}>
-    <ReadingIntentToolbar hidden={hidden || workspace.editorMountState !== "ready"} {onSourceRequest} {onRelationRequest} {layoutRevision} />
+    <ReadingIntentToolbar hidden={hidden || workspace.editorMountState !== "ready"} {onSourceRequest} {onRelationRequest} {onStoreThoughtFragment} {layoutRevision} />
     <PendingSentenceRelation />
     {#if relationReview}<SentenceRelationReview entry={relationReview} onNavigate={onRelationNavigate} onClose={onReviewClose} />{/if}
     {#if readingNoteReview}<ReadingNoteReview entry={readingNoteReview} onNavigate={onRelationNavigate} onClose={onReadingNoteClose} {onRead} />{/if}

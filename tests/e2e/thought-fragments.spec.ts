@@ -25,6 +25,10 @@ async function setup(page: Page) {
   await expect(page.locator(".topbar-status")).toContainText("저장됨");
   await page.reload();
   await expect(page.locator(".article-editor")).toContainText("생각을 담는 글");
+  await expect(page.getByRole("group", { name: "글쓰기 편집기", exact: true })).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
 }
 async function openFragments(page: Page) {
   await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
@@ -38,7 +42,63 @@ async function copied(page: Page, count: number) {
   await expect
     .poll(() => page.evaluate(() => (window as ClipboardWindow).copiedDocuments.length))
     .toBe(count);
+  await expect(page.locator('[data-copy-trigger="preview"]')).toBeEnabled();
+  await expect(page.locator('[data-copy-trigger="preview"]')).toHaveAttribute(
+    "aria-label",
+    "복사됨",
+  );
   return page.evaluate(() => (window as ClipboardWindow).copiedDocuments.at(-1)!);
+}
+
+for (const mobile of [false, true]) {
+  test(`captures selected prose nearby and preserves public output on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1280, height: 900 });
+    await setup(page);
+    const editor = page.locator(".article-editor");
+    const html = await copied(page, 1);
+    const sentence = editor.locator("p").first();
+    await sentence.click({ clickCount: 3 });
+    await expect(editor).toBeFocused();
+    await expect
+      .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+      .toBe("원래 문장");
+    const toolbar = page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true });
+    await expect(toolbar).toBeVisible();
+    expect(
+      await toolbar.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return (
+          rect.left >= 0 && rect.right <= innerWidth && element.scrollWidth <= element.clientWidth
+        );
+      }),
+    ).toBe(true);
+    const storeButton = toolbar.getByRole("button", {
+      name: "선택한 글 조각으로 보관",
+      exact: true,
+    });
+    if (mobile) await storeButton.click();
+    else {
+      await storeButton.focus();
+      await page.keyboard.press("Enter");
+    }
+    const dialog = page.getByRole("dialog", { name: "생각 조각", exact: true });
+    await expect(dialog.getByRole("status")).toContainText("선택한 글을 조각으로 보관했습니다");
+    await expect(dialog.locator(".fragment-card > .fragment-text")).toHaveText("원래 문장");
+    await expect(sentence.locator("strong a, a strong")).toHaveText("원래 문장");
+    await expect(sentence.locator("a")).toHaveAttribute("href", "https://example.com/source");
+    await dialog.getByRole("button", { name: "생각 조각 닫기", exact: true }).click();
+    await expect(editor).toBeFocused();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("원래 문장");
+    expect(await copied(page, 2)).toBe(html);
+    await expect(page.locator(".topbar-status")).toContainText("저장됨");
+    await page.reload();
+    await expect(editor).toContainText("생각을 담는 글");
+    await openFragments(page);
+    await expect(dialog.locator(".fragment-card > .fragment-text")).toHaveText("원래 문장");
+    await expect(dialog.getByRole("status")).toHaveCount(0);
+  });
 }
 
 for (const mobile of [false, true]) {

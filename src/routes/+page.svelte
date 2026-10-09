@@ -35,6 +35,7 @@
     let writingPurposeOpen = $state(false);
     let writingPurposeReturnFocus: HTMLElement | undefined;
     let thoughtFragmentsOpen = $state(false);
+    let thoughtSelectionStored = $state(false);
     let thoughtFragmentsReturnFocus: HTMLElement | undefined;
     let readingReturnPosition: (() => void) | undefined;
     const drawerMode = $derived(compact || focusMode || readingMode);
@@ -67,6 +68,8 @@
 
     function openThoughtFragments() {
         if (workspace.editorMountState !== "ready") return;
+        thoughtSelectionStored = false;
+        workspace.thoughtFragments.clearError();
         thoughtFragmentsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
         closeRails();
         workspace.isStoragePanelOpen = false;
@@ -75,13 +78,22 @@
         thoughtFragmentsOpen = true;
     }
 
+    function storeSelectedThoughtFragment() {
+        if (workspace.editorMountState !== "ready") return;
+        openThoughtFragments();
+        thoughtFragmentsReturnFocus = workspace.editor?.view.dom;
+        thoughtSelectionStored = workspace.thoughtFragments.captureSelection();
+    }
+
     async function closeThoughtFragments() {
         if (!thoughtFragmentsOpen) return;
         thoughtFragmentsOpen = false;
         const target = thoughtFragmentsReturnFocus;
         thoughtFragmentsReturnFocus = undefined;
         await tick();
-        if (target?.isConnected && target.getClientRects().length) target.focus({ preventScroll: true });
+        const editor = workspace.editor;
+        if (editor && target === editor.view.dom) editor.view.focus();
+        else if (target?.isConnected && target.getClientRects().length) target.focus({ preventScroll: true });
         else document.querySelector<HTMLButtonElement>('[aria-label="더보기 메뉴"]')?.focus({ preventScroll: true });
     }
 
@@ -541,7 +553,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
+            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} onStoreThoughtFragment={storeSelectedThoughtFragment} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
             <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
             {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} onEditPurpose={openWritingPurpose} />{/if}
 
@@ -581,7 +593,7 @@
     <CopyRecovery />
     <CopiedOutputDialog />
     <WritingPurposeDialog open={writingPurposeOpen} onClose={closeWritingPurpose} />
-    <ThoughtFragmentsDialog open={thoughtFragmentsOpen} onClose={closeThoughtFragments} onInserted={afterThoughtFragmentInserted} onNavigate={onThoughtFragmentNavigate} />
+    <ThoughtFragmentsDialog open={thoughtFragmentsOpen} selectionStored={thoughtSelectionStored} onClose={closeThoughtFragments} onInserted={afterThoughtFragmentInserted} onNavigate={onThoughtFragmentNavigate} />
 </div>
 
 <style>

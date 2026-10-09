@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { maxThoughtFragmentLength, maxThoughtFragments } from "#lib/editor/thought-fragments-format.ts";
     import ThoughtFragmentCard from "./ThoughtFragmentCard.svelte";
-    let { open, onClose, onInserted, onNavigate }: { open: boolean; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
+    let { open, selectionStored = false, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: boolean; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const fragments = workspace.thoughtFragments;
     let dialog = $state<HTMLDialogElement>();
@@ -19,7 +19,7 @@
         if (!dialog) return;
         if (open && !dialog.open) {
             openedVersion = workspace.documentReplacementVersion;
-            status = ""; fragments.clearError();
+            status = selectionStored ? "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다." : "";
             dialog.showModal();
             void tick().then(() => { if (open && dialog?.open) field?.focus(); });
         } else if (!open && dialog.open) dialog.close();

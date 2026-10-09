@@ -30,9 +30,10 @@ for (const mobile of [false, true]) {
         .toBe("기억할 문장");
     }
     const toolbar = page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true });
-    await sentence.click();
-    await page.keyboard.press("Home");
-    await page.keyboard.press("Shift+End");
+    await sentence.click({ clickCount: 3 });
+    await expect
+      .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+      .toBe("기억할 문장");
     await expect(toolbar).toBeVisible();
     const readingToggle = toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true });
     await expect(readingToggle).toHaveAttribute("aria-expanded", "false");
