@@ -2695,6 +2695,7 @@ export function createWorkspaceState() {
 
   onMount(() => {
     let mountedEditor: Editor | undefined;
+    let settleEditorCreation: (() => void) | undefined;
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
     const handleDraftStorageEvent = (event: StorageEvent) => {
@@ -2801,6 +2802,14 @@ export function createWorkspaceState() {
         draftPersistence.acceptRemote(observedRaw, draftRead.snapshot);
       }
 
+      let resolveCreation!: () => void;
+      let rejectCreation!: (error: unknown) => void;
+      const editorCreated = new Promise<void>((resolve, reject) => {
+        resolveCreation = resolve;
+        rejectCreation = reject;
+      });
+      settleEditorCreation = resolveCreation;
+
       mountedEditor = new Editor({
         element: editorHost,
         extensions,
@@ -2859,9 +2868,16 @@ export function createWorkspaceState() {
           },
         },
         onCreate: ({ editor: current }) => {
-          editor = current;
-          refreshEditorState(current);
-          canPersistDraft = !invalidDraftRaw || Boolean(invalidDraftBackupKey);
+          try {
+            editor = current;
+            refreshEditorState(current);
+            canPersistDraft = !invalidDraftRaw || Boolean(invalidDraftBackupKey);
+            resolveCreation();
+          } catch (error) {
+            current.destroy();
+            editor = undefined;
+            rejectCreation(error);
+          }
         },
         onUpdate: ({ editor: current }) => {
           refreshEditorState(current);
@@ -2889,11 +2905,15 @@ export function createWorkspaceState() {
           editorSignal += 1;
         },
       });
+      // Tiptap emits create asynchronously after its DOM is already present.
+      await editorCreated;
+      settleEditorCreation = undefined;
     }
 
     const editorMountController = createEditorMountController({
       mount: mountEditor,
-      isReady: () => Boolean(mountedEditor),
+      isReady: () =>
+        Boolean(mountedEditor && editor === mountedEditor && !mountedEditor.isDestroyed),
       setState(value) {
         editorMountState = value;
       },
@@ -2906,6 +2926,8 @@ export function createWorkspaceState() {
 
     return () => {
       editorMountController.dispose();
+      settleEditorCreation?.();
+      settleEditorCreation = undefined;
       retryEditorMount = undefined;
       window.removeEventListener("resize", closeFloatingMenus);
       window.removeEventListener("scroll", closeFloatingMenus, true);

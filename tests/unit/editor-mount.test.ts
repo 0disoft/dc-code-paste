@@ -10,6 +10,26 @@ function deferred() {
 }
 
 describe("editor mount lifecycle", () => {
+  it("keeps an existing editor DOM unavailable until its initialization finishes", async () => {
+    const created = deferred();
+    let hasDom = false;
+    const setState = vi.fn<(state: EditorMountState) => void>();
+    const controller = createEditorMountController({
+      mount: async () => {
+        hasDom = true;
+        await created.promise;
+      },
+      isReady: () => hasDom,
+      setState,
+      onFailure: vi.fn<() => void>(),
+    });
+    const attempt = controller.attempt();
+    expect(hasDom).toBe(true);
+    expect(setState).toHaveBeenLastCalledWith("loading");
+    created.resolve();
+    await attempt;
+    expect(setState).toHaveBeenLastCalledWith("ready");
+  });
   it("keeps a failed editor unavailable until a successful retry", async () => {
     let mounted = false;
     const mount = vi

@@ -53,7 +53,7 @@
 </script>
 
 <div class="canvas-view" hidden={hidden}>
-    <ReadingIntentToolbar {hidden} {onSourceRequest} />
+    <ReadingIntentToolbar hidden={hidden || workspace.editorMountState !== "ready"} {onSourceRequest} />
     {#if workspace.editorMountState === "error"}
         <div class="canvas-notice is-error" role="alert">
             <span>편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.</span>
@@ -79,6 +79,8 @@
             bind:this={workspace.editorHost}
             role="group"
             aria-label="글쓰기 편집기"
+            aria-busy={workspace.editorMountState === "loading"}
+            inert={workspace.editorMountState !== "ready"}
             ondragover={handleDragOver}
             ondrop={handleDrop}
         ></div>
