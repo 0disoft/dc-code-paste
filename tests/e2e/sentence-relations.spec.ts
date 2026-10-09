@@ -20,6 +20,7 @@ async function setup(page: Page, markdown: string) {
 async function select(page: Page, first: number, last = first) {
   if (first === last) {
     await page.locator(".article-editor > p").nth(first).click();
+    await expect(page.locator(".article-editor")).toBeFocused();
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
   } else {
@@ -359,5 +360,79 @@ for (const mobile of [false, true]) {
     await page.getByRole("button", { name: "실행 취소", exact: true }).click();
     await expect(review).toHaveCount(0);
     await expect(list.getByRole("article")).toHaveCount(1);
+  });
+}
+
+for (const mobile of [false, true]) {
+  test(`keeps a custom relation name in drafts and out of exported HTML on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1280, height: 900 });
+    await page.addInitScript(() => {
+      (window as ClipboardWindow).copiedDocuments = [];
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          write: async (items: ClipboardItem[]) => {
+            (window as ClipboardWindow).copiedDocuments.push(
+              await (await items[0].getType("text/html")).text(),
+            );
+          },
+        },
+      });
+    });
+    await setup(page, "# 남겨둔 장면\n\n여름의 바람\n\n다시 열린 창");
+    const editor = page.locator(".article-editor");
+    const original = await editor.textContent();
+    const copy = page.locator('[data-copy-trigger="preview"]');
+    await copy.click();
+    await expect
+      .poll(() => page.evaluate(() => (window as ClipboardWindow).copiedDocuments.length))
+      .toBe(1);
+    const html = await page.evaluate(() => (window as ClipboardWindow).copiedDocuments[0]);
+    await select(page, 0);
+    await page
+      .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
+      .getByRole("button", { name: "문장 관계 연결", exact: true })
+      .click();
+    await page.getByLabel("연결할 관계", { exact: true }).selectOption("custom");
+    const start = page.getByRole("button", { name: "연결 시작", exact: true });
+    await expect(start).toBeDisabled();
+    await page.getByLabel("관계 이름", { exact: true }).fill("   ");
+    await expect(start).toBeDisabled();
+    const name = "<img src=x> 다시 떠오르는 장면";
+    await page.getByLabel("관계 이름", { exact: true }).fill(`  ${name}  `);
+    await start.click();
+    const pending = page.getByRole("region", { name: "문장 관계 연결 중", exact: true });
+    await expect(pending).toContainText(name);
+    await select(page, 1);
+    await pending.getByRole("button", { name: "선택한 구간 연결", exact: true }).click();
+    await expect(page.locator(".topbar-status")).toContainText("저장됨");
+    await page.reload();
+    const list = await relations(page);
+    const card = list.getByRole("article", { name: `${name} 관계 1`, exact: true });
+    await expect(card).toHaveAttribute("data-relation-state", "linked");
+    await expect(card).toContainText(name);
+    await expect(card.locator("img")).toHaveCount(0);
+    await card.getByRole("button", { name: "문장 관계 1 나란히 보기", exact: true }).click();
+    const review = page.getByRole("region", { name: "연결 구간 나란히 보기", exact: true });
+    await expect(review).toContainText(name);
+    await expect(review.locator("img")).toHaveCount(0);
+    expect(await editor.textContent()).toBe(original);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await copy.click();
+    await expect
+      .poll(() => page.evaluate(() => (window as ClipboardWindow).copiedDocuments.length))
+      .toBe(1);
+    expect(await page.evaluate(() => (window as ClipboardWindow).copiedDocuments[0])).toBe(html);
+    await review.getByRole("button", { name: `${name} 구간 1 비교에서 이동`, exact: true }).click();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("다시 열린 창");
+    await relations(page);
+    await card.getByRole("button", { name: "문장 관계 1 해제", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await expect(card).toContainText(name);
+    expect(await editor.textContent()).toBe(original);
   });
 }

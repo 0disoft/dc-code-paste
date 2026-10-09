@@ -18,6 +18,8 @@ import {
 import {
   normalizeRelationAnchorIds,
   normalizeSentenceRelations,
+  normalizeCustomRelationLabel,
+  sentenceRelationLabel,
   type SentenceRelationKind,
 } from "#lib/editor/sentence-relations-format.ts";
 import { applyBlockAction } from "#lib/editor/block-actions.ts";
@@ -269,11 +271,48 @@ it("rejects malformed kinds, duplicate identities and oversized records through 
   const selected = selectBlock(stateFor(), 0);
   const claim = selectedRelationPassage(selected)!;
   expect(
-    createSentenceRelationTransaction(selectBlock(selected, 1), claim, "condition", () => "same"),
+    createSentenceRelationTransaction(selectBlock(selected, 1), claim, "condition", {
+      identity: () => "same",
+    }),
   ).toHaveProperty("error");
 });
 
-it("roundtrips connections in a draft while leaving partial styled HTML export byte-identical", async () => {
+it("accepts named connections and rejects missing, multiline or oversized names at the schema boundary", () => {
+  const initial = stateFor([paragraph("여름의 바람"), paragraph("다시 열린 창")]);
+  const first = selectBlock(initial, 0);
+  const passage = selectedRelationPassage(first)!;
+  const target = selectBlock(first, 1);
+  for (const label of [undefined, "", "  ", "두\n줄", "길".repeat(81)]) {
+    expect(createSentenceRelationTransaction(target, passage, "custom", { label })).toHaveProperty(
+      "error",
+    );
+  }
+  const result = createSentenceRelationTransaction(target, passage, "custom", {
+    label: "  다시 떠오르는 장면  ",
+  });
+  if ("error" in result) throw new Error(result.error);
+  const state = target.apply(result.transaction);
+  state.doc.check();
+  expect(state.doc.textContent).toBe(initial.doc.textContent);
+  const entry = sentenceRelationCatalog(state.doc)[0];
+  expect(entry.relation.kind).toBe("custom");
+  expect(sentenceRelationLabel(entry.relation)).toBe("다시 떠오르는 장면");
+  for (const label of [undefined, 1, "", "두\n줄", "길".repeat(81)]) {
+    expect(normalizeSentenceRelations([{ ...entry.relation, label }])).toBeNull();
+    expect(() =>
+      schema
+        .nodeFromJSON({
+          ...state.doc.toJSON(),
+          attrs: { sentenceRelations: [{ ...entry.relation, label }] },
+        })
+        .check(),
+    ).toThrow("Invalid sentence relations");
+  }
+  expect(normalizeCustomRelationLabel("이름\u0000제어문자")).toBeNull();
+  expect(sentenceRelationLabel(connect(initial).doc.attrs.sentenceRelations[0])).toBe("조건");
+});
+
+it("roundtrips named connections in a draft while leaving partial styled HTML export byte-identical", async () => {
   let initial = stateFor([
     paragraph("주장 가운데 끝", [
       { type: "bold" },
@@ -284,7 +323,9 @@ it("roundtrips connections in a draft while leaving partial styled HTML export b
   initial = initial.apply(initial.tr.setSelection(TextSelection.create(initial.doc, 4, 7)));
   const claim = selectedRelationPassage(initial)!;
   const target = selectBlock(initial, 1);
-  const result = createSentenceRelationTransaction(target, claim, "condition");
+  const result = createSentenceRelationTransaction(target, claim, "custom", {
+    label: "<장면> & 이어지는 말",
+  });
   if ("error" in result) throw new Error(result.error);
   const linked = target.apply(result.transaction);
   const preferences: DraftPreferences = {
@@ -305,6 +346,9 @@ it("roundtrips connections in a draft while leaving partial styled HTML export b
     schema,
   );
   expect(sentenceRelationCatalog(schema.nodeFromJSON(restored.document))[0].state).toBe("linked");
+  expect(sentenceRelationCatalog(schema.nodeFromJSON(restored.document))[0].relation.label).toBe(
+    "<장면> & 이어지는 말",
+  );
   const options = {
     theme: "github-light" as const,
     bodyFontFamily: "Georgia",

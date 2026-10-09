@@ -3,7 +3,7 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import type { RelationAnchor, SentenceRelationEntry, RelationState } from "#lib/editor/sentence-relations.ts";
-    import { sentenceRelationKinds } from "#lib/editor/sentence-relations-format.ts";
+    import { sentenceRelationLabel } from "#lib/editor/sentence-relations-format.ts";
     let { entries, onNavigate, onCompare, onRemoved, label = "문장 관계 목록" }: { entries: SentenceRelationEntry[]; onNavigate: (anchor: RelationAnchor) => void; onCompare: (id: string) => void; onRemoved?: () => void; label?: string } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let list = $state<HTMLElement>();
@@ -21,9 +21,9 @@
 </script>
 
 <section class="relation-list" aria-label={label} tabindex="-1" bind:this={list}>
-    <p class="ui-hint">작성자가 연결한 근거·조건·반론입니다. 관계와 연결 당시 원문은 초안에 보관합니다.</p>
+    <p class="ui-hint">작성자가 함께 읽도록 연결한 구간입니다. 관계와 연결 당시 원문은 초안에 보관합니다.</p>
     {#each entries as entry, index (entry.relation.id)}
-        {@const kind = sentenceRelationKinds.find((item) => item.value === entry.relation.kind)!.label}
+        {@const kind = sentenceRelationLabel(entry.relation)}
         <article class="relation-item" data-relation-state={entry.state} aria-label={`${kind} 관계 ${index + 1}`}>
             <div class="relation-head"><strong>{kind}</strong><span>{entry.state === "linked" ? "연결됨" : "다시 확인"}</span></div>
             {#if entry.state !== "linked"}<p class="relation-status" role="status">{messages[entry.state]}</p>{/if}
@@ -50,8 +50,9 @@
     .relation-item { display: grid; gap: 12px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
     .relation-item[data-relation-state="missing"], .relation-item[data-relation-state="duplicated"] { border-color: var(--accent-line); }
     .relation-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .relation-head strong { color: var(--text); font-size: 0.86rem; }
+    .relation-head strong { min-width: 0; overflow-wrap: anywhere; color: var(--text); font-size: 0.86rem; }
     .relation-head span, .relation-snapshot { color: var(--muted); font-size: 0.72rem; }
+    .relation-head span { flex: 0 0 auto; }
     .relation-status { margin: 0; color: var(--accent-strong); font-size: 0.78rem; line-height: 1.65; }
     .relation-side { display: grid; gap: 8px; min-width: 0; }
     .relation-side h3 { margin: 0; color: var(--muted); font-size: 0.75rem; font-weight: 500; }

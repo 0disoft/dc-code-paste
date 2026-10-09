@@ -2,18 +2,37 @@ export const sentenceRelationKinds = [
   { value: "evidence", label: "근거" },
   { value: "condition", label: "조건" },
   { value: "counterpoint", label: "반론" },
+  { value: "custom", label: "직접 이름 붙이기" },
 ] as const;
 export type SentenceRelationKind = (typeof sentenceRelationKinds)[number]["value"];
 export type RelationPart = { id: string; text: string };
 export type SentenceRelation = {
   id: string;
   kind: SentenceRelationKind;
+  label?: string;
   claim: RelationPart[];
   related: RelationPart[];
 };
 export const maxSentenceRelations = 128;
 export const maxRelationParts = 128;
 export const maxRelationTextLength = 8000;
+export const maxRelationLabelLength = 80;
+
+export function normalizeCustomRelationLabel(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const label = value.trim();
+  const containsControl = Array.from(label).some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  return label && label.length <= maxRelationLabelLength && !containsControl ? label : null;
+}
+
+export function sentenceRelationLabel(relation: Pick<SentenceRelation, "kind" | "label">): string {
+  return relation.kind === "custom"
+    ? (normalizeCustomRelationLabel(relation.label) ?? "함께 읽기")
+    : sentenceRelationKinds.find((item) => item.value === relation.kind)!.label;
+}
 
 export function isSentenceRelationKind(value: unknown): value is SentenceRelationKind {
   return sentenceRelationKinds.some((item) => item.value === value);
@@ -72,7 +91,15 @@ export function normalizeSentenceRelations(value: unknown): SentenceRelation[] |
     const claim = parts(relation.claim);
     const related = parts(relation.related);
     if (!claim || !related) return null;
-    result.push({ id: relation.id, kind: relation.kind, claim, related });
+    const label = relation.kind === "custom" ? normalizeCustomRelationLabel(relation.label) : null;
+    if (relation.kind === "custom" ? !label : relation.label !== undefined) return null;
+    result.push({
+      id: relation.id,
+      kind: relation.kind,
+      ...(label ? { label } : {}),
+      claim,
+      related,
+    });
   }
   return result;
 }

@@ -46,6 +46,7 @@ import {
 } from "#lib/editor/sentence-relations.ts";
 import {
   isSentenceRelationKind,
+  normalizeCustomRelationLabel,
   type SentenceRelationKind,
 } from "#lib/editor/sentence-relations-format.ts";
 import {
@@ -366,6 +367,7 @@ export function createWorkspaceState() {
   let editorSelectionRevision = $state(0);
   let pendingSentenceRelation = $state.raw<{
     kind: SentenceRelationKind;
+    label?: string;
     passage: SelectedRelationPassage;
   }>();
   let sentenceRelationError = $state("");
@@ -3286,10 +3288,12 @@ export function createWorkspaceState() {
     get sentenceRelationError() {
       return sentenceRelationError;
     },
-    beginSentenceRelation(kind: SentenceRelationKind) {
+    beginSentenceRelation(kind: SentenceRelationKind, name?: string) {
       const passage = selectedRelationPassage(editor?.state);
       if (!passage || !isSentenceRelationKind(kind)) return false;
-      pendingSentenceRelation = { kind, passage };
+      const label = kind === "custom" ? normalizeCustomRelationLabel(name) : null;
+      if (kind === "custom" && !label) return false;
+      pendingSentenceRelation = { kind, ...(label ? { label } : {}), passage };
       sentenceRelationError = "";
       selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
       return true;
@@ -3304,6 +3308,7 @@ export function createWorkspaceState() {
         editor.state,
         pendingSentenceRelation.passage,
         pendingSentenceRelation.kind,
+        { label: pendingSentenceRelation.label },
       );
       if ("error" in result) {
         sentenceRelationError = result.error;

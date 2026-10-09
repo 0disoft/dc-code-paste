@@ -4,7 +4,7 @@
         RelationState,
         SentenceRelationEntry,
     } from "#lib/editor/sentence-relations.ts";
-    import { sentenceRelationKinds } from "#lib/editor/sentence-relations-format.ts";
+    import { sentenceRelationLabel } from "#lib/editor/sentence-relations-format.ts";
 
     type SidePart = SentenceRelationEntry["claim"]["parts"][number];
     let panel = $state<HTMLElement>();
@@ -19,9 +19,7 @@
         onClose: () => void;
     } = $props();
 
-    const kind = $derived(
-        sentenceRelationKinds.find((item) => item.value === entry.relation.kind)?.label ?? "관계",
-    );
+    const kind = $derived(sentenceRelationLabel(entry.relation));
     const sides = $derived([
         { label: "처음 선택한 구간", endpoint: entry.claim },
         { label: `${kind} 구간`, endpoint: entry.related },

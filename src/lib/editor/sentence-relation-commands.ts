@@ -10,6 +10,7 @@ import {
   maxSentenceRelations,
   normalizeRelationAnchorIds,
   normalizeSentenceRelations,
+  normalizeCustomRelationLabel,
   type RelationPart,
   type SentenceRelationKind,
 } from "./sentence-relations-format.ts";
@@ -91,12 +92,16 @@ export function createSentenceRelationTransaction(
   state: EditorState,
   claim: SelectedRelationPassage,
   kind: SentenceRelationKind,
-  identity = createRelationId,
+  options: { identity?: () => string; label?: string } = {},
 ): { transaction: Transaction } | { error: string } {
   const related = selectedRelationPassage(state);
   const relations = normalizeSentenceRelations(state.doc.attrs.sentenceRelations);
   if (!relations || !isSentenceRelationKind(kind) || claim.document !== state.doc || !related)
     return { error: "연결할 글 구간을 다시 선택해 주세요. 구간은 8,000자까지 선택할 수 있습니다." };
+  const label = kind === "custom" ? normalizeCustomRelationLabel(options.label) : null;
+  if (kind === "custom" && !label)
+    return { error: "관계 이름을 80자 이내의 한 줄로 입력해 주세요." };
+  const identity = options.identity ?? createRelationId;
   if (
     claim.parts.some((first) =>
       related.parts.some((second) => first.from < second.to && first.to > second.from),
@@ -110,6 +115,7 @@ export function createSentenceRelationTransaction(
   const relation = {
     id: identity(),
     kind,
+    ...(label ? { label } : {}),
     claim: makeParts(claim.parts),
     related: makeParts(related.parts),
   };
