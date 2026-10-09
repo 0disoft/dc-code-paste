@@ -11,6 +11,8 @@
     import SelectionTextSection from "./SelectionTextSection.svelte";
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
     import SentenceSourceSection from "./SentenceSourceSection.svelte";
+    import SentenceRelationSection from "./SentenceRelationSection.svelte";
+    import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import DocumentSourcesSection from "./DocumentSourcesSection.svelte";
     import WritingDefaultsSection from "./WritingDefaultsSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
@@ -23,10 +25,12 @@
         compact?: boolean;
         onBlockAction?: () => void;
         sourceRequest?: number;
+        relationRequest?: number;
+        onRelationNavigate: (anchor: RelationAnchor) => void;
         onSourceNavigate?: (href: string, from: number, to: number) => void;
     };
 
-    let { open = true, compact = false, onBlockAction, sourceRequest = 0, onSourceNavigate }: Props = $props();
+    let { open = true, compact = false, onBlockAction, sourceRequest = 0, relationRequest = 0, onSourceNavigate, onRelationNavigate }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -36,6 +40,7 @@
 
     let tab = $state<"selection" | "article">("selection");
     $effect(() => { if (sourceRequest) tab = "selection"; });
+    $effect(() => { if (relationRequest) tab = "selection"; });
 
     const descriptions: Record<string, string> = {
         summaryBox: "핵심 내용을 요약해 강조하는 블록입니다.",
@@ -187,6 +192,7 @@
 
             {/if}
 
+            <SentenceRelationSection request={relationRequest} onApplied={onBlockAction} onNavigate={onRelationNavigate} />
             <ReadingIntentSection />
             <SentenceSourceSection onApplied={onBlockAction} />
             <SelectionTextSection />

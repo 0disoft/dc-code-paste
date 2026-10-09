@@ -137,11 +137,16 @@ export function sentenceRelationCatalog(document: Node | undefined): SentenceRel
       states.push("changed");
     return { parts, state: combinedState(states) };
   }
-  return (normalizeSentenceRelations(document?.attrs.sentenceRelations) ?? []).map((relation) => {
-    const claim = endpoint(relation.claim);
-    const related = endpoint(relation.related);
-    return { relation, claim, related, state: combinedState([claim.state, related.state]) };
-  });
+  const entries = (normalizeSentenceRelations(document?.attrs.sentenceRelations) ?? []).map(
+    (relation) => {
+      const claim = endpoint(relation.claim);
+      const related = endpoint(relation.related);
+      return { relation, claim, related, state: combinedState([claim.state, related.state]) };
+    },
+  );
+  const position = (entry: SentenceRelationEntry) =>
+    Math.min(...entry.claim.parts.flatMap((part) => part.matches.map((anchor) => anchor.from)));
+  return entries.sort((first, second) => position(first) - position(second));
 }
 
 export function createSentenceRelationReader() {

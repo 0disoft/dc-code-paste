@@ -9,7 +9,7 @@
     import { closeHistory } from "@tiptap/pm/history";
     import { readingIntentOptions } from "#lib/editor/reading-intent-format.ts";
 
-    let { hidden = false, onSourceRequest, layoutRevision = 0 }: { hidden?: boolean; onSourceRequest?: () => void; layoutRevision?: number } = $props();
+    let { hidden = false, onSourceRequest, onRelationRequest, layoutRevision = 0 }: { hidden?: boolean; onSourceRequest?: () => void; onRelationRequest?: () => void; layoutRevision?: number } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const selection = $derived(workspace.readingIntentSelection);
     let toolbar = $state<HTMLDivElement>();
@@ -130,6 +130,7 @@
             <button class="ui-btn ui-btn--outline ui-btn--icon" class:is-active={workspace.isActive("italic")} type="button" aria-label="기울임" title="기울임" aria-pressed={workspace.isActive("italic")} onpointerdown={preserveSelection} onclick={() => formatSelection("italic")}><Italic size={16} aria-hidden="true" /></button>
             <button class="ui-btn ui-btn--outline reading-toggle" class:is-active={selection.intent !== null || selection.mixed} type="button" aria-label="읽는 의도 선택" aria-expanded={readingExpanded} aria-controls="selection-reading-intents" onpointerdown={preserveSelection} onclick={() => readingExpanded = !readingExpanded}><span>{readingLabel}</span><ChevronDown size={14} aria-hidden="true" /></button>
             {#if onSourceRequest}<button class="ui-btn ui-btn--outline" type="button" aria-label="문장 출처 연결" onpointerdown={preserveSelection} onclick={onSourceRequest}>출처</button>{/if}
+            {#if onRelationRequest}<button class="ui-btn ui-btn--outline" type="button" aria-label="문장 관계 연결" onpointerdown={preserveSelection} onclick={onRelationRequest}>관계</button>{/if}
         </div>
         {#if readingExpanded}
             <div class="selection-reading-intents" id="selection-reading-intents"><ReadingIntentSection compact /></div>

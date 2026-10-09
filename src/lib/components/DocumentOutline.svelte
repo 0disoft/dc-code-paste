@@ -5,17 +5,21 @@
     import { readingIntentOptions, type ReadingIntent } from "#lib/editor/reading-intent-format.ts";
     import type { ReadingPassage } from "#lib/editor/reading-path.ts";
     import ReadingPath from "./ReadingPath.svelte";
+    import SentenceRelationsList from "./SentenceRelationsList.svelte";
+    import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
 
-    let { onNavigate, onPassageNavigate }: { onNavigate: (index: number) => void; onPassageNavigate: (passage: ReadingPassage) => void } = $props();
+    let { onNavigate, onPassageNavigate, onRelationNavigate }: { onNavigate: (index: number) => void; onPassageNavigate: (passage: ReadingPassage) => void; onRelationNavigate: (anchor: RelationAnchor) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let query = $state("");
-    let route = $state<"all" | ReadingIntent>("all");
+    let route = $state<"all" | "relations" | ReadingIntent>("all");
     const entries = $derived(workspace.documentOutline);
     const filtered = $derived(entries.filter((entry) => `${entry.label} ${entry.text}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
 </script>
 
-<label class="ui-field path-selector"><span class="ui-label">읽기 경로</span><select class="ui-select" aria-label="읽기 경로" bind:value={route}><option value="all">전체 글</option>{#each readingIntentOptions as item (item.value)}<option value={item.value}>{item.label}</option>{/each}</select></label>
-{#if route !== "all"}
+<label class="ui-field path-selector"><span class="ui-label">읽기 경로</span><select class="ui-select" aria-label="읽기 경로" bind:value={route}><option value="all">전체 글</option><option value="relations">문장 관계</option>{#each readingIntentOptions as item (item.value)}<option value={item.value}>{item.label}</option>{/each}</select></label>
+{#if route === "relations"}
+    <SentenceRelationsList entries={workspace.sentenceRelations} onNavigate={onRelationNavigate} />
+{:else if route !== "all"}
     <ReadingPath intent={route} onNavigate={onPassageNavigate} />
 {:else}
 <div class="outline-search">

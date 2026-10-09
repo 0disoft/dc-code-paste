@@ -3,6 +3,7 @@
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
     import type { ReadingPassage } from "#lib/editor/reading-path.ts";
     import type { EmphasisPassage } from "#lib/editor/emphasis-review.ts";
+    import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import StoragePanel from "#lib/components/StoragePanel.svelte";
@@ -27,6 +28,7 @@
     let focusMode = $state(false);
     const drawerMode = $derived(compact || focusMode);
     let sourceRequest = $state(0);
+    let relationRequest = $state(0);
 
     async function onSourceRequest() {
         selectWorkspaceView("editor");
@@ -35,6 +37,22 @@
         sourceRequest++;
         await tick();
         document.getElementById("sentence-source-href")?.focus();
+    }
+
+    async function onRelationRequest() {
+        selectWorkspaceView("editor");
+        leftRailOpen = false;
+        rightRailOpen = true;
+        relationRequest++;
+        await tick();
+        document.getElementById("sentence-relation-kind")?.focus();
+    }
+
+    async function onRelationNavigate(anchor: RelationAnchor) {
+        selectWorkspaceView("editor");
+        if (drawerMode) closeRails();
+        await tick();
+        workspace.navigateRelationAnchor(anchor);
     }
 
     async function onSourceNavigate(href: string, from: number, to: number) {
@@ -265,7 +283,7 @@
     {/if}
 
     <div class="app-body">
-        <BlockSidebar open={leftRailOpen} compact={drawerMode} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} />
+        <BlockSidebar open={leftRailOpen} compact={drawerMode} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} {onRelationNavigate} />
 
         <section class="canvas" aria-label="글쓰기 작업 영역" inert={drawerMode && (leftRailOpen || rightRailOpen)}>
             {#if workspace.isStoragePanelOpen ||
@@ -355,7 +373,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} layoutRevision={focusMode ? 1 : 0} />
+            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} layoutRevision={focusMode ? 1 : 0} />
             <PreviewCanvas hidden={activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
 
             {#if workspace.codeLineContextMenu}
@@ -388,7 +406,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {onSourceNavigate} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {relationRequest} {onSourceNavigate} {onRelationNavigate} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />

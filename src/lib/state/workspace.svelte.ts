@@ -41,6 +41,23 @@ import {
   type EmphasisPassage,
 } from "#lib/editor/emphasis-review.ts";
 import {
+  createSentenceRelationReader,
+  type RelationAnchor,
+} from "#lib/editor/sentence-relations.ts";
+import {
+  isSentenceRelationKind,
+  type SentenceRelationKind,
+} from "#lib/editor/sentence-relations-format.ts";
+import {
+  createSentenceRelationTransaction,
+  mapSelectedRelationPassage,
+  navigateRelationAnchor,
+  removeSentenceRelationTransaction,
+  selectedRelationPassage,
+  type SelectedRelationPassage,
+} from "#lib/editor/sentence-relation-commands.ts";
+import { closeHistory } from "@tiptap/pm/history";
+import {
   clearCopiedOutput,
   copiedOutputChanges,
   copiedOutputStorageKey,
@@ -347,6 +364,11 @@ export function createWorkspaceState() {
   let writingDefaultsStatus = $state<"idle" | "saved" | "cleared" | "error">("idle");
   let selectionToolbarAction = $state({ revision: 0, dismiss: false });
   let editorSelectionRevision = $state(0);
+  let pendingSentenceRelation = $state.raw<{
+    kind: SentenceRelationKind;
+    passage: SelectedRelationPassage;
+  }>();
+  let sentenceRelationError = $state("");
 
   let html = $state("");
   let previewVisible = $state(false);
@@ -458,6 +480,15 @@ export function createWorkspaceState() {
   const readDocumentSources = createDocumentSourceReader();
   const readReadingPassages = createReadingPassageReader();
   const readEmphasisReview = createEmphasisReviewReader();
+  const readSentenceRelations = createSentenceRelationReader();
+
+  $effect(() => {
+    void documentReplacementVersion;
+    untrack(() => {
+      pendingSentenceRelation = undefined;
+      sentenceRelationError = "";
+    });
+  });
   const copyFeedback = createCopyFeedbackController();
   const copyTasks = createCopyTaskController((channel) => {
     activeCopyChannel = channel;
@@ -3044,6 +3075,15 @@ export function createWorkspaceState() {
         onTransaction: ({ editor: current, transaction, appendedTransactions }) => {
           let restoredPreferences = false;
           for (const tr of [transaction, ...appendedTransactions]) {
+            if (pendingSentenceRelation && tr.docChanged) {
+              const passage = mapSelectedRelationPassage(pendingSentenceRelation.passage, tr);
+              if (passage) pendingSentenceRelation = { ...pendingSentenceRelation, passage };
+              else {
+                pendingSentenceRelation = undefined;
+                sentenceRelationError =
+                  "처음 선택한 구간이 바뀌었습니다. 관계를 다시 시작해 주세요.";
+              }
+            }
             for (const step of tr.steps) {
               if (step instanceof DocumentPreferencesStep) {
                 applyDraftPreferences(step.after);
@@ -3217,6 +3257,79 @@ export function createWorkspaceState() {
     get readingPassages() {
       void documentJson;
       return readReadingPassages(editor?.state.doc);
+    },
+    get sentenceRelations() {
+      void documentJson;
+      return readSentenceRelations(editor?.state.doc);
+    },
+    get selectedSentenceRelations() {
+      void editorSignal;
+      const selection = editor?.state.selection;
+      if (!selection) return [];
+      return readSentenceRelations(editor?.state.doc).filter((entry) =>
+        [...entry.claim.parts, ...entry.related.parts].some((part) =>
+          part.matches.some((anchor) =>
+            selection.empty
+              ? selection.from >= anchor.from && selection.from <= anchor.to
+              : selection.from < anchor.to && selection.to > anchor.from,
+          ),
+        ),
+      );
+    },
+    get sentenceRelationSelection() {
+      void editorSignal;
+      return selectedRelationPassage(editor?.state);
+    },
+    get pendingSentenceRelation() {
+      return pendingSentenceRelation;
+    },
+    get sentenceRelationError() {
+      return sentenceRelationError;
+    },
+    beginSentenceRelation(kind: SentenceRelationKind) {
+      const passage = selectedRelationPassage(editor?.state);
+      if (!passage || !isSentenceRelationKind(kind)) return false;
+      pendingSentenceRelation = { kind, passage };
+      sentenceRelationError = "";
+      selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
+      return true;
+    },
+    cancelSentenceRelation() {
+      pendingSentenceRelation = undefined;
+      sentenceRelationError = "";
+    },
+    connectSentenceRelation() {
+      if (!editor || !pendingSentenceRelation) return false;
+      const result = createSentenceRelationTransaction(
+        editor.state,
+        pendingSentenceRelation.passage,
+        pendingSentenceRelation.kind,
+      );
+      if ("error" in result) {
+        sentenceRelationError = result.error;
+        return false;
+      }
+      pendingSentenceRelation = undefined;
+      sentenceRelationError = "";
+      editor.view.dispatch(result.transaction);
+      editor.view.dispatch(closeHistory(editor.state.tr));
+      refreshEditorState(editor);
+      selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
+      return true;
+    },
+    removeSentenceRelation(id: string) {
+      if (!editor) return false;
+      const tr = removeSentenceRelationTransaction(editor.state, id);
+      if (!tr) return false;
+      editor.view.dispatch(tr);
+      editor.view.dispatch(closeHistory(editor.state.tr));
+      refreshEditorState(editor);
+      return true;
+    },
+    navigateRelationAnchor(anchor: RelationAnchor) {
+      if (!editor || !navigateRelationAnchor(editor, anchor)) return false;
+      selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: false };
+      return true;
     },
     get emphasisReview() {
       void documentJson;

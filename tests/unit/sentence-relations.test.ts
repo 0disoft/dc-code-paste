@@ -255,7 +255,7 @@ it("rejects malformed kinds, duplicate identities and oversized records through 
         content: [paragraph("원문")],
       })
       .check(),
-  ).toThrow();
+  ).toThrow("Invalid sentence relations");
   expect(() =>
     schema
       .nodeFromJSON({
@@ -263,7 +263,7 @@ it("rejects malformed kinds, duplicate identities and oversized records through 
         content: [paragraph("원문", [{ type: "relationAnchor", attrs: { ids: ["bad id"] } }])],
       })
       .check(),
-  ).toThrow();
+  ).toThrow("Invalid relation anchor identities");
   const state = selectBlock(stateFor([paragraph("긴".repeat(8001)), paragraph("조건")]), 0);
   expect(selectedRelationPassage(state)).toBeNull();
   const selected = selectBlock(stateFor(), 0);
