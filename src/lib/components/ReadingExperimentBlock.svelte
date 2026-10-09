@@ -4,6 +4,8 @@
     import type { ReadingExperimentUnit } from "#lib/editor/reading-experiment.ts";
     import type { ReadingNoteEntry } from "#lib/editor/reading-notes.ts";
     import { maxReadingNoteLength } from "#lib/editor/reading-notes-format.ts";
+    import ReadingFragmentOrigins from "./ReadingFragmentOrigins.svelte";
+    import type { ReadingFragmentOrigin } from "#lib/editor/reading-fragment-origins.ts";
 
     type Props = {
         active?: boolean;
@@ -14,9 +16,11 @@
         error: string;
         onSave: (unit: ReadingExperimentUnit, text: string) => boolean;
         onClearError: () => void;
+        fragmentOrigins: ReadingFragmentOrigin[];
+        onFragmentNavigate: (id: string) => void;
     };
 
-    let { active = true, unit, options, render, notes, error, onSave, onClearError }: Props = $props();
+    let { active = true, unit, options, render, notes, error, onSave, onClearError, fragmentOrigins, onFragmentNavigate }: Props = $props();
 
     let html = $state("");
     let busy = $state(true);
@@ -98,7 +102,7 @@
     }
 </script>
 
-<article class="reading-unit" data-unit-code={unit.code} data-reading-unit-index={unit.index} aria-label={`읽기 구간 ${unit.index + 1}`} tabindex="-1">
+<article class="reading-unit" data-unit-code={unit.code} data-reading-unit-index={unit.index} aria-label={`읽기 구간 ${unit.index + 1}`} aria-busy={busy} tabindex="-1">
     {#if busy && !html}
         <p class="unit-notice" role="status">구간을 준비하는 중</p>
     {:else if failed}
@@ -107,6 +111,7 @@
         <!-- Export HTML is app-generated and sanitized before it reaches this component. -->
         <div class="unit-document">{@html html}</div>
     {/if}
+    {#if !busy && !failed && fragmentOrigins.length}<ReadingFragmentOrigins entries={fragmentOrigins} unitNumber={unit.index + 1} onNavigate={onFragmentNavigate} />{/if}
     {#if unit.canNote}
         <div class="unit-notes">
             {#if notes.length}

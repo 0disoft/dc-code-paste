@@ -383,3 +383,76 @@ for (const mobile of [false, true]) {
     expect(await copied(page, 2)).toBe(html);
   });
 }
+
+for (const mobile of [false, true]) {
+  test(`inspects visible fragment origins without revealing unread or private source material on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1280, height: 900 });
+    await setup(page);
+    const editor = page.locator(".article-editor");
+    const dialog = await openFragments(page);
+    const input = dialog.getByLabel("새 생각 조각", { exact: true });
+    await input.fill("조각에서 온 첫 구간\n아직 읽지 않은 뒷 구간");
+    await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+    await input.fill("PRIVATE_UNUSED_SNIPPET");
+    await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+    const card = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
+    await card.getByRole("button", { name: "글로 넣기", exact: true }).click();
+    await expect(editor.locator("p").first()).toHaveText("조각에서 온 첫 구간");
+    await editor.locator("p").first().click();
+    await page.keyboard.press("Home");
+    await page.keyboard.insertText("수정한 ");
+    await openFragments(page);
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await card.getByLabel("보관할 조각 내용", { exact: true }).fill("PRIVATE_SOURCE_UPDATE");
+    await card.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+    await dialog.getByRole("button", { name: "생각 조각 닫기", exact: true }).click();
+    await expect(page.locator(".topbar-status")).toContainText("저장됨");
+    await page.reload();
+    await expect(editor.locator("p").first()).toHaveText("수정한 조각에서 온 첫 구간");
+    const html = await copied(page, 1);
+    expect(html).not.toContain("PRIVATE_SOURCE_UPDATE");
+    expect(html).not.toContain("PRIVATE_UNUSED_SNIPPET");
+    await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+    await page.getByRole("menuitem", { name: "처음부터 읽어보기", exact: true }).click();
+    const reader = page.getByRole("region", { name: "처음부터 읽어보기", exact: true });
+    await reader.getByRole("button", { name: "차례로 펼치기", exact: true }).click();
+    await expect(reader).not.toContainText("아직 읽지 않은 뒷 구간");
+    await expect(reader.locator(".reading-fragment-origins")).toHaveCount(0);
+    await reader.getByRole("button", { name: "다음 구간 펼치기", exact: true }).click();
+    const unit = reader.getByRole("article", { name: "읽기 구간 2", exact: true });
+    await expect(unit).toHaveAttribute("aria-busy", "false");
+    const origin = unit.locator(".reading-fragment-origins");
+    await origin.locator("summary").click();
+    await expect(origin.locator(".origin-entry")).toHaveAttribute("data-origin-state", "changed");
+    await expect(origin).toContainText("보관한 조각도 수정된 상태입니다.");
+    await expect(origin).toContainText("당시 내용은 글을 전부 펼친 뒤 볼 수 있습니다.");
+    await expect(origin.locator(".origin-text")).toHaveCount(0);
+    await expect(reader).not.toContainText("아직 읽지 않은 뒷 구간");
+    await expect(reader).not.toContainText("PRIVATE_SOURCE_UPDATE");
+    await expect(reader).not.toContainText("PRIVATE_UNUSED_SNIPPET");
+    await reader.getByRole("button", { name: "다음 구간 펼치기", exact: true }).click();
+    await expect(reader).toContainText("아직 읽지 않은 뒷 구간");
+    await expect(origin.locator(".origin-text")).toHaveCount(0);
+    await reader.getByRole("button", { name: "전부 펼치기", exact: true }).click();
+    await expect(origin.locator(".origin-text")).toHaveText("조각에서 온 첫 구간");
+    await expect(origin).not.toContainText("아직 읽지 않은 뒷 구간");
+    await expect(reader).not.toContainText("PRIVATE_SOURCE_UPDATE");
+    await expect(reader).not.toContainText("PRIVATE_UNUSED_SNIPPET");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await origin
+      .getByRole("button", {
+        name: "읽기 구간 2 조각 1 넣은 자리 1 구간 1 본문으로 이동",
+        exact: true,
+      })
+      .click();
+    await expect(editor).toBeFocused();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+      "수정한 조각에서 온 첫 구간",
+    );
+    expect(await copied(page, 2)).toBe(html);
+  });
+}

@@ -11,15 +11,17 @@
     import ReadingFrontier from "./ReadingFrontier.svelte";
     import WritingPurposeSummary from "./WritingPurposeSummary.svelte";
     import { readingRelationFrontier } from "#lib/editor/reading-frontier.ts";
+    import { readingFragmentOrigins } from "#lib/editor/reading-fragment-origins.ts";
 
     type Props = {
         hidden?: boolean;
         onExit: () => void;
         onNavigate: (anchor: RelationAnchor, noteId: string) => void;
         onEditPurpose: () => void;
+        onFragmentNavigate: (id: string) => void;
     };
 
-    let { hidden = false, onExit, onNavigate, onEditPurpose }: Props = $props();
+    let { hidden = false, onExit, onNavigate, onEditPurpose, onFragmentNavigate }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const experiment = workspace.readingExperiment;
@@ -52,6 +54,7 @@
     const frontier = $derived(readingRelationFrontier(workspace.sentenceRelations, lastVisibleUnit ? lastVisibleUnit.position + lastVisibleUnit.node.nodeSize : 0));
     const intendedUnits = $derived(units.filter((unit) => unit.intentions.length > 0));
     const notesByUnit = $derived(groupNotesByUnit(units, notes));
+    const fragmentOriginsByUnit = $derived(readingFragmentOrigins(visibleUnits, hidden ? [] : workspace.thoughtFragments.entries, !progressive || revealed >= units.length));
     const error = $derived(experiment.error);
 
     const stateMessages: Record<RelationState, string> = {
@@ -311,6 +314,8 @@
                         {options}
                         render={renderUnit}
                         notes={notesByUnit.get(unit.index) ?? []}
+                        fragmentOrigins={fragmentOriginsByUnit.get(unit.index) ?? []}
+                        {onFragmentNavigate}
                         {error}
                         onSave={saveNote}
                         onClearError={experiment.clearError}

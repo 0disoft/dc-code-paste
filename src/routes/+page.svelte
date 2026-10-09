@@ -574,7 +574,7 @@
 
             <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} onStoreThoughtFragment={storeSelectedThoughtFragment} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0) + (fragmentsDocked ? 8 : 0)} />
             <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
-            {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} onEditPurpose={openWritingPurpose} />{/if}
+            {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} onEditPurpose={openWritingPurpose} onFragmentNavigate={onThoughtFragmentNavigate} />{/if}
 
             {#if workspace.codeLineContextMenu}
                 <div
