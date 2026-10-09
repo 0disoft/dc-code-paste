@@ -16,6 +16,7 @@ import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
 import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 import { SelectedBlockDecoration } from "./block-inspector";
 import { ReadingIntentMark } from "./reading-intent";
+import { SentenceSourceMark } from "./sentence-source";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -136,6 +137,7 @@ export function createEditorExtensions() {
     ...editorialExtensions,
     LinkBox,
     ReadingIntentMark,
+    SentenceSourceMark,
     TextStyle,
     Color,
     FontFamily,

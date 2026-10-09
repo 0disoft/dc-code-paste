@@ -14,6 +14,12 @@ import { normalizeTableSpan } from "#lib/editor/data-table.ts";
 import { readingIntentAttributes } from "#lib/editor/reading-intent-format.ts";
 import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
 import {
+  normalizeSentenceSource,
+  sentenceSourceAttributes,
+  sentenceSourceLabel,
+  type SentenceSource,
+} from "#lib/editor/sentence-source-format.ts";
+import {
   normalizeBlockAppearance,
   summaryToneColors,
   summarySpacing,
@@ -69,6 +75,7 @@ export const dcExportSupportedNodeTypes = new Set([
   "rebuttalBox",
 ]);
 export const dcExportSupportedMarkTypes = new Set([
+  "sentenceSource",
   "readingIntent",
   "bold",
   "italic",
@@ -796,9 +803,7 @@ function renderInline(
     return "<br>";
   }
 
-  return childrenOf(node)
-    .map((child) => renderInline(child, options, context))
-    .join("");
+  return renderInlineChildren(node, options, context);
 }
 
 function renderInlineChildren(
@@ -806,9 +811,42 @@ function renderInlineChildren(
   options: DcExportOptions,
   context: RenderContext = {},
 ): string {
-  return childrenOf(node)
-    .map((child) => renderInline(child, options, context))
-    .join("");
+  const children = childrenOf(node);
+  let html = "";
+  let groupBody = "";
+  let groupSource: SentenceSource | null = null;
+  function flushSource() {
+    if (!groupSource) return;
+    const attrs = sentenceSourceAttributes(groupSource)!;
+    const attributes = Object.entries(attrs)
+      .map(([key, value]) => `${key}="${escapeHtml(value)}"`)
+      .join(" ");
+    const style = joinStyle({
+      color: documentPalette(options).link,
+      "font-size": ".8em",
+      "text-decoration": "underline",
+      "font-weight": 400,
+    });
+    html += `<span ${attributes}>${groupBody}</span> <a href="${escapeHtml(groupSource.href)}" target="_blank" rel="noopener noreferrer" style="${style}">[출처: ${escapeHtml(sentenceSourceLabel(groupSource))}]</a>`;
+    groupBody = "";
+    groupSource = null;
+  }
+  for (const child of children) {
+    const source =
+      child.type === "text" && !child.marks?.some((mark) => mark.type === "code")
+        ? normalizeSentenceSource(
+            child.marks?.find((mark) => mark.type === "sentenceSource")?.attrs,
+          )
+        : null;
+    if (JSON.stringify(source) !== JSON.stringify(groupSource)) flushSource();
+    const body = renderInline(child, options, context);
+    if (source) {
+      groupSource = source;
+      groupBody += body;
+    } else html += body;
+  }
+  flushSource();
+  return html;
 }
 
 function renderParagraph(

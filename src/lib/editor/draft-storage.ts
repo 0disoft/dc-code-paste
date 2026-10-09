@@ -89,6 +89,7 @@ const draftNodeTypes = new Set([
   "calloutBox",
 ]);
 const draftMarkTypes = new Set([
+  "sentenceSource",
   "readingIntent",
   "bold",
   "italic",
