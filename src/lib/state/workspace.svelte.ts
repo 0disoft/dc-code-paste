@@ -60,6 +60,7 @@ import {
 import { closeHistory } from "@tiptap/pm/history";
 import { createReadingExperimentState } from "./reading-experiment.svelte.ts";
 import { createWritingPurposeState } from "./writing-purpose.svelte.ts";
+import { createThoughtFragmentsState } from "./thought-fragments.svelte.ts";
 import {
   clearCopiedOutput,
   copiedOutputChanges,
@@ -498,6 +499,13 @@ export function createWorkspaceState() {
       void documentJson;
       return editor;
     },
+  });
+  const thoughtFragments = createThoughtFragmentsState({
+    editor: () => {
+      void documentJson;
+      return editor;
+    },
+    language: () => language,
   });
 
   $effect(() => {
@@ -3282,6 +3290,7 @@ export function createWorkspaceState() {
     },
     readingExperiment,
     writingPurpose,
+    thoughtFragments,
     get selectedSentenceRelations() {
       void editorSignal;
       const selection = editor?.state.selection;

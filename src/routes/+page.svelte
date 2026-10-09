@@ -17,6 +17,7 @@
     import CopyRecovery from "#lib/components/CopyRecovery.svelte";
     import CopiedOutputDialog from "#lib/components/CopiedOutputDialog.svelte";
     import WritingPurposeDialog from "#lib/components/WritingPurposeDialog.svelte";
+    import ThoughtFragmentsDialog from "#lib/components/ThoughtFragmentsDialog.svelte";
     import ReadingExperiment from "#lib/components/ReadingExperiment.svelte";
     import { relationFreeDocument } from "#lib/editor/relation-free-document.ts";
 
@@ -33,6 +34,8 @@
     let readingOpened = $state(false);
     let writingPurposeOpen = $state(false);
     let writingPurposeReturnFocus: HTMLElement | undefined;
+    let thoughtFragmentsOpen = $state(false);
+    let thoughtFragmentsReturnFocus: HTMLElement | undefined;
     let readingReturnPosition: (() => void) | undefined;
     const drawerMode = $derived(compact || focusMode || readingMode);
     let sourceRequest = $state(0);
@@ -60,6 +63,45 @@
         await tick();
         if (target?.isConnected && target.getClientRects().length) target.focus({ preventScroll: true });
         else document.querySelector<HTMLButtonElement>('[aria-label="더보기 메뉴"]')?.focus({ preventScroll: true });
+    }
+
+    function openThoughtFragments() {
+        if (workspace.editorMountState !== "ready") return;
+        thoughtFragmentsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+        closeRails();
+        workspace.isStoragePanelOpen = false;
+        workspace.isMarkdownPanelOpen = false;
+        workspace.isLlmPanelOpen = false;
+        thoughtFragmentsOpen = true;
+    }
+
+    async function closeThoughtFragments() {
+        if (!thoughtFragmentsOpen) return;
+        thoughtFragmentsOpen = false;
+        const target = thoughtFragmentsReturnFocus;
+        thoughtFragmentsReturnFocus = undefined;
+        await tick();
+        if (target?.isConnected && target.getClientRects().length) target.focus({ preventScroll: true });
+        else document.querySelector<HTMLButtonElement>('[aria-label="더보기 메뉴"]')?.focus({ preventScroll: true });
+    }
+
+    async function afterThoughtFragmentInserted() {
+        thoughtFragmentsOpen = false;
+        thoughtFragmentsReturnFocus = undefined;
+        readingReturnPosition = undefined;
+        selectWorkspaceView("editor");
+        await tick();
+        const editor = workspace.editor;
+        if (editor) { editor.view.focus(); editor.view.dispatch(editor.state.tr.scrollIntoView()); }
+    }
+
+    async function onThoughtFragmentNavigate(id: string) {
+        thoughtFragmentsOpen = false;
+        thoughtFragmentsReturnFocus = undefined;
+        readingReturnPosition = undefined;
+        selectWorkspaceView("editor");
+        await tick();
+        workspace.thoughtFragments.navigate(id);
     }
 
     async function startReading() {
@@ -198,6 +240,8 @@
             readingOpened = false;
             writingPurposeOpen = false;
             writingPurposeReturnFocus = undefined;
+            thoughtFragmentsOpen = false;
+            thoughtFragmentsReturnFocus = undefined;
             readingReturnPosition = undefined;
             void tick().then(() => {
                 if (workspace.documentReplacementVersion === version) workspace.editor?.commands.focus("start");
@@ -377,6 +421,7 @@
         onStartReading={startReading}
         onEndReading={endReading}
         onEditPurpose={openWritingPurpose}
+        onOpenThoughtFragments={openThoughtFragments}
     />
 
     {#if drawerMode && (leftRailOpen || rightRailOpen)}
@@ -536,6 +581,7 @@
     <CopyRecovery />
     <CopiedOutputDialog />
     <WritingPurposeDialog open={writingPurposeOpen} onClose={closeWritingPurpose} />
+    <ThoughtFragmentsDialog open={thoughtFragmentsOpen} onClose={closeThoughtFragments} onInserted={afterThoughtFragmentInserted} onNavigate={onThoughtFragmentNavigate} />
 </div>
 
 <style>
