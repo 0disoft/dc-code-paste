@@ -9,16 +9,20 @@
     import Smartphone from "@lucide/svelte/icons/smartphone";
     import ReadingLayoutComparison from "./ReadingLayoutComparison.svelte";
     import { readingLayoutOptions } from "#lib/editor/reading-layout.ts";
+    import EmphasisReview from "./EmphasisReview.svelte";
+    import type { EmphasisPassage } from "#lib/editor/emphasis-review.ts";
 
     type Props = {
         hidden?: boolean;
+        onEmphasisNavigate: (passage: EmphasisPassage) => void;
     };
 
-    let { hidden = false }: Props = $props();
+    let { hidden = false, onEmphasisNavigate }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let previewWidth = $state<"fit" | "desktop" | "mobile">("fit");
     let comparing = $state(false);
+    let reviewing = $state(false);
     let comparisonToggle = $state<HTMLButtonElement>();
     const layoutLabel = $derived(readingLayoutOptions.find((item) => item.value === workspace.readingLayout)!.label);
     const widths = [
@@ -50,9 +54,13 @@
 
         <div class="preview-tools">
             {#if workspace.previewMode === "rendered"}
-                <button class="ui-btn ui-btn--outline" type="button" aria-expanded={comparing} aria-controls="reading-layout-comparison" onclick={() => comparing = !comparing} bind:this={comparisonToggle}>
+                <button class="ui-btn ui-btn--outline" type="button" aria-expanded={comparing} aria-controls="reading-layout-comparison" onclick={() => { comparing = !comparing; if (comparing) reviewing = false; }} bind:this={comparisonToggle}>
                     {comparing ? "비교 닫기" : "배치 비교"}
                 </button>
+                <button class="ui-btn ui-btn--outline" type="button" aria-expanded={reviewing} aria-controls="emphasis-review" disabled={workspace.editorMountState !== "ready"} onclick={() => { reviewing = !reviewing; if (reviewing) comparing = false; }}>
+                    {reviewing ? "강조 점검 닫기" : "강조 점검"}
+                </button>
+                {#if !reviewing}
                 <div class="ui-segmented" role="group" aria-label="미리보기 폭">
                     {#each widths as item (item.value)}
                         <button type="button" class:is-active={previewWidth === item.value} aria-pressed={previewWidth === item.value} title={item.value === "fit" ? "작업 영역에 맞춤" : `${item.label} ${item.width} 폭으로 확인`} onclick={() => (previewWidth = item.value)}>
@@ -61,6 +69,7 @@
                         </button>
                     {/each}
                 </div>
+                {/if}
             {/if}
             <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>
             <span class="status-pill" aria-label="현재 글 배경">{workspace.documentThemeLabel}</span>
@@ -116,7 +125,9 @@
 
     <div class="canvas-scroll">
         {#if workspace.previewMode === "rendered"}
-            {#if comparing && !hidden}
+            {#if reviewing}
+                <EmphasisReview onNavigate={onEmphasisNavigate} />
+            {:else if comparing && !hidden}
                 <ReadingLayoutComparison width={selectedWidth.width} onapply={() => { comparing = false; comparisonToggle?.focus(); }} />
             {:else}
             <div class="preview-stage">

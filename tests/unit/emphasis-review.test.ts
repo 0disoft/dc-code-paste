@@ -114,7 +114,7 @@ it("navigates without changing content or history and rejects edited, unmarked a
   });
   let state = EditorState.create({ doc });
   let historyMeta: unknown;
-  const editorFocus = vi.fn();
+  const editorFocus = vi.fn<() => void>();
   const editor = {
     get state() {
       return state;

@@ -2,6 +2,7 @@
     import { onMount, setContext, tick, untrack } from "svelte";
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
     import type { ReadingPassage } from "#lib/editor/reading-path.ts";
+    import type { EmphasisPassage } from "#lib/editor/emphasis-review.ts";
     import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import StoragePanel from "#lib/components/StoragePanel.svelte";
@@ -48,6 +49,13 @@
         if (drawerMode) closeRails();
         await tick();
         workspace.navigateReadingPassage(passage);
+    }
+
+    async function onEmphasisNavigate(passage: EmphasisPassage) {
+        selectWorkspaceView("editor");
+        if (drawerMode) closeRails();
+        await tick();
+        workspace.navigateEmphasisPassage(passage);
     }
 
     $effect(() => {
@@ -149,7 +157,7 @@
             if (position !== undefined) offset = current.view.coordsAtPos(position).top - bounds.top;
         } else {
             const blocks = "p, h1, h2, h3, pre, li, td";
-            anchor = Array.from(scroller.querySelectorAll<HTMLElement>(`.preview-surface :is(${blocks})`))
+            anchor = Array.from(scroller.querySelectorAll<HTMLElement>(`.preview-surface :is(${blocks}), .emphasis-review .passage-text`))
                 .find((element) => element.textContent?.trim() && !element.querySelector(blocks) && element.getBoundingClientRect().bottom > bounds.top && element.getBoundingClientRect().top < bounds.bottom);
             if (anchor) offset = anchor.getBoundingClientRect().top - bounds.top;
         }
@@ -348,7 +356,7 @@
             {/if}
 
             <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} layoutRevision={focusMode ? 1 : 0} />
-            <PreviewCanvas hidden={activeWorkspaceView !== "preview"} />
+            <PreviewCanvas hidden={activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
 
             {#if workspace.codeLineContextMenu}
                 <div

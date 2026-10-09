@@ -36,6 +36,11 @@ import {
   type ReadingPassage,
 } from "#lib/editor/reading-path.ts";
 import {
+  createEmphasisReviewReader,
+  navigateEmphasisPassage,
+  type EmphasisPassage,
+} from "#lib/editor/emphasis-review.ts";
+import {
   clearCopiedOutput,
   copiedOutputChanges,
   copiedOutputStorageKey,
@@ -452,6 +457,7 @@ export function createWorkspaceState() {
   const exportSession = createDcExportSession();
   const readDocumentSources = createDocumentSourceReader();
   const readReadingPassages = createReadingPassageReader();
+  const readEmphasisReview = createEmphasisReviewReader();
   const copyFeedback = createCopyFeedbackController();
   const copyTasks = createCopyTaskController((channel) => {
     activeCopyChannel = channel;
@@ -3211,6 +3217,24 @@ export function createWorkspaceState() {
     get readingPassages() {
       void documentJson;
       return readReadingPassages(editor?.state.doc);
+    },
+    get emphasisReview() {
+      void documentJson;
+      return readEmphasisReview(editor?.state.doc);
+    },
+    get activeEmphasisPassage() {
+      void editorSignal;
+      const selection = editor?.state.selection;
+      return readEmphasisReview(editor?.state.doc).passages.find(
+        (passage) => selection && selection.from >= passage.from && selection.to <= passage.to,
+      );
+    },
+    navigateEmphasisPassage(passage: EmphasisPassage) {
+      if (!editor) return false;
+      const selected = navigateEmphasisPassage(editor, passage);
+      if (selected)
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: false };
+      return selected;
     },
     get activeReadingPassage() {
       void editorSignal;
