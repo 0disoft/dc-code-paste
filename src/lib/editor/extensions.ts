@@ -20,6 +20,7 @@ import { SentenceSourceMark } from "./sentence-source";
 import { RelationAnchorMark, SentenceRelationAttributes } from "./sentence-relations";
 import { ReadingNoteAttributes } from "./reading-notes.ts";
 import { WritingPurposeAttributes } from "./writing-purpose.ts";
+import { changesOnlyPrivateWritingMetadata } from "./private-writing-metadata.ts";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -34,7 +35,10 @@ const DcStarterKit = StarterKit.extend({
                 appendTransaction(transactions, oldState, state) {
                   // Preference history steps change settings without editing the document.
                   // Keep the insertion paragraph for content changes and intentional editor focus.
-                  if (oldState.doc.eq(state.doc) && !transactions.some((tr) => tr.getMeta("focus")))
+                  if (
+                    !transactions.some((tr) => tr.getMeta("focus")) &&
+                    (oldState.doc.eq(state.doc) || changesOnlyPrivateWritingMetadata(transactions))
+                  )
                     return null;
                   return (
                     plugin.spec.appendTransaction?.call(plugin, transactions, oldState, state) ??

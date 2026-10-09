@@ -6,7 +6,13 @@ export const maxWritingPurposeLength = 500;
 
 export function normalizeWritingPurpose(value: unknown): string | null {
   if (typeof value !== "string" || value.length > maxWritingPurposeLength) return null;
-  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value)) return null;
+  if (
+    Array.from(value).some((character) => {
+      const code = character.charCodeAt(0);
+      return (code < 32 && code !== 9 && code !== 10 && code !== 13) || code === 127;
+    })
+  )
+    return null;
   return value.trim().replace(/\s+/g, " ");
 }
 

@@ -10,6 +10,7 @@
     import PendingSentenceRelation from "./PendingSentenceRelation.svelte";
     import SentenceRelationReview from "./SentenceRelationReview.svelte";
     import ReadingNoteReview from "./ReadingNoteReview.svelte";
+    import WritingPurposeSummary from "./WritingPurposeSummary.svelte";
     import type { ReadingNoteEntry } from "#lib/editor/reading-notes.ts";
     import type { SentenceRelationEntry, RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
@@ -22,12 +23,13 @@
         readingNoteReview?: ReadingNoteEntry;
         onReadingNoteClose: () => void;
         onRead: () => void;
+        onEditPurpose: () => void;
         onRelationNavigate: (anchor: RelationAnchor) => void;
         onReviewClose: () => void;
         layoutRevision?: number;
     };
 
-    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, readingNoteReview, onReadingNoteClose, onRead, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
+    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, readingNoteReview, onReadingNoteClose, onRead, onEditPurpose, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
@@ -82,6 +84,7 @@
     {/if}
 
     <div class="canvas-scroll">
+        <WritingPurposeSummary value={workspace.writingPurpose.value} onEdit={onEditPurpose} />
         <div
             class="editor-surface"
             class:editor-surface-dark={workspace.documentTheme === "darkEditorial"}

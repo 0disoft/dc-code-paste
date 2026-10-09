@@ -59,6 +59,7 @@ import {
 } from "#lib/editor/sentence-relation-commands.ts";
 import { closeHistory } from "@tiptap/pm/history";
 import { createReadingExperimentState } from "./reading-experiment.svelte.ts";
+import { createWritingPurposeState } from "./writing-purpose.svelte.ts";
 import {
   clearCopiedOutput,
   copiedOutputChanges,
@@ -491,6 +492,12 @@ export function createWorkspaceState() {
     },
     exportOptions,
     render: (document, options) => exportSession.exportDocument(document, options),
+  });
+  const writingPurpose = createWritingPurposeState({
+    editor: () => {
+      void documentJson;
+      return editor;
+    },
   });
 
   $effect(() => {
@@ -3274,6 +3281,7 @@ export function createWorkspaceState() {
       return readSentenceRelations(editor?.state.doc);
     },
     readingExperiment,
+    writingPurpose,
     get selectedSentenceRelations() {
       void editorSignal;
       const selection = editor?.state.selection;

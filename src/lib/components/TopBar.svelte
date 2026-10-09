@@ -39,6 +39,7 @@
         readingMode?: boolean;
         onStartReading: () => void;
         onEndReading: () => void;
+        onEditPurpose: () => void;
     };
 
     let {
@@ -54,6 +55,7 @@
         readingMode = false,
         onStartReading,
         onEndReading,
+        onEditPurpose,
     }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
@@ -212,6 +214,7 @@
         </button>
 
         <OverflowMenu label="더보기 메뉴" menuLabel="도구 메뉴">
+            <button class="ui-menu-item" type="button" role="menuitem" aria-label="이 글의 목적" disabled={workspace.editorMountState !== "ready"} onclick={onEditPurpose}><FileText size={16} aria-hidden="true" /><span>이 글의 목적</span></button>
             <button
                 class="ui-menu-item"
                 class:is-active={workspace.isMarkdownPanelOpen}

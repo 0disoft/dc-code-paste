@@ -16,6 +16,7 @@
     import PreviewCanvas from "#lib/components/PreviewCanvas.svelte";
     import CopyRecovery from "#lib/components/CopyRecovery.svelte";
     import CopiedOutputDialog from "#lib/components/CopiedOutputDialog.svelte";
+    import WritingPurposeDialog from "#lib/components/WritingPurposeDialog.svelte";
     import ReadingExperiment from "#lib/components/ReadingExperiment.svelte";
     import { relationFreeDocument } from "#lib/editor/relation-free-document.ts";
 
@@ -30,6 +31,8 @@
     let focusMode = $state(false);
     let readingMode = $state(false);
     let readingOpened = $state(false);
+    let writingPurposeOpen = $state(false);
+    let writingPurposeReturnFocus: HTMLElement | undefined;
     let readingReturnPosition: (() => void) | undefined;
     const drawerMode = $derived(compact || focusMode || readingMode);
     let sourceRequest = $state(0);
@@ -38,6 +41,26 @@
     const relationReview = $derived(workspace.sentenceRelations.find((entry) => entry.relation.id === relationReviewId));
     let readingNoteReviewId = $state<string>();
     const readingNoteReview = $derived(workspace.readingExperiment.notes.find((entry) => entry.note.id === readingNoteReviewId));
+
+    function openWritingPurpose() {
+        if (workspace.editorMountState !== "ready") return;
+        writingPurposeReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+        closeRails();
+        workspace.isStoragePanelOpen = false;
+        workspace.isMarkdownPanelOpen = false;
+        workspace.isLlmPanelOpen = false;
+        writingPurposeOpen = true;
+    }
+
+    async function closeWritingPurpose() {
+        if (!writingPurposeOpen) return;
+        writingPurposeOpen = false;
+        const target = writingPurposeReturnFocus;
+        writingPurposeReturnFocus = undefined;
+        await tick();
+        if (target?.isConnected && target.getClientRects().length) target.focus({ preventScroll: true });
+        else document.querySelector<HTMLButtonElement>('[aria-label="더보기 메뉴"]')?.focus({ preventScroll: true });
+    }
 
     async function startReading() {
         if (workspace.editorMountState !== "ready") return;
@@ -173,6 +196,8 @@
             readingNoteReviewId = undefined;
             readingMode = false;
             readingOpened = false;
+            writingPurposeOpen = false;
+            writingPurposeReturnFocus = undefined;
             readingReturnPosition = undefined;
             void tick().then(() => {
                 if (workspace.documentReplacementVersion === version) workspace.editor?.commands.focus("start");
@@ -351,6 +376,7 @@
         {readingMode}
         onStartReading={startReading}
         onEndReading={endReading}
+        onEditPurpose={openWritingPurpose}
     />
 
     {#if drawerMode && (leftRailOpen || rightRailOpen)}
@@ -470,9 +496,9 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
+            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
             <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
-            {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} />{/if}
+            {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} onEditPurpose={openWritingPurpose} />{/if}
 
             {#if workspace.codeLineContextMenu}
                 <div
@@ -509,6 +535,7 @@
 
     <CopyRecovery />
     <CopiedOutputDialog />
+    <WritingPurposeDialog open={writingPurposeOpen} onClose={closeWritingPurpose} />
 </div>
 
 <style>

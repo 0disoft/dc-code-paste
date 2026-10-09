@@ -9,15 +9,17 @@
     import { readingIntentOptions } from "#lib/editor/reading-intent-format.ts";
     import ReadingExperimentBlock from "./ReadingExperimentBlock.svelte";
     import ReadingFrontier from "./ReadingFrontier.svelte";
+    import WritingPurposeSummary from "./WritingPurposeSummary.svelte";
     import { readingRelationFrontier } from "#lib/editor/reading-frontier.ts";
 
     type Props = {
         hidden?: boolean;
         onExit: () => void;
         onNavigate: (anchor: RelationAnchor, noteId: string) => void;
+        onEditPurpose: () => void;
     };
 
-    let { hidden = false, onExit, onNavigate }: Props = $props();
+    let { hidden = false, onExit, onNavigate, onEditPurpose }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const experiment = workspace.readingExperiment;
@@ -220,6 +222,7 @@
 
     <div class="canvas-scroll reading-scroll" bind:this={scroller}>
         <div class="reading-column" style:width={selectedWidth.width}>
+            <WritingPurposeSummary value={workspace.writingPurpose.value} onEdit={onEditPurpose} />
             {#if progressive && frontierOpen}<ReadingFrontier entries={frontier} onNavigate={revisitAnchor} onReveal={revealThrough} remaining={remainingUnits} />{/if}
             {#if recapOpen}
                 <section class="note-recap" id="reading-note-recap" aria-label="멈춘 자리 모아보기">
