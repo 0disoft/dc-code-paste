@@ -7,6 +7,7 @@
     import { documentTextColors } from "#lib/dc/document-colors.ts";
     import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
     import ReadingIntentToolbar from "./ReadingIntentToolbar.svelte";
+    import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
 
     type Props = {
         hidden?: boolean;
@@ -16,6 +17,7 @@
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
+    const layout = $derived(readingLayoutMetrics(workspace.readingLayout));
 
     const BLOCK_MIME = "application/x-dc-block";
 
@@ -70,6 +72,8 @@
             style={`--editor-article-background:${colors.background};--editor-article-color:${compositeColor(colors.fallback, colors.background)};` +
                 `--editor-body-font-family:${safeDcProseFontFamily(workspace.bodyFontFamily)};` +
                 `--editor-body-font-size:${workspace.bodyFontSize};` +
+                `--editor-prose-line-height:${layout.lineHeight};--editor-paragraph-gap:${layout.paragraphGap}px;` +
+                `--editor-list-line-height:${layout.listLineHeight};--editor-list-item-gap:${layout.listItemGap}px;` +
                 `--editor-code-font-size:${workspace.codeFontSize}`}
             bind:this={workspace.editorHost}
             role="group"

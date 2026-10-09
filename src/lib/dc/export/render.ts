@@ -12,6 +12,7 @@ import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts
 import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 import { normalizeTableSpan } from "#lib/editor/data-table.ts";
 import { readingIntentAttributes } from "#lib/editor/reading-intent-format.ts";
+import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
 import {
   normalizeBlockAppearance,
   summaryToneColors,
@@ -817,26 +818,27 @@ function renderParagraph(
 ): string {
   const palette = documentPalette(options);
   const body = renderInlineChildren(node, options, context) || "&nbsp;";
+  const layout = readingLayoutMetrics(options.readingLayout);
 
   if (context.proseTableSafe) {
     return renderDcProseCellBlock({
       body,
       options,
       color: context.text ?? palette.text,
-      margin: "0 0 14px",
+      margin: `0 0 ${layout.paragraphGap}px`,
       fontSize: safeBodyFontSize(options),
-      lineHeight: 1.72,
+      lineHeight: layout.lineHeight,
     });
   }
 
   const paragraphStyle = joinStyle({
-    margin: "0 0 14px",
+    margin: `0 0 ${layout.paragraphGap}px`,
   });
   const textStyle = joinStyle({
     color: context.text ?? palette.text,
     "font-family": safeProseFontFamily(options.bodyFontFamily),
     "font-size": safeBodyFontSize(options),
-    "line-height": 1.72,
+    "line-height": layout.lineHeight,
   });
 
   return `<p style="${paragraphStyle}"><span style="${textStyle}">${body}</span></p>`;
@@ -865,6 +867,7 @@ async function renderList(
   ordered: boolean,
 ): Promise<string> {
   const palette = documentPalette(options);
+  const layout = readingLayoutMetrics(options.readingLayout);
   const listItemContext: RenderContext = {
     text: palette.text,
     background: palette.articleBackground,
@@ -877,16 +880,16 @@ async function renderList(
   const bodyFontSize = safeBodyFontSize(options);
   const tableStyle = joinStyle({
     width: "100%",
-    margin: "0 0 14px",
+    margin: `0 0 ${layout.paragraphGap}px`,
     "border-collapse": "collapse",
   });
   const markerCellStyle = joinStyle({
     width: "22px",
-    padding: "0 9px 7px 0",
+    padding: `0 9px ${layout.listItemGap}px 0`,
     color: palette.text,
     "font-family": proseFontFamily,
     "font-size": bodyFontSize,
-    "line-height": 1.7,
+    "line-height": layout.listLineHeight,
     "text-align": ordered ? "right" : "center",
     "vertical-align": "top",
     "white-space": "nowrap",
@@ -895,22 +898,22 @@ async function renderList(
     color: palette.text,
     "font-family": proseFontFamily,
     "font-size": bodyFontSize,
-    "line-height": 1.7,
+    "line-height": layout.listLineHeight,
     "white-space": "nowrap",
   });
   const bodyCellStyle = joinStyle({
-    padding: "0 0 7px",
+    padding: `0 0 ${layout.listItemGap}px`,
     color: palette.text,
     "font-family": proseFontFamily,
     "font-size": bodyFontSize,
-    "line-height": 1.7,
+    "line-height": layout.listLineHeight,
     "vertical-align": "top",
   });
   const bodyTextStyle = joinStyle({
     color: palette.text,
     "font-family": proseFontFamily,
     "font-size": bodyFontSize,
-    "line-height": 1.7,
+    "line-height": layout.listLineHeight,
   });
   const rawStart = node.attrs?.start;
   const start =

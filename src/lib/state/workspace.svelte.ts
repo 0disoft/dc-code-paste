@@ -20,6 +20,7 @@ import {
   setSelectionReadingIntent,
 } from "#lib/editor/reading-intent.ts";
 import type { ReadingIntent } from "#lib/editor/reading-intent-format.ts";
+import { normalizeReadingLayout, type ReadingLayout } from "#lib/editor/reading-layout.ts";
 import {
   documentOutline,
   activeOutlineIndex,
@@ -303,6 +304,7 @@ export function createWorkspaceState() {
   let showLineNumbers = $state(false);
 
   let documentTheme = $state<DcDocumentTheme>("cleanEditorial");
+  let readingLayout = $state<ReadingLayout>("balanced");
 
   let html = $state("");
   let previewVisible = $state(false);
@@ -781,6 +783,7 @@ export function createWorkspaceState() {
       codeFontSize: defaultCodeFontSize,
       showLineNumbers: false,
       documentTheme: "cleanEditorial",
+      readingLayout: "balanced",
       structure: defaultDcExportStructure,
     };
   }
@@ -796,6 +799,7 @@ export function createWorkspaceState() {
       codeFontSize,
       showLineNumbers,
       documentTheme,
+      readingLayout,
       structure: defaultDcExportStructure,
     };
   }
@@ -856,6 +860,7 @@ export function createWorkspaceState() {
       : defaultCodeFontSize;
     showLineNumbers = preferences.showLineNumbers;
     documentTheme = preferences.documentTheme;
+    readingLayout = normalizeReadingLayout(preferences.readingLayout);
   }
 
   function changeDocumentPreferences(
@@ -865,6 +870,7 @@ export function createWorkspaceState() {
         | "bodyFontFamily"
         | "bodyFontSize"
         | "documentTheme"
+        | "readingLayout"
         | "theme"
         | "codeFontSize"
         | "showLineNumbers"
@@ -1269,6 +1275,7 @@ export function createWorkspaceState() {
       codeFontSize,
       showLineNumbers,
       documentTheme,
+      readingLayout,
       structure: defaultDcExportStructure,
     };
   }
@@ -3110,6 +3117,12 @@ export function createWorkspaceState() {
     },
     set documentTheme(value) {
       changeDocumentPreferences({ documentTheme: value });
+    },
+    get readingLayout() {
+      return readingLayout;
+    },
+    set readingLayout(value) {
+      changeDocumentPreferences({ readingLayout: normalizeReadingLayout(value) });
     },
     get html() {
       return html;

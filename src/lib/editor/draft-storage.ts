@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import { normalizeReadingLayout, type ReadingLayout } from "./reading-layout.ts";
 import {
   normalizeDcExportStructure,
   type DcDocumentTheme,
@@ -26,6 +27,7 @@ export type DraftPreferences = {
   codeFontSize: string;
   showLineNumbers: boolean;
   documentTheme: DcDocumentTheme;
+  readingLayout?: ReadingLayout;
   structure: DcExportStructure;
 };
 
@@ -192,6 +194,9 @@ export function normalizeDraftPreferences(value: unknown): DraftPreferences | un
     codeFontSize: value.codeFontSize,
     showLineNumbers: value.showLineNumbers,
     documentTheme: isDocumentTheme(value.documentTheme) ? value.documentTheme : "lightLecture",
+    ...(value.readingLayout === undefined
+      ? {}
+      : { readingLayout: normalizeReadingLayout(value.readingLayout) }),
     structure,
   };
 }
