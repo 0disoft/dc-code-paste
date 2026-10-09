@@ -49,7 +49,12 @@ export function readSelectionReadingIntent(state: EditorState | undefined) {
       );
     } else {
       state.doc.nodesBetween(state.selection.from, state.selection.to, (node, _pos, parent) => {
-        if (!node.isText || !parent?.type.allowsMarkType(markType)) return;
+        if (
+          !node.isText ||
+          !parent?.type.allowsMarkType(markType) ||
+          node.marks.some((mark) => mark.type.name === "code")
+        )
+          return;
         canApply = true;
         values.add(
           normalizeReadingIntent(node.marks.find((mark) => mark.type === markType)?.attrs.intent),

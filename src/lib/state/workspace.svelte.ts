@@ -16,6 +16,11 @@ import {
 import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
 import { readSelectionTextStyle } from "#lib/editor/selection-text-style.ts";
 import {
+  readSelectionReadingIntent,
+  setSelectionReadingIntent,
+} from "#lib/editor/reading-intent.ts";
+import type { ReadingIntent } from "#lib/editor/reading-intent-format.ts";
+import {
   documentOutline,
   activeOutlineIndex,
   navigateToBlock,
@@ -2915,6 +2920,13 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get readingIntentSelection() {
+      void editorSignal;
+      return readSelectionReadingIntent(editor?.state);
+    },
+    setReadingIntent(intent: ReadingIntent | null) {
+      runEditorCommand((current) => setSelectionReadingIntent(current, intent));
+    },
     get selectionTextStyle() {
       void editorSignal;
       return readSelectionTextStyle(editor?.state);

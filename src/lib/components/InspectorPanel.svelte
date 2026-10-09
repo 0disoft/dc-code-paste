@@ -9,6 +9,7 @@
     import CalloutSection from "./CalloutSection.svelte";
     import InlineFormatSection from "./InlineFormatSection.svelte";
     import SelectionTextSection from "./SelectionTextSection.svelte";
+    import ReadingIntentSection from "./ReadingIntentSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
     import Megaphone from "@lucide/svelte/icons/megaphone";
     import Type from "@lucide/svelte/icons/type";
@@ -180,6 +181,7 @@
 
             {/if}
 
+            <ReadingIntentSection />
             <SelectionTextSection />
 
             {#if blockInfo && !["paragraph", "heading", "bulletList", "orderedList"].includes(blockInfo.type) && !workspace.isLinkPanelOpen}

@@ -89,6 +89,17 @@ it("reports mixed intentions and refuses a selection made entirely of code", () 
     state.tr.setSelection(TextSelection.create(doc, 7, doc.content.size - 1)),
   );
   expect(readSelectionReadingIntent(codeSelection).canApply).toBe(false);
+  const inline = schema.nodeFromJSON({
+    type: "doc",
+    content: [
+      { type: "paragraph", content: [{ ...plain("inline code"), marks: [{ type: "code" }] }] },
+    ],
+  });
+  const inlineState = EditorState.create({
+    doc: inline,
+    selection: TextSelection.create(inline, 1, inline.content.size - 1),
+  });
+  expect(readSelectionReadingIntent(inlineState).canApply).toBe(false);
 });
 
 it("rejects unknown intention attributes and never exports them as markup", async () => {

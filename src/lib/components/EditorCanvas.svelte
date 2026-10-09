@@ -6,6 +6,7 @@
     import { compositeColor } from "#lib/dc/sanitize-style.ts";
     import { documentTextColors } from "#lib/dc/document-colors.ts";
     import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
+    import ReadingIntentToolbar from "./ReadingIntentToolbar.svelte";
 
     type Props = {
         hidden?: boolean;
@@ -49,6 +50,7 @@
 </script>
 
 <div class="canvas-view" hidden={hidden}>
+    <ReadingIntentToolbar {hidden} />
     {#if workspace.editorMountState === "error"}
         <div class="canvas-notice is-error" role="alert">
             <span>편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.</span>
