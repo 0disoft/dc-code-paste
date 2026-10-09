@@ -4,12 +4,23 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import Paintbrush from "@lucide/svelte/icons/paintbrush";
     import { proseFontOptions } from "#lib/editor/text-fonts.ts";
+    import { readingLayoutOptions } from "#lib/editor/reading-layout.ts";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 </script>
 
 <section class="ui-section" aria-label="문서">
     <span class="ui-section-title"><Paintbrush size={15} aria-hidden="true" /> 문서</span>
+
+    <label class="ui-field">
+        <span class="ui-label">읽기 배치</span>
+        <select class="ui-select" bind:value={workspace.readingLayout} aria-label="읽기 배치">
+            {#each readingLayoutOptions as item (item.value)}
+                <option value={item.value}>{item.label}</option>
+            {/each}
+        </select>
+    </label>
+    <p class="ui-hint">미리보기의 ‘배치 비교’에서 두 간격을 함께 볼 수 있습니다.</p>
 
     <label class="ui-field">
         <span class="ui-label">글 배경</span>

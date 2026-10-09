@@ -374,8 +374,9 @@
   margin: 0 0 var(--editor-list-item-gap, 7px);
 }
 
-.article-editor li > p {
+.editor-surface .article-editor li > p {
   margin: 0;
+  line-height: var(--editor-list-line-height, 1.7);
 }
 
 .article-editor hr {

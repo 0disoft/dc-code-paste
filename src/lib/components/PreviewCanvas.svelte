@@ -7,6 +7,8 @@
     import Clipboard from "@lucide/svelte/icons/clipboard";
     import Monitor from "@lucide/svelte/icons/monitor";
     import Smartphone from "@lucide/svelte/icons/smartphone";
+    import ReadingLayoutComparison from "./ReadingLayoutComparison.svelte";
+    import { readingLayoutOptions } from "#lib/editor/reading-layout.ts";
 
     type Props = {
         hidden?: boolean;
@@ -16,6 +18,9 @@
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let previewWidth = $state<"fit" | "desktop" | "mobile">("fit");
+    let comparing = $state(false);
+    let comparisonToggle = $state<HTMLButtonElement>();
+    const layoutLabel = $derived(readingLayoutOptions.find((item) => item.value === workspace.readingLayout)!.label);
     const widths = [
         { value: "fit", label: "맞춤", width: "100%" },
         { value: "desktop", label: "PC", width: "960px" },
@@ -45,6 +50,9 @@
 
         <div class="preview-tools">
             {#if workspace.previewMode === "rendered"}
+                <button class="ui-btn ui-btn--outline" type="button" aria-expanded={comparing} aria-controls="reading-layout-comparison" onclick={() => comparing = !comparing} bind:this={comparisonToggle}>
+                    {comparing ? "비교 닫기" : "배치 비교"}
+                </button>
                 <div class="ui-segmented" role="group" aria-label="미리보기 폭">
                     {#each widths as item (item.value)}
                         <button type="button" class:is-active={previewWidth === item.value} aria-pressed={previewWidth === item.value} title={item.value === "fit" ? "작업 영역에 맞춤" : `${item.label} ${item.width} 폭으로 확인`} onclick={() => (previewWidth = item.value)}>
@@ -56,6 +64,7 @@
             {/if}
             <span class="status-pill" aria-label="현재 복붙 구조">DC 테이블</span>
             <span class="status-pill" aria-label="현재 글 배경">{workspace.documentThemeLabel}</span>
+            <span class="status-pill" aria-label="현재 읽기 배치">{layoutLabel}</span>
             <div class="ui-segmented" aria-label="미리보기 형식">
                 <button
                     class:is-active={workspace.previewMode === "rendered"}
@@ -107,6 +116,9 @@
 
     <div class="canvas-scroll">
         {#if workspace.previewMode === "rendered"}
+            {#if comparing && !hidden}
+                <ReadingLayoutComparison width={selectedWidth.width} onapply={() => { comparing = false; comparisonToggle?.focus(); }} />
+            {:else}
             <div class="preview-stage">
                 <p class="preview-width-note">{previewWidth === "fit" ? "작업 영역에 맞춤" : `${selectedWidth.label} · ${selectedWidth.width} · 좁은 화면에서는 가로로 스크롤하세요`}</p>
             <div
@@ -119,6 +131,7 @@
                 {/if}
             </div>
             </div>
+            {/if}
         {:else}
             <textarea
                 class="html-source"
