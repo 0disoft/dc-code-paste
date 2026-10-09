@@ -11,7 +11,7 @@
     let position = $state<{ left: number; top: number } | null>(null);
     let dismissedSelection = $state<string | null>(null);
     function selectionKey() {
-        return `${workspace.editorSelectionRevision}:${workspace.documentReplacementVersion}`;
+        return `${workspace.editorSelectionRevision}:${workspace.documentReplacementVersion}:${selection.intent}:${selection.mixed}`;
     }
 
     $effect(() => {

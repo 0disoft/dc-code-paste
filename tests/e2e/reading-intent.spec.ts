@@ -38,10 +38,12 @@ for (const mobile of [false, true]) {
     await expect(sentence.locator('[data-reading-intent="focus"]')).toHaveText("기억할 핵심 문장");
     await expect(sentence.locator("a")).toHaveAttribute("href", "https://example.com/source");
     await expect(sentence.locator("strong")).toHaveText("기억할 핵심 문장");
+    await expect(toolbar).toHaveCount(0);
     expect(await editor.textContent()).toBe(original);
     await page.screenshot({ path: testInfo.outputPath("reading-intent.png") });
     await editor.press("Control+z");
     await expect(sentence.locator("[data-reading-intent]")).toHaveCount(0);
+    await expect(toolbar).toBeVisible();
     await editor.press("Control+y");
     await expect(sentence.locator('[data-reading-intent="focus"]')).toHaveCount(1);
     await toolbar
@@ -57,6 +59,10 @@ for (const mobile of [false, true]) {
     await page.reload();
     await expect(sentence.locator('[data-reading-intent="question"]')).toHaveText(
       "기억할 핵심 문장",
+    );
+    await expect(page.getByRole("group", { name: "글쓰기 편집기", exact: true })).toHaveAttribute(
+      "aria-busy",
+      "false",
     );
     await sentence.click();
     await page.keyboard.press("Home");

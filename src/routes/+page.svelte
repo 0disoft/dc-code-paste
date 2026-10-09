@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount, setContext, tick, untrack } from "svelte";
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
+    import type { ReadingPassage } from "#lib/editor/reading-path.ts";
     import { createWorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import StoragePanel from "#lib/components/StoragePanel.svelte";
@@ -38,6 +39,13 @@
         if (compact) closeRails();
         await tick();
         workspace.navigateSentenceSource(href, from, to);
+    }
+
+    async function onPassageNavigate(passage: ReadingPassage) {
+        selectWorkspaceView("editor");
+        if (compact) closeRails();
+        await tick();
+        workspace.navigateReadingPassage(passage);
     }
 
     $effect(() => {
@@ -184,7 +192,7 @@
     {/if}
 
     <div class="app-body">
-        <BlockSidebar open={leftRailOpen} {compact} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} />
+        <BlockSidebar open={leftRailOpen} {compact} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} />
 
         <section class="canvas" aria-label="글쓰기 작업 영역" inert={compact && (leftRailOpen || rightRailOpen)}>
             {#if workspace.isStoragePanelOpen ||

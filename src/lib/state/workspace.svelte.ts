@@ -28,6 +28,12 @@ import {
 import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
 import { createDocumentSourceReader } from "#lib/editor/document-sources.ts";
 import {
+  activeReadingPassage,
+  createReadingPassageReader,
+  navigateReadingPassage,
+  type ReadingPassage,
+} from "#lib/editor/reading-path.ts";
+import {
   clearCopiedOutput,
   copiedOutputChanges,
   copiedOutputStorageKey,
@@ -443,6 +449,7 @@ export function createWorkspaceState() {
 
   const exportSession = createDcExportSession();
   const readDocumentSources = createDocumentSourceReader();
+  const readReadingPassages = createReadingPassageReader();
   const copyFeedback = createCopyFeedbackController();
   const copyTasks = createCopyTaskController((channel) => {
     activeCopyChannel = channel;
@@ -3186,8 +3193,34 @@ export function createWorkspaceState() {
       void editorSignal;
       return readSelectionReadingIntent(editor?.state);
     },
+    get readingPassages() {
+      void documentJson;
+      return readReadingPassages(editor?.state.doc);
+    },
+    get activeReadingPassage() {
+      void editorSignal;
+      const passages = readReadingPassages(editor?.state.doc);
+      return passages[activeReadingPassage(passages, editor?.state.selection)];
+    },
+    navigateReadingPassage(passage: ReadingPassage) {
+      if (!editor) return false;
+      const selected = navigateReadingPassage(
+        editor,
+        passage,
+        readReadingPassages(editor.state.doc),
+      );
+      if (selected)
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: false };
+      return selected;
+    },
     setReadingIntent(intent: ReadingIntent | null) {
-      runEditorCommand((current) => setSelectionReadingIntent(current, intent));
+      if (!editor) return false;
+      const changed = setSelectionReadingIntent(editor, intent);
+      if (changed) {
+        refreshEditorState(editor);
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
+      }
+      return changed;
     },
     get selectionTextStyle() {
       void editorSignal;

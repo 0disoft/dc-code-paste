@@ -3,6 +3,7 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
+    import type { ReadingPassage } from "#lib/editor/reading-path.ts";
     import Heading1 from "@lucide/svelte/icons/heading-1";
     import Pilcrow from "@lucide/svelte/icons/pilcrow";
     import Rows3 from "@lucide/svelte/icons/rows-3";
@@ -39,9 +40,10 @@
         compact?: boolean;
         onInsert?: (kind?: PaletteBlockKind) => void;
         onNavigate: (index: number) => void;
+        onPassageNavigate: (passage: ReadingPassage) => void;
     };
 
-    let { open = true, compact = false, onInsert, onNavigate }: Props = $props();
+    let { open = true, compact = false, onInsert, onNavigate, onPassageNavigate }: Props = $props();
 
     let tab = $state<"blocks" | "templates" | "outline">("blocks");
     let query = $state("");
@@ -218,7 +220,7 @@
         </div>
     {:else}
         <div id="outline-tabpanel" class="rail-scroll" role="tabpanel" aria-labelledby="outline-tab">
-            <DocumentOutline {onNavigate} />
+            <DocumentOutline {onNavigate} {onPassageNavigate} />
         </div>
     {/if}
 </aside>

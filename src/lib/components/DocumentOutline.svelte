@@ -2,14 +2,22 @@
     import { getContext } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
+    import { readingIntentOptions, type ReadingIntent } from "#lib/editor/reading-intent-format.ts";
+    import type { ReadingPassage } from "#lib/editor/reading-path.ts";
+    import ReadingPath from "./ReadingPath.svelte";
 
-    let { onNavigate }: { onNavigate: (index: number) => void } = $props();
+    let { onNavigate, onPassageNavigate }: { onNavigate: (index: number) => void; onPassageNavigate: (passage: ReadingPassage) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let query = $state("");
+    let route = $state<"all" | ReadingIntent>("all");
     const entries = $derived(workspace.documentOutline);
     const filtered = $derived(entries.filter((entry) => `${entry.label} ${entry.text}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
 </script>
 
+<label class="ui-field path-selector"><span class="ui-label">읽기 경로</span><select class="ui-select" aria-label="읽기 경로" bind:value={route}><option value="all">전체 글</option>{#each readingIntentOptions as item (item.value)}<option value={item.value}>{item.label}</option>{/each}</select></label>
+{#if route !== "all"}
+    <ReadingPath intent={route} onNavigate={onPassageNavigate} />
+{:else}
 <div class="outline-search">
     <input class="ui-input" type="search" aria-label="글 구성 검색" placeholder="내용이나 블록 이름으로 찾기" bind:value={query} />
     <p class="outline-count" role="status">{query.trim() ? `${filtered.length}개 찾음 / ` : ""}총 {entries.length}개 블록</p>
@@ -27,8 +35,10 @@
     </ol>
 </nav>
 {#if filtered.length === 0}<p class="outline-count">일치하는 블록이 없습니다.</p>{/if}
+{/if}
 
 <style>
+    .path-selector { margin-bottom: 12px; }
     .outline-search { position: sticky; top: 0; z-index: 1; display: grid; gap: 8px; padding-bottom: 8px; background: var(--rail); }
     .outline-count { margin: 0; color: var(--muted); font-size: 0.78rem; }
     .outline-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
