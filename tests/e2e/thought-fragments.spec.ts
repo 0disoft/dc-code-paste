@@ -211,3 +211,86 @@ test("inserts code with exact indentation from the reader and restores its usage
   await card.getByRole("button", { name: "조각 1 넣은 자리 1 구간 1 이동", exact: true }).click();
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(text);
 });
+
+test("keeps fragments beside editable prose, preserves unfinished edits across presentations, and opens settings on request", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await setup(page);
+  const editor = page.locator(".article-editor");
+  const dialog = await openFragments(page);
+  const input = dialog.getByLabel("새 생각 조각", { exact: true });
+  await input.fill("아직 보관하지 않은 입력");
+  await dialog.getByRole("button", { name: "생각 조각 본문 곁에 두기", exact: true }).click();
+  await expect(dialog).toHaveAttribute("aria-modal", "false");
+  await expect.poll(() => dialog.evaluate((element) => element.matches(":modal"))).toBe(false);
+  await expect(input).toHaveValue("아직 보관하지 않은 입력");
+  await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeDisabled();
+  const editorBounds = await page.locator(".canvas").boundingBox();
+  const dialogBounds = await dialog.boundingBox();
+  expect(editorBounds!.x + editorBounds!.width).toBeLessThanOrEqual(dialogBounds!.x + 1);
+  await editor.locator("p").last().click();
+  await expect(editor).toBeFocused();
+  await page.keyboard.press("End");
+  await page.keyboard.insertText(" 계속 쓰는 중");
+  await expect(editor).toContainText("계속 쓰는 중");
+  await expect(input).toHaveValue("아직 보관하지 않은 입력");
+  await input.fill("곁에서 넣은 조각");
+  await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+  const card = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
+  await editor.locator("p").first().click({ clickCount: 3 });
+  await card.getByRole("button", { name: "글로 넣기", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(editor).toBeFocused();
+  await expect(editor.locator("strong a, a strong")).toHaveText("원래 문장");
+  await expect(editor.locator("p").nth(1)).toHaveText("곁에서 넣은 조각");
+  await card.getByText("넣은 자리 보기", { exact: true }).click();
+  await card.getByRole("button", { name: "조각 1 넣은 자리 1 구간 1 이동", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(editor).toBeFocused();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("곁에서 넣은 조각");
+  await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+  const edit = card.getByLabel("보관할 조각 내용", { exact: true });
+  await edit.fill("저장하지 않은 조각 수정");
+  await input.fill("계속 담을 입력");
+  await page.screenshot({ path: testInfo.outputPath("thought-fragments-docked.png") });
+  await page.setViewportSize({ width: 320, height: 844 });
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect.poll(() => dialog.evaluate((element) => element.matches(":modal"))).toBe(true);
+  await expect(input).toHaveValue("계속 담을 입력");
+  await expect(edit).toHaveValue("저장하지 않은 조각 수정");
+  await expect(
+    dialog.getByRole("button", { name: "생각 조각 본문 곁에 두기", exact: true }),
+  ).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1400, height: 900 });
+  await expect(dialog).toHaveAttribute("aria-modal", "false");
+  await expect(edit).toHaveValue("저장하지 않은 조각 수정");
+  await dialog.getByRole("button", { name: "생각 조각 크게 열기", exact: true }).click();
+  await expect(dialog).toHaveAttribute("aria-modal", "true");
+  await expect(input).toHaveValue("계속 담을 입력");
+  await expect(edit).toHaveValue("저장하지 않은 조각 수정");
+  await dialog.getByRole("button", { name: "생각 조각 본문 곁에 두기", exact: true }).click();
+  await expect(dialog).toHaveAttribute("aria-modal", "false");
+  await edit.press("Escape");
+  await expect(edit).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  const html = await copied(page, 1);
+  expect(html).not.toContain("계속 담을 입력");
+  expect(html).not.toContain("저장하지 않은 조각 수정");
+  await input.press("Escape");
+  await expect(dialog).toBeHidden();
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "집중해서 쓰기", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveClass(/is-focused/);
+  await openFragments(page);
+  await expect(dialog).toHaveAttribute("aria-modal", "false");
+  await expect(input).toHaveValue("계속 담을 입력");
+  await editor.locator("p").first().click({ clickCount: 3 });
+  await page
+    .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
+    .getByRole("button", { name: "문장 출처 연결", exact: true })
+    .click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByLabel("자료 주소", { exact: true })).toBeFocused();
+});

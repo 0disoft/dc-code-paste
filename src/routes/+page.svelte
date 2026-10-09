@@ -36,6 +36,8 @@
     let writingPurposeReturnFocus: HTMLElement | undefined;
     let thoughtFragmentsOpen = $state(false);
     let thoughtSelectionStored = $state(false);
+    let thoughtFragmentsDockPreference = $state(false);
+    const fragmentsDocked = $derived(thoughtFragmentsOpen && thoughtFragmentsDockPreference && !compact);
     let thoughtFragmentsReturnFocus: HTMLElement | undefined;
     let readingReturnPosition: (() => void) | undefined;
     const drawerMode = $derived(compact || focusMode || readingMode);
@@ -85,6 +87,21 @@
         thoughtSelectionStored = workspace.thoughtFragments.captureSelection();
     }
 
+    async function toggleThoughtFragmentsDock() {
+        if (compact || !thoughtFragmentsOpen) return;
+        const restore = captureCanvasPosition();
+        thoughtFragmentsDockPreference = !thoughtFragmentsDockPreference;
+        closeRails();
+        await tick();
+        restore();
+    }
+
+    function dismissFragmentsForSettings() {
+        if (!fragmentsDocked) return;
+        thoughtFragmentsOpen = false;
+        thoughtFragmentsReturnFocus = undefined;
+    }
+
     async function closeThoughtFragments() {
         if (!thoughtFragmentsOpen) return;
         thoughtFragmentsOpen = false;
@@ -98,8 +115,7 @@
     }
 
     async function afterThoughtFragmentInserted() {
-        thoughtFragmentsOpen = false;
-        thoughtFragmentsReturnFocus = undefined;
+        if (!fragmentsDocked) { thoughtFragmentsOpen = false; thoughtFragmentsReturnFocus = undefined; }
         readingReturnPosition = undefined;
         selectWorkspaceView("editor");
         await tick();
@@ -108,8 +124,7 @@
     }
 
     async function onThoughtFragmentNavigate(id: string) {
-        thoughtFragmentsOpen = false;
-        thoughtFragmentsReturnFocus = undefined;
+        if (!fragmentsDocked) { thoughtFragmentsOpen = false; thoughtFragmentsReturnFocus = undefined; }
         readingReturnPosition = undefined;
         selectWorkspaceView("editor");
         await tick();
@@ -194,6 +209,7 @@
     }
 
     async function onSourceRequest() {
+        dismissFragmentsForSettings();
         selectWorkspaceView("editor");
         leftRailOpen = false;
         rightRailOpen = true;
@@ -203,6 +219,7 @@
     }
 
     async function onRelationRequest() {
+        dismissFragmentsForSettings();
         selectWorkspaceView("editor");
         leftRailOpen = false;
         rightRailOpen = true;
@@ -278,6 +295,7 @@
     });
 
     async function toggleRail(side: "left" | "right") {
+        if (side === "right") dismissFragmentsForSettings();
         const opening = side === "left" ? !leftRailOpen : !rightRailOpen;
         leftRailOpen = side === "left" && opening;
         rightRailOpen = side === "right" && opening;
@@ -553,7 +571,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} onStoreThoughtFragment={storeSelectedThoughtFragment} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
+            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} onStoreThoughtFragment={storeSelectedThoughtFragment} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} onEditPurpose={openWritingPurpose} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0) + (fragmentsDocked ? 8 : 0)} />
             <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
             {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} onEditPurpose={openWritingPurpose} />{/if}
 
@@ -587,13 +605,13 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {relationRequest} {onSourceNavigate} {onRelationNavigate} {onRelationCompare} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen && !fragmentsDocked} compact={drawerMode || fragmentsDocked} {sourceRequest} {relationRequest} {onSourceNavigate} {onRelationNavigate} {onRelationCompare} onBlockAction={onInspectorBlockAction} />
+        <ThoughtFragmentsDialog open={thoughtFragmentsOpen} selectionStored={thoughtSelectionStored} dockAvailable={!compact} docked={fragmentsDocked} onToggleDock={toggleThoughtFragmentsDock} onClose={closeThoughtFragments} onInserted={afterThoughtFragmentInserted} onNavigate={onThoughtFragmentNavigate} />
     </div>
 
     <CopyRecovery />
     <CopiedOutputDialog />
     <WritingPurposeDialog open={writingPurposeOpen} onClose={closeWritingPurpose} />
-    <ThoughtFragmentsDialog open={thoughtFragmentsOpen} selectionStored={thoughtSelectionStored} onClose={closeThoughtFragments} onInserted={afterThoughtFragmentInserted} onNavigate={onThoughtFragmentNavigate} />
 </div>
 
 <style>

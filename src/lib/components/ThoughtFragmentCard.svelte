@@ -66,7 +66,7 @@
     .fragment-head span, .fragment-hint, label, summary { color: var(--muted); font-size: 0.78rem; }
     .fragment-hint { margin: 0; line-height: 1.65; }
     .fragment-text { margin: 0; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.84rem; line-height: 1.7; }
-    textarea { width: 100%; resize: vertical; }
+    textarea { width: 100%; height: auto; min-height: 7rem; resize: vertical; }
     summary { padding-block: 4px; cursor: pointer; }
     .fragment-use { display: grid; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 0.8rem; }
     .fragment-part { display: grid; gap: 8px; min-width: 0; }

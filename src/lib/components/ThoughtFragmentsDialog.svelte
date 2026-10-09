@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { maxThoughtFragmentLength, maxThoughtFragments } from "#lib/editor/thought-fragments-format.ts";
     import ThoughtFragmentCard from "./ThoughtFragmentCard.svelte";
-    let { open, selectionStored = false, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: boolean; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
+    let { open, selectionStored = false, dockAvailable = false, docked = false, onToggleDock, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: boolean; dockAvailable?: boolean; docked?: boolean; onToggleDock: () => void; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const fragments = workspace.thoughtFragments;
     let dialog = $state<HTMLDialogElement>();
@@ -17,13 +17,25 @@
         const version = workspace.documentReplacementVersion;
         if (version !== draftVersion) { draftVersion = version; draft = ""; }
         if (!dialog) return;
-        if (open && !dialog.open) {
-            openedVersion = workspace.documentReplacementVersion;
-            status = selectionStored ? "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다." : "";
-            dialog.showModal();
-            void tick().then(() => { if (open && dialog?.open) field?.focus(); });
+        if (open) {
+            const wasOpen = dialog.open;
+            const beside = docked && dockAvailable;
+            if (!wasOpen || dialog.matches(":modal") === beside) {
+                const focused = document.activeElement instanceof HTMLElement && dialog.contains(document.activeElement) ? document.activeElement : undefined;
+                // Keep the same form and cards while switching presentation. A close
+                // event from the mode switch must not dismiss the reopened panel.
+                if (wasOpen) dialog.close();
+                if (!wasOpen) { openedVersion = version; status = ""; }
+                if (beside) dialog.show(); else dialog.showModal();
+                void tick().then(() => {
+                    if (!open || !dialog?.open) return;
+                    if (focused?.isConnected) focused.focus({ preventScroll: true });
+                    else if (!wasOpen) field?.focus();
+                });
+            }
         } else if (!open && dialog.open) dialog.close();
     });
+    $effect(() => { if (open && selectionStored) status = "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다."; });
     const entries = $derived(open ? fragments.entries : []);
     function current() { return open && openedVersion === workspace.documentReplacementVersion; }
     function add() {
@@ -37,16 +49,17 @@
     function navigate(id: string) { if (current()) onNavigate(id); }
 </script>
 
-<dialog class="fragments-dialog" bind:this={dialog} aria-labelledby="thought-fragments-title" oncancel={onClose} onclose={onClose} onkeydown={(event) => event.stopPropagation()}>
+<dialog class="fragments-dialog" class:is-docked={docked} bind:this={dialog} aria-labelledby="thought-fragments-title" aria-modal={docked ? "false" : "true"} oncancel={onClose} onclose={() => { if (!dialog?.open) onClose(); }} onkeydown={(event) => { event.stopPropagation(); if (docked && event.key === "Escape" && !event.isComposing) { event.preventDefault(); onClose(); } }}>
     {#if open}
         <div class="fragments-content">
             <header><div><h2 id="thought-fragments-title">생각 조각</h2><p>정리하기 전 문장, 코드, 자료 주소를 일단 담아 두세요.</p></div><button class="ui-btn ui-btn--outline" type="button" aria-label="생각 조각 닫기" onclick={onClose}>닫기</button></header>
+            {#if dockAvailable}<button class="ui-btn ui-btn--outline dock-toggle" type="button" aria-label={docked ? "생각 조각 크게 열기" : "생각 조각 본문 곁에 두기"} aria-pressed={docked} onclick={onToggleDock}>{docked ? "크게 열기" : "본문 곁에 두기"}</button>{/if}
             <form onsubmit={(event) => { event.preventDefault(); add(); }}>
                 <label for="thought-fragment-input">새 생각 조각</label>
                 <textarea id="thought-fragment-input" class="ui-input" bind:this={field} bind:value={draft} rows="4" maxlength={maxThoughtFragmentLength}></textarea>
                 <div class="fragments-actions"><p>{entries.length} / {maxThoughtFragments}개 · 초안에만 보관</p><button class="ui-btn ui-btn--primary" type="submit" disabled={!draft.trim() || entries.length >= maxThoughtFragments}>조각 보관</button></div>
             </form>
-            <p class="fragments-hint">본문에 넣을 때 글과 코드를 고를 수 있습니다. 선택한 내용을 지우지 않고 그 뒤에 새 블록으로 넣습니다.</p>
+            <p class="fragments-hint">본문에 넣을 때 글과 코드를 고를 수 있습니다. 선택한 내용을 지우지 않고 그 뒤에 새 블록으로 넣습니다. 넣은 자리는 조각을 새로 넣은 구간만 표시합니다.</p>
             {#if fragments.error}<p class="fragments-error" role="alert">{fragments.error}</p>{/if}
             {#if status}<p class="fragments-hint" role="status">{status}</p>{/if}
             {#if !entries.length}<p class="fragments-hint">아직 보관한 조각이 없습니다.</p>{/if}
@@ -60,13 +73,16 @@
 <style>
     .fragments-dialog { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); }
     .fragments-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+    .fragments-dialog.is-docked { position: static; flex: 0 0 clamp(320px, 26vw, 380px); width: clamp(320px, 26vw, 380px); min-width: 0; min-height: 0; max-height: none; margin: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; overflow-y: auto; overscroll-behavior: contain; }
+    .is-docked .fragments-content { padding: 18px; }
+    .dock-toggle { justify-self: start; }
     .fragments-content { display: grid; gap: 14px; min-width: 0; padding: 20px; }
     header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     h2 { margin: 0; font-size: 1.1rem; }
     header p, .fragments-hint { margin: 6px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.65; }
     form { display: grid; gap: 8px; min-width: 0; }
     label { font-size: 0.85rem; }
-    textarea { width: 100%; resize: vertical; }
+    textarea { width: 100%; height: auto; min-height: 7rem; resize: vertical; }
     .fragments-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .fragments-actions p { margin: 0; color: var(--muted); font-size: 0.76rem; }
     .fragments-list { display: grid; gap: 12px; min-width: 0; }
