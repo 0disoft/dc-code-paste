@@ -12,6 +12,7 @@
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
     import SentenceSourceSection from "./SentenceSourceSection.svelte";
     import DocumentSourcesSection from "./DocumentSourcesSection.svelte";
+    import WritingDefaultsSection from "./WritingDefaultsSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
     import Megaphone from "@lucide/svelte/icons/megaphone";
     import Type from "@lucide/svelte/icons/type";
@@ -207,6 +208,7 @@
             aria-labelledby="article-tab"
         >
             <ArticleSettingsSection />
+            <WritingDefaultsSection />
             <DocumentSourcesSection onNavigate={onSourceNavigate} />
         </div>
     {/if}

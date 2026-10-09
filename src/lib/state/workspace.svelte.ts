@@ -28,6 +28,15 @@ import {
 import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
 import { createDocumentSourceReader } from "#lib/editor/document-sources.ts";
 import {
+  clearWritingDefaults,
+  normalizeWritingAppearance,
+  readWritingDefaults,
+  writeWritingDefaults,
+  writingBodyFontSizes,
+  writingDefaultsStorageKey,
+  type WritingAppearance,
+} from "#lib/editor/writing-defaults.ts";
+import {
   documentOutline,
   activeOutlineIndex,
   navigateToBlock,
@@ -190,7 +199,7 @@ export function createWorkspaceState() {
 
   const defaultCodeFontSize = "15px";
 
-  const bodySizes = ["14px", "15px", "16px", "17px", "18px", "19px", "20px"];
+  const bodySizes = writingBodyFontSizes;
 
   const codeSizes = ["12px", "13px", "14px", "15px", "16px", "17px", "18px"];
 
@@ -311,6 +320,8 @@ export function createWorkspaceState() {
 
   let documentTheme = $state<DcDocumentTheme>("cleanEditorial");
   let readingLayout = $state<ReadingLayout>("balanced");
+  let rememberedWritingAppearance = $state<WritingAppearance>();
+  let writingDefaultsStatus = $state<"idle" | "saved" | "cleared" | "error">("idle");
   let selectionToolbarAction = $state({ revision: 0, dismiss: false });
   let editorSelectionRevision = $state(0);
 
@@ -785,14 +796,14 @@ export function createWorkspaceState() {
     return {
       language: defaultLanguage,
       theme: "github-light",
-      bodyFontFamily: defaultProseFontFamily,
-      bodyFontSize: defaultBodyFontSize,
-      selectionFontFamily: defaultProseFontFamily,
-      selectionFontSize: defaultBodyFontSize,
+      bodyFontFamily: rememberedWritingAppearance?.bodyFontFamily ?? defaultProseFontFamily,
+      bodyFontSize: rememberedWritingAppearance?.bodyFontSize ?? defaultBodyFontSize,
+      selectionFontFamily: rememberedWritingAppearance?.bodyFontFamily ?? defaultProseFontFamily,
+      selectionFontSize: rememberedWritingAppearance?.bodyFontSize ?? defaultBodyFontSize,
       codeFontSize: defaultCodeFontSize,
       showLineNumbers: false,
-      documentTheme: "cleanEditorial",
-      readingLayout: "balanced",
+      documentTheme: rememberedWritingAppearance?.documentTheme ?? "cleanEditorial",
+      readingLayout: rememberedWritingAppearance?.readingLayout ?? "balanced",
       structure: defaultDcExportStructure,
     };
   }
@@ -815,6 +826,29 @@ export function createWorkspaceState() {
 
   function cloneSerializableValue<T>(value: T): T {
     return JSON.parse(JSON.stringify($state.snapshot(value))) as T;
+  }
+
+  function currentWritingAppearance(): WritingAppearance {
+    return { bodyFontFamily, bodyFontSize, documentTheme, readingLayout };
+  }
+
+  function rememberCurrentWritingAppearance() {
+    const saved = writeWritingDefaults(draftStorage(), currentWritingAppearance());
+    if (!saved) {
+      writingDefaultsStatus = "error";
+      return;
+    }
+    rememberedWritingAppearance = saved;
+    writingDefaultsStatus = "saved";
+  }
+
+  function forgetWritingAppearance() {
+    if (!clearWritingDefaults(draftStorage())) {
+      writingDefaultsStatus = "error";
+      return;
+    }
+    rememberedWritingAppearance = undefined;
+    writingDefaultsStatus = "cleared";
   }
 
   function cloneDocumentContent(document: JSONContent): JSONContent {
@@ -2699,6 +2733,10 @@ export function createWorkspaceState() {
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
     const handleDraftStorageEvent = (event: StorageEvent) => {
+      if (event.key === writingDefaultsStorageKey || event.key === null) {
+        rememberedWritingAppearance = readWritingDefaults(draftStorage());
+        writingDefaultsStatus = "idle";
+      }
       if (event.key === draftStorageKey && canPersistDraft) {
         observeDraftStorageChange(event.newValue);
       }
@@ -2777,6 +2815,7 @@ export function createWorkspaceState() {
       const extensions = createEditorExtensions();
       const schema = getSchema(extensions);
       const storage = draftStorage();
+      rememberedWritingAppearance = readWritingDefaults(storage);
       const draftRead = storage
         ? readDraftSnapshotWithRecovery(storage, (snapshot) => {
             try {
@@ -2800,6 +2839,8 @@ export function createWorkspaceState() {
         documentJson = cloneDocumentContent(draftRead.snapshot.document);
         applyDraftPreferences(cloneDraftPreferences(draftRead.snapshot.preferences));
         draftPersistence.acceptRemote(observedRaw, draftRead.snapshot);
+      } else {
+        applyDraftPreferences(defaultDraftPreferences());
       }
 
       let resolveCreation!: () => void;
@@ -2959,6 +3000,21 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    rememberCurrentWritingAppearance,
+    forgetWritingAppearance,
+    get rememberedWritingAppearance() {
+      return rememberedWritingAppearance;
+    },
+    get writingDefaultsStatus() {
+      return writingDefaultsStatus;
+    },
+    get areWritingDefaultsCurrent() {
+      return (
+        !!rememberedWritingAppearance &&
+        JSON.stringify(normalizeWritingAppearance(currentWritingAppearance())) ===
+          JSON.stringify(rememberedWritingAppearance)
+      );
+    },
     get selectionToolbarAction() {
       return selectionToolbarAction;
     },
