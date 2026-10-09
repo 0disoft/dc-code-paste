@@ -8,6 +8,8 @@
     import type { RelationAnchor, RelationState } from "#lib/editor/sentence-relations.ts";
     import { readingIntentOptions } from "#lib/editor/reading-intent-format.ts";
     import ReadingExperimentBlock from "./ReadingExperimentBlock.svelte";
+    import ReadingFrontier from "./ReadingFrontier.svelte";
+    import { readingRelationFrontier } from "#lib/editor/reading-frontier.ts";
 
     type Props = {
         hidden?: boolean;
@@ -24,6 +26,7 @@
     let progressive = $state(false);
     let revealed = $state(1);
     let recapOpen = $state(false);
+    let frontierOpen = $state(false);
     let scroller = $state<HTMLElement>();
     let recapButton = $state<HTMLButtonElement>();
     let navigationRevision = 0;
@@ -43,6 +46,8 @@
     const notes = $derived(experiment.notes);
     const options = $derived(experiment.exportOptions);
     const visibleUnits = $derived(progressive ? units.slice(0, revealed) : units);
+    const lastVisibleUnit = $derived(visibleUnits.at(-1));
+    const frontier = $derived(readingRelationFrontier(workspace.sentenceRelations, lastVisibleUnit ? lastVisibleUnit.position + lastVisibleUnit.node.nodeSize : 0));
     const intendedUnits = $derived(units.filter((unit) => unit.intentions.length > 0));
     const notesByUnit = $derived(groupNotesByUnit(units, notes));
     const error = $derived(experiment.error);
@@ -95,6 +100,7 @@
         progressive = true;
         revealed = Math.min(1, units.length);
         recapOpen = false;
+        frontierOpen = false;
         await focusUnit(units[0]?.index, ++navigationRevision);
     }
 
@@ -108,6 +114,34 @@
     function showAll() {
         navigationRevision += 1;
         progressive = false;
+        frontierOpen = false;
+    }
+
+    async function toggleFrontier() {
+        frontierOpen = !frontierOpen;
+        if (!frontierOpen) return;
+        await tick();
+        if (hidden || !progressive || !frontierOpen || !scroller) return;
+        scroller.scrollTop = 0;
+        document.getElementById("reading-frontier-view")?.focus({ preventScroll: true });
+    }
+
+    function remainingUnits(position: number) {
+        const index = units.findIndex((unit) => unit.position + unit.node.nodeSize >= position);
+        return index < 0 ? 0 : Math.max(0, index + 1 - revealed);
+    }
+
+    async function revealThrough(position: number) {
+        if (hidden || !progressive) return;
+        const index = units.findIndex((unit) => unit.position + unit.node.nodeSize >= position);
+        if (index < 0) return;
+        revealed = Math.max(revealed, index + 1);
+        await focusUnit(units[index].index, ++navigationRevision);
+    }
+
+    async function revisitAnchor(anchor: RelationAnchor) {
+        const unit = visibleUnits.find((item) => anchor.from >= item.position && anchor.to <= item.position + item.node.nodeSize);
+        if (unit) await focusUnit(unit.index, ++navigationRevision);
     }
 
     async function removeNote(id: string) {
@@ -146,14 +180,15 @@
                 <button
                     class="ui-btn ui-btn--outline"
                     type="button"
+                    aria-label="다음 구간 펼치기"
                     disabled={revealed >= units.length}
-                    onclick={revealNext}>다음 구간 펼치기</button
+                    onclick={revealNext}><span class="reading-label-wide">다음 구간 펼치기</span><span class="reading-label-compact" aria-hidden="true">다음</span></button
                 >
-                <button class="ui-btn ui-btn--outline" type="button" disabled={!units.length} onclick={startProgressive}
-                    >처음부터 다시 읽기</button
+                <button class="ui-btn ui-btn--outline" type="button" aria-label="처음부터 다시 읽기" disabled={!units.length} onclick={startProgressive}
+                    ><span class="reading-label-wide">처음부터 다시 읽기</span><span class="reading-label-compact" aria-hidden="true">처음부터</span></button
                 >
-                <button class="ui-btn ui-btn--outline" type="button" onclick={showAll}
-                    >전부 펼치기</button
+                <button class="ui-btn ui-btn--outline" type="button" aria-label="전부 펼치기" onclick={showAll}
+                    ><span class="reading-label-wide">전부 펼치기</span><span class="reading-label-compact" aria-hidden="true">전부</span></button
                 >
             {:else}
                 <button class="ui-btn ui-btn--outline" type="button" disabled={!units.length} onclick={startProgressive}
@@ -162,25 +197,30 @@
             {/if}
         </div>
         <div class="reading-notes">
+            {#if progressive}
+                <button class="ui-btn ui-btn--outline" type="button" aria-label="여기까지 나온 연결" aria-expanded={frontierOpen} aria-controls={frontierOpen ? "reading-frontier-view" : undefined} onclick={toggleFrontier}><span class="reading-label-wide">여기까지 나온 연결</span><span class="reading-label-compact" aria-hidden="true">연결</span></button>
+            {/if}
             <button
                 class="ui-btn ui-btn--outline"
                 type="button"
+                aria-label="멈춘 자리 모아보기"
                 aria-expanded={recapOpen}
                 aria-controls="reading-note-recap"
                 bind:this={recapButton}
-                onclick={() => (recapOpen = !recapOpen)}>멈춘 자리 모아보기</button
+                onclick={() => (recapOpen = !recapOpen)}><span class="reading-label-wide">멈춘 자리 모아보기</span><span class="reading-label-compact" aria-hidden="true">멈춘 자리</span></button
             >
             <button
                 class="ui-btn ui-btn--primary"
                 type="button"
                 aria-label="읽어보기 끝내기"
-                onclick={onExit}>읽어보기 끝내기</button
+                onclick={onExit}><span class="reading-label-wide">읽어보기 끝내기</span><span class="reading-label-compact" aria-hidden="true">끝내기</span></button
             >
         </div>
     </div>
 
     <div class="canvas-scroll reading-scroll" bind:this={scroller}>
         <div class="reading-column" style:width={selectedWidth.width}>
+            {#if progressive && frontierOpen}<ReadingFrontier entries={frontier} onNavigate={revisitAnchor} onReveal={revealThrough} remaining={remainingUnits} />{/if}
             {#if recapOpen}
                 <section class="note-recap" id="reading-note-recap" aria-label="멈춘 자리 모아보기">
                     <p class="recap-note">
@@ -319,6 +359,9 @@
         flex-wrap: wrap;
         gap: 8px;
         margin-inline-start: auto;
+    }
+    .reading-label-compact {
+        display: none;
     }
     .reading-scroll {
         padding: 16px;
@@ -494,6 +537,12 @@
         outline-offset: 2px;
     }
     @media (max-width: 600px) {
+        .reading-label-wide {
+            display: none;
+        }
+        .reading-label-compact {
+            display: inline;
+        }
         .reading-head {
             padding: 8px 12px;
         }
