@@ -201,13 +201,13 @@
 
         <button
             class="ui-btn ui-btn--chrome topbar-preview"
-            class:is-active={view === "preview"}
+            class:is-active={readingMode || view === "preview"}
             type="button"
             aria-label={readingMode ? "글쓰기" : view === "editor" ? "미리보기" : "글쓰기"}
-            aria-pressed={view === "preview"}
+            aria-pressed={readingMode || view === "preview"}
             onclick={() => readingMode ? onEndReading() : onSelectView(view === "editor" ? "preview" : "editor")}
         >
-            {#if view === "editor"}<Eye size={17} aria-hidden="true" />{:else}<Type size={17} aria-hidden="true" />{/if}
+            {#if !readingMode && view === "editor"}<Eye size={17} aria-hidden="true" />{:else}<Type size={17} aria-hidden="true" />{/if}
             <span>{readingMode ? "글쓰기" : view === "editor" ? "미리보기" : "글쓰기"}</span>
         </button>
 

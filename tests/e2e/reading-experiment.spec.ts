@@ -93,6 +93,34 @@ for (const mobile of [false, true]) {
     expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("핵심 문장 입니다.");
     expect(await editor.textContent()).toBe(original);
     await expect(editor.locator("strong a, a strong")).toHaveText("핵심 문장");
+    const review = page.getByRole("region", { name: "고칠 때 참고할 읽기 메모", exact: true });
+    await expect(review).toContainText("근거를 먼저 보고 싶다.");
+    await expect(review).toHaveAttribute("data-note-state", "linked");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.type("보충");
+    await expect(review).toHaveAttribute("data-note-state", "changed");
+    await review.getByText("메모를 남긴 구간 보기", { exact: true }).click();
+    await expect(review).toContainText("핵보충심 문장");
+    await review.getByText("메모 당시 원문 보기", { exact: true }).click();
+    await expect(review.locator(".note-part details p")).toHaveText("핵심 문장 입니다.");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`reading-note-edit-${mobile ? "mobile" : "desktop"}.png`),
+    });
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await expect(review).toHaveAttribute("data-note-state", "linked");
+    expect(await editor.textContent()).toBe(original);
+    await review.getByRole("button", { name: "계속 읽어보기", exact: true }).click();
+    await expect(reader).toBeFocused();
+    await expect(review).toBeHidden();
+    await reader.getByRole("button", { name: "읽어보기 끝내기", exact: true }).click();
+    await expect(review).toBeVisible();
+    await review.getByRole("button", { name: "편집 중 읽기 메모 닫기", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await expect(editor).toBeFocused();
   });
 }
 

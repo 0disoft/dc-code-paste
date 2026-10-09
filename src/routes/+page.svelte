@@ -36,6 +36,8 @@
     let relationRequest = $state(0);
     let relationReviewId = $state<string>();
     const relationReview = $derived(workspace.sentenceRelations.find((entry) => entry.relation.id === relationReviewId));
+    let readingNoteReviewId = $state<string>();
+    const readingNoteReview = $derived(workspace.readingExperiment.notes.find((entry) => entry.note.id === readingNoteReviewId));
 
     async function startReading() {
         if (workspace.editorMountState !== "ready") return;
@@ -61,11 +63,26 @@
         restore?.();
     }
 
-    async function onReadingNoteNavigate(anchor: RelationAnchor) {
+    async function onReadingNoteNavigate(anchor: RelationAnchor, noteId: string) {
+        if (!workspace.readingExperiment.notes.some((entry) => entry.note.id === noteId)) return;
         readingMode = false;
         readingReturnPosition = undefined;
+        relationReviewId = undefined;
+        readingNoteReviewId = noteId;
         await onRelationNavigate(anchor);
     }
+
+    async function closeReadingNoteReview() {
+        const restorePosition = captureCanvasPosition();
+        readingNoteReviewId = undefined;
+        await tick();
+        workspace.editor?.view.focus();
+        restorePosition();
+    }
+
+    $effect(() => {
+        if (readingNoteReviewId && !readingNoteReview) readingNoteReviewId = undefined;
+    });
 
     $effect(() => {
         if (readingMode && (workspace.isStoragePanelOpen || workspace.isMarkdownPanelOpen || workspace.isLlmPanelOpen)) {
@@ -84,6 +101,7 @@
         selectWorkspaceView("editor");
         closeRails();
         relationReviewId = id;
+        readingNoteReviewId = undefined;
         await tick();
         if (relationReviewId !== id) return;
         document.getElementById("sentence-relation-review")?.focus({ preventScroll: true });
@@ -152,6 +170,7 @@
             closeRails();
             workspace.isStoragePanelOpen = false;
             relationReviewId = undefined;
+            readingNoteReviewId = undefined;
             readingMode = false;
             readingOpened = false;
             readingReturnPosition = undefined;
@@ -451,7 +470,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0)} />
+            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {readingNoteReview} onReadingNoteClose={closeReadingNoteReview} onRead={startReading} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0) + (readingNoteReview ? 4 : 0)} />
             <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
             {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} />{/if}
 

@@ -12,7 +12,7 @@
     type Props = {
         hidden?: boolean;
         onExit: () => void;
-        onNavigate: (anchor: RelationAnchor) => void;
+        onNavigate: (anchor: RelationAnchor, noteId: string) => void;
     };
 
     let { hidden = false, onExit, onNavigate }: Props = $props();
@@ -214,7 +214,7 @@
                                             type="button"
                                             disabled={part.matches.length !== 1}
                                             aria-label={`읽기 메모 ${noteIndex + 1} 구간 ${partIndex + 1} 원문으로 이동`}
-                                            onclick={() => onNavigate(part.matches[0])}
+                                            onclick={() => onNavigate(part.matches[0], entry.note.id)}
                                             >원문으로 이동</button
                                         >
                                     </div>

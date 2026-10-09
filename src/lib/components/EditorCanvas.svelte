@@ -9,6 +9,8 @@
     import ReadingIntentToolbar from "./ReadingIntentToolbar.svelte";
     import PendingSentenceRelation from "./PendingSentenceRelation.svelte";
     import SentenceRelationReview from "./SentenceRelationReview.svelte";
+    import ReadingNoteReview from "./ReadingNoteReview.svelte";
+    import type { ReadingNoteEntry } from "#lib/editor/reading-notes.ts";
     import type { SentenceRelationEntry, RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
 
@@ -17,12 +19,15 @@
         onSourceRequest?: () => void;
         onRelationRequest?: () => void;
         relationReview?: SentenceRelationEntry;
+        readingNoteReview?: ReadingNoteEntry;
+        onReadingNoteClose: () => void;
+        onRead: () => void;
         onRelationNavigate: (anchor: RelationAnchor) => void;
         onReviewClose: () => void;
         layoutRevision?: number;
     };
 
-    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
+    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, readingNoteReview, onReadingNoteClose, onRead, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
@@ -64,6 +69,7 @@
     <ReadingIntentToolbar hidden={hidden || workspace.editorMountState !== "ready"} {onSourceRequest} {onRelationRequest} {layoutRevision} />
     <PendingSentenceRelation />
     {#if relationReview}<SentenceRelationReview entry={relationReview} onNavigate={onRelationNavigate} onClose={onReviewClose} />{/if}
+    {#if readingNoteReview}<ReadingNoteReview entry={readingNoteReview} onNavigate={onRelationNavigate} onClose={onReadingNoteClose} {onRead} />{/if}
     {#if workspace.editorMountState === "error"}
         <div class="canvas-notice is-error" role="alert">
             <span>편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.</span>
