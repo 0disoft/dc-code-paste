@@ -13,6 +13,7 @@ import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 import { normalizeTableSpan } from "#lib/editor/data-table.ts";
 import { readingIntentAttributes } from "#lib/editor/reading-intent-format.ts";
 import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
+import { relationFreeDocument } from "#lib/editor/relation-free-document.ts";
 import {
   normalizeSentenceSource,
   sentenceSourceAttributes,
@@ -75,6 +76,7 @@ export const dcExportSupportedNodeTypes = new Set([
   "rebuttalBox",
 ]);
 export const dcExportSupportedMarkTypes = new Set([
+  "relationAnchor",
   "sentenceSource",
   "readingIntent",
   "bold",
@@ -2368,7 +2370,12 @@ async function exportDocumentWithBlockCache(
   }
 
   const palette = documentPalette(options);
-  const body = await renderBlockAsync(document, options, { proseTableSafe: true }, cache);
+  const body = await renderBlockAsync(
+    relationFreeDocument(document),
+    options,
+    { proseTableSafe: true },
+    cache,
+  );
   const bodyWithAttribution = options.includeAttribution
     ? `${body}${renderAttributionFooter(options)}`
     : body;

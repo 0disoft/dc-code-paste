@@ -17,6 +17,7 @@ import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 import { SelectedBlockDecoration } from "./block-inspector";
 import { ReadingIntentMark } from "./reading-intent";
 import { SentenceSourceMark } from "./sentence-source";
+import { RelationAnchorMark, SentenceRelationAttributes } from "./sentence-relations";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -138,6 +139,8 @@ export function createEditorExtensions() {
     LinkBox,
     ReadingIntentMark,
     SentenceSourceMark,
+    RelationAnchorMark,
+    SentenceRelationAttributes,
     TextStyle,
     Color,
     FontFamily,
