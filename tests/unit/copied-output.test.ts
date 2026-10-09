@@ -39,6 +39,32 @@ class MemoryStorage {
   }
 }
 
+it("compares published content while ignoring private notes, purpose and anchor-only text splits", () => {
+  const output = createCopiedOutput(
+    document(),
+    preferences,
+    "<p>복사한 문장</p>",
+    "복사한 문장",
+    "preview",
+  )!;
+  const privateDocument = structuredClone(output.draft.document);
+  privateDocument.attrs = { writingPurpose: "목적", readingNotes: [], sentenceRelations: [] };
+  privateDocument.content![0].content = [
+    {
+      type: "text",
+      text: "복사한 ",
+      marks: [{ type: "relationAnchor", attrs: { ids: ["private"] } }],
+    },
+    { type: "text", text: "문장" },
+  ];
+  expect(copiedOutputChanges(output, privateDocument, preferences)).toEqual({
+    content: false,
+    appearance: false,
+  });
+  privateDocument.content![0].content![0].marks!.push({ type: "bold" });
+  expect(copiedOutputChanges(output, privateDocument, preferences).content).toBe(true);
+});
+
 it("preserves exact clipboard bytes and a separate copy of the document without changing drafts", () => {
   const storage = new MemoryStorage();
   const source = document();

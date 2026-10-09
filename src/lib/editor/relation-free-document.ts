@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/core";
 
-/** Keep private connections out of export and rejoin text split only by anchor identities. */
+/** Keep private writing metadata out of export and rejoin text split by anchor identities. */
 export function relationFreeDocument(node: JSONContent): JSONContent {
   const privateMark = node.marks?.some((mark) => mark.type === "relationAnchor");
   const marks = privateMark
@@ -11,7 +11,9 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
   const privateAttribute =
     node.type === "doc" &&
     node.attrs &&
-    ("sentenceRelations" in node.attrs || "readingNotes" in node.attrs);
+    ("sentenceRelations" in node.attrs ||
+      "readingNotes" in node.attrs ||
+      "writingPurpose" in node.attrs);
   if (!privateMark && !childrenChanged && !privateAttribute) return node;
   const result = { ...node };
   if (privateMark) {
@@ -22,6 +24,7 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
     const attrs = { ...node.attrs };
     delete attrs.sentenceRelations;
     delete attrs.readingNotes;
+    delete attrs.writingPurpose;
     if (Object.keys(attrs).length) result.attrs = attrs;
     else delete result.attrs;
   }

@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
+import { relationFreeDocument } from "./relation-free-document.ts";
 import {
   createDraftSnapshot,
   normalizeDraftSnapshot,
@@ -129,7 +130,7 @@ export function copiedOutputChanges(
 }
 
 function documentFingerprint(document: JSONContent) {
-  return JSON.stringify(document, (_key, value) => {
+  return JSON.stringify(relationFreeDocument(document), (_key, value) => {
     if (value?.type !== "sentenceSource" || !value.attrs) return value;
     const attrs = { ...value.attrs };
     delete attrs.reviewKey;

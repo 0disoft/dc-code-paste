@@ -19,6 +19,7 @@ import { ReadingIntentMark } from "./reading-intent";
 import { SentenceSourceMark } from "./sentence-source";
 import { RelationAnchorMark, SentenceRelationAttributes } from "./sentence-relations";
 import { ReadingNoteAttributes } from "./reading-notes.ts";
+import { WritingPurposeAttributes } from "./writing-purpose.ts";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -140,6 +141,7 @@ export function createEditorExtensions() {
     LinkBox,
     ReadingIntentMark,
     ReadingNoteAttributes,
+    WritingPurposeAttributes,
     SentenceSourceMark,
     RelationAnchorMark,
     SentenceRelationAttributes,
