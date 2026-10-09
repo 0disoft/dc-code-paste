@@ -47,6 +47,10 @@
   line-height: var(--editor-prose-line-height, 1.72);
 }
 
+.editor-surface .article-editor [data-source-href] {
+  border-bottom: 1px dotted currentColor;
+}
+
 .editor-surface-dark .article-editor a {
   color: oklch(83.57% 0.141 84.66);
 }

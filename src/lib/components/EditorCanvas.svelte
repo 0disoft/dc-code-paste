@@ -11,9 +11,10 @@
 
     type Props = {
         hidden?: boolean;
+        onSourceRequest?: () => void;
     };
 
-    let { hidden = false }: Props = $props();
+    let { hidden = false, onSourceRequest }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
@@ -52,7 +53,7 @@
 </script>
 
 <div class="canvas-view" hidden={hidden}>
-    <ReadingIntentToolbar {hidden} />
+    <ReadingIntentToolbar {hidden} {onSourceRequest} />
     {#if workspace.editorMountState === "error"}
         <div class="canvas-notice is-error" role="alert">
             <span>편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.</span>

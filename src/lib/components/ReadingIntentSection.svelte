@@ -4,7 +4,7 @@
   import { WORKSPACE_CONTEXT_KEY } from '#lib/state/workspace-context.ts';
   import { readingIntentOptions } from '#lib/editor/reading-intent-format.ts';
 
-  let { compact = false }: { compact?: boolean } = $props();
+  let { compact = false, onSourceRequest }: { compact?: boolean; onSourceRequest?: () => void } = $props();
 
   const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -34,6 +34,9 @@
   {/if}
 
   <div class="reading-intent-controls">
+    {#if compact && onSourceRequest}
+      <button type="button" class="ui-btn ui-btn--outline" aria-label="문장 출처 연결" disabled={!selection.canApply} onpointerdown={handlePointerDown} onclick={onSourceRequest}>출처</button>
+    {/if}
     {#each readingIntentOptions as option (option.value)}
       <button
         type="button"

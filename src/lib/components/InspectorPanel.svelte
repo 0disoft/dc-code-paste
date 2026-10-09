@@ -10,6 +10,7 @@
     import InlineFormatSection from "./InlineFormatSection.svelte";
     import SelectionTextSection from "./SelectionTextSection.svelte";
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
+    import SentenceSourceSection from "./SentenceSourceSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
     import Megaphone from "@lucide/svelte/icons/megaphone";
     import Type from "@lucide/svelte/icons/type";
@@ -19,9 +20,10 @@
         open?: boolean;
         compact?: boolean;
         onBlockAction?: () => void;
+        sourceRequest?: number;
     };
 
-    let { open = true, compact = false, onBlockAction }: Props = $props();
+    let { open = true, compact = false, onBlockAction, sourceRequest = 0 }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -30,6 +32,7 @@
     });
 
     let tab = $state<"selection" | "article">("selection");
+    $effect(() => { if (sourceRequest) tab = "selection"; });
 
     const descriptions: Record<string, string> = {
         summaryBox: "핵심 내용을 요약해 강조하는 블록입니다.",
@@ -182,6 +185,7 @@
             {/if}
 
             <ReadingIntentSection />
+            <SentenceSourceSection onApplied={onBlockAction} />
             <SelectionTextSection />
 
             {#if blockInfo && !["paragraph", "heading", "bulletList", "orderedList"].includes(blockInfo.type) && !workspace.isLinkPanelOpen}

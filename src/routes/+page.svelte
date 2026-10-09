@@ -21,6 +21,16 @@
     let leftRailOpen = $state(false);
     let rightRailOpen = $state(false);
     let compact = $state(false);
+    let sourceRequest = $state(0);
+
+    async function onSourceRequest() {
+        selectWorkspaceView("editor");
+        leftRailOpen = false;
+        rightRailOpen = true;
+        sourceRequest++;
+        await tick();
+        document.getElementById("sentence-source-href")?.focus();
+    }
 
     $effect(() => {
         const version = workspace.documentReplacementVersion;
@@ -256,7 +266,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={activeWorkspaceView !== "editor"} />
+            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} />
             <PreviewCanvas hidden={activeWorkspaceView !== "preview"} />
 
             {#if workspace.codeLineContextMenu}
@@ -289,7 +299,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} {compact} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen} {compact} {sourceRequest} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />

@@ -22,6 +22,11 @@ import {
 import type { ReadingIntent } from "#lib/editor/reading-intent-format.ts";
 import { normalizeReadingLayout, type ReadingLayout } from "#lib/editor/reading-layout.ts";
 import {
+  readSelectionSentenceSource,
+  setSelectionSentenceSource,
+} from "#lib/editor/sentence-source.ts";
+import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
+import {
   documentOutline,
   activeOutlineIndex,
   navigateToBlock,
@@ -2927,6 +2932,16 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get sentenceSourceSelection() {
+      void editorSignal;
+      return readSelectionSentenceSource(editor?.state);
+    },
+    setSentenceSource(source: SentenceSource | null) {
+      if (!editor) return false;
+      const changed = setSelectionSentenceSource(editor, source);
+      if (changed) refreshEditorState(editor);
+      return changed;
+    },
     get readingIntentSelection() {
       void editorSignal;
       return readSelectionReadingIntent(editor?.state);

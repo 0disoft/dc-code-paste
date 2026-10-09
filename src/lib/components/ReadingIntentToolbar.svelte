@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
 
-    let { hidden = false }: { hidden?: boolean } = $props();
+    let { hidden = false, onSourceRequest }: { hidden?: boolean; onSourceRequest?: () => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const selection = $derived(workspace.readingIntentSelection);
     let toolbar = $state<HTMLDivElement>();
@@ -56,7 +56,7 @@
 
 {#if position}
     <div class="reading-intent-toolbar" bind:this={toolbar} role="toolbar" aria-label="선택 문장 읽는 의도" style:left={`${position.left}px`} style:top={`${position.top}px`}>
-        <ReadingIntentSection compact />
+        <ReadingIntentSection compact {onSourceRequest} />
     </div>
 {/if}
 
