@@ -247,6 +247,11 @@
 
             <span class="ui-menu-sep" aria-hidden="true"></span>
 
+            <button class="ui-menu-item" type="button" role="menuitem" aria-label="마지막 복사 결과" disabled={!workspace.lastCopiedOutput} onclick={() => (workspace.isCopiedOutputOpen = true)}>
+                <Clipboard size={16} aria-hidden="true" />
+                <span>마지막 복사 결과</span>
+            </button>
+
             <button
                 class="ui-menu-item"
                 type="button"

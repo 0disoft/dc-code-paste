@@ -220,6 +220,7 @@ describe("workspace preview render lifecycle", () => {
     });
     const setState = vi.fn<(state: WorkspaceCopyState) => void>();
     const setManualHtml = vi.fn<(html: string) => void>();
+    const onCopied = vi.fn<(html: string) => void>();
 
     await copyDcPreview({
       document: document("current"),
@@ -228,9 +229,33 @@ describe("workspace preview render lifecycle", () => {
       isCurrent: () => true,
       setManualHtml,
       setState,
+      onCopied,
     });
     expect(setManualHtml).toHaveBeenLastCalledWith("current-html");
     expect(setState).toHaveBeenLastCalledWith("error");
+    expect(onCopied).not.toHaveBeenCalled();
+  });
+
+  it("records successful clipboard bytes even if editing continues while the write is acknowledged", async () => {
+    vi.mocked(exportDocumentToDcHtml).mockResolvedValue("exact-copied-html");
+    let current = true;
+    vi.mocked(copyDcHtmlWhenReady).mockImplementation(async (pendingHtml) => {
+      await pendingHtml;
+      current = false;
+    });
+    const onCopied = vi.fn<(html: string) => void>();
+    const setState = vi.fn<(state: WorkspaceCopyState) => void>();
+    await copyDcPreview({
+      document: document("original"),
+      exportOptions: options,
+      plainText: "original",
+      isCurrent: () => current,
+      setManualHtml: () => {},
+      setState,
+      onCopied,
+    });
+    expect(onCopied).toHaveBeenCalledExactlyOnceWith("exact-copied-html");
+    expect(setState).toHaveBeenCalledExactlyOnceWith("idle");
   });
 
   it("reports HTML generation failure without offering an empty manual copy", async () => {

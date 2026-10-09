@@ -28,6 +28,16 @@ import {
 import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
 import { createDocumentSourceReader } from "#lib/editor/document-sources.ts";
 import {
+  clearCopiedOutput,
+  copiedOutputChanges,
+  copiedOutputStorageKey,
+  createCopiedOutput,
+  readCopiedOutput,
+  writeCopiedOutput,
+  type CopiedOutput,
+} from "#lib/editor/copied-output.ts";
+import { copyDcHtml, copyPlainText } from "#lib/dc/clipboard.ts";
+import {
   clearWritingDefaults,
   normalizeWritingAppearance,
   readWritingDefaults,
@@ -337,6 +347,11 @@ export function createWorkspaceState() {
 
   let copyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
   let manualCopyHtml = $state("");
+  let lastCopiedOutput = $state<CopiedOutput>();
+  let copiedOutputPersisted = $state(true);
+  let copiedOutputError = $state("");
+  let isCopiedOutputOpen = $state(false);
+  let savedOutputCopyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
   let activeCopyChannel = $state<CopyChannel | null>(null);
 
   let sourceCopyState = $state<"idle" | "copied" | "error" | "render-error">("idle");
@@ -2649,6 +2664,8 @@ export function createWorkspaceState() {
       if (!operation) return;
       const currentDocument = documentJson;
       const currentOptions = exportOptions();
+      const preferences = cloneDraftPreferences(currentDraftPreferences());
+      const plainText = editor?.getText() ?? "";
       const optionsFingerprint = JSON.stringify(currentOptions);
       const isCurrent = () =>
         operation.isCurrent() &&
@@ -2658,7 +2675,11 @@ export function createWorkspaceState() {
         document: currentDocument,
         exportOptions: currentOptions,
         renderDocument: exportSession.exportDocument,
-        plainText: editor?.getText() ?? "",
+        plainText,
+        onCopied(value) {
+          if (operation.isCurrent())
+            rememberCopiedOutput(currentDocument, preferences, value, plainText, "preview");
+        },
         isCurrent,
         setManualHtml(value) {
           if (isCurrent()) manualCopyHtml = value;
@@ -2675,12 +2696,87 @@ export function createWorkspaceState() {
         sourceCopyState = value;
       });
       if (!operation) return;
+      const document = documentJson;
+      const preferences = cloneDraftPreferences(currentDraftPreferences());
+      const plainText = editor?.getText() ?? "";
       await copySourceHtmlText({
         html,
+        onCopied(value) {
+          if (operation.isCurrent())
+            rememberCopiedOutput(document, preferences, value, plainText, "source");
+        },
         setState: operation.setState,
         scheduleReset: operation.scheduleReset,
       });
     });
+  }
+
+  function rememberCopiedOutput(
+    document: JSONContent,
+    preferences: DraftPreferences,
+    html: string,
+    plainText: string,
+    channel: CopiedOutput["channel"],
+  ) {
+    const output = createCopiedOutput(document, preferences, html, plainText, channel);
+    if (!output) return;
+    lastCopiedOutput = output;
+    copiedOutputPersisted = writeCopiedOutput(draftStorage(), output);
+    copiedOutputError = "";
+    savedOutputCopyState = "idle";
+  }
+
+  async function copySavedOutput() {
+    const output = lastCopiedOutput;
+    if (!output) return;
+    return copyTasks.run("saved", async () => {
+      const operation = copyFeedback.begin("saved", (value) => {
+        if (lastCopiedOutput === output) savedOutputCopyState = value;
+      });
+      if (!operation) return;
+      operation.setState("idle");
+      try {
+        if (output.channel === "source") await copyPlainText(output.html);
+        else await copyDcHtml(output.html, output.plainText);
+        operation.setState("copied");
+        operation.scheduleReset(operation.setState, 1300);
+      } catch {
+        operation.setState("error");
+      }
+    });
+  }
+
+  function restoreCopiedOutput() {
+    const output = lastCopiedOutput;
+    if (!output) return;
+    if (!validateStoredDocument(output.draft.document)) {
+      copiedOutputError = storageLoadError;
+      return;
+    }
+    if (
+      !window.confirm(
+        "현재 글을 마지막 복사 당시의 글로 바꿀까요? 현재 글은 초안 기록에 보관합니다.",
+      )
+    )
+      return;
+    if (!checkpointCurrentDraftBeforeReplacement()) {
+      copiedOutputError = "현재 글을 초안 기록에 보관하지 못했습니다. 먼저 파일로 저장해 주세요.";
+      return;
+    }
+    replaceEditorDocument(output.draft.document, output.draft.preferences);
+    draftHistoryController.markBaseline();
+    isCopiedOutputOpen = false;
+    copiedOutputError = "";
+  }
+
+  function forgetCopiedOutput() {
+    if (!clearCopiedOutput(draftStorage())) {
+      copiedOutputError = "복사 기록을 지우지 못했습니다. 브라우저 저장소를 확인해 주세요.";
+      return;
+    }
+    lastCopiedOutput = undefined;
+    isCopiedOutputOpen = false;
+    copiedOutputError = "";
   }
 
   async function copyLlmAuthoringGuide() {
@@ -2733,6 +2829,12 @@ export function createWorkspaceState() {
     const closeFloatingMenus = () => closeCodeLineContextMenu();
     const flushDraftOnPageExit = () => flushScheduledDraftPersist();
     const handleDraftStorageEvent = (event: StorageEvent) => {
+      if (event.key === copiedOutputStorageKey || event.key === null) {
+        lastCopiedOutput = readCopiedOutput(draftStorage());
+        copiedOutputPersisted = true;
+        copiedOutputError = "";
+        savedOutputCopyState = "idle";
+      }
       if (event.key === writingDefaultsStorageKey || event.key === null) {
         rememberedWritingAppearance = readWritingDefaults(draftStorage());
         writingDefaultsStatus = "idle";
@@ -2815,6 +2917,7 @@ export function createWorkspaceState() {
       const extensions = createEditorExtensions();
       const schema = getSchema(extensions);
       const storage = draftStorage();
+      lastCopiedOutput = readCopiedOutput(storage);
       rememberedWritingAppearance = readWritingDefaults(storage);
       const draftRead = storage
         ? readDraftSnapshotWithRecovery(storage, (snapshot) => {
@@ -2982,7 +3085,7 @@ export function createWorkspaceState() {
   });
 
   $effect(() => {
-    if (!previewVisible) return;
+    if (!previewVisible && !isCopiedOutputOpen) return;
     schedulePreviewRender(documentJson, exportOptions());
     return clearScheduledPreviewRender;
   });
@@ -3000,6 +3103,32 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    copySavedOutput,
+    restoreCopiedOutput,
+    forgetCopiedOutput,
+    get lastCopiedOutput() {
+      return lastCopiedOutput;
+    },
+    get copiedOutputPersisted() {
+      return copiedOutputPersisted;
+    },
+    get copiedOutputError() {
+      return copiedOutputError;
+    },
+    get savedOutputCopyState() {
+      return savedOutputCopyState;
+    },
+    get copiedOutputChanges() {
+      return lastCopiedOutput
+        ? copiedOutputChanges(lastCopiedOutput, documentJson, currentDraftPreferences())
+        : undefined;
+    },
+    get isCopiedOutputOpen() {
+      return isCopiedOutputOpen;
+    },
+    set isCopiedOutputOpen(value) {
+      isCopiedOutputOpen = value;
+    },
     rememberCurrentWritingAppearance,
     forgetWritingAppearance,
     get rememberedWritingAppearance() {

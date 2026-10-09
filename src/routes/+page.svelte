@@ -12,6 +12,7 @@
     import EditorCanvas from "#lib/components/EditorCanvas.svelte";
     import PreviewCanvas from "#lib/components/PreviewCanvas.svelte";
     import CopyRecovery from "#lib/components/CopyRecovery.svelte";
+    import CopiedOutputDialog from "#lib/components/CopiedOutputDialog.svelte";
 
     type WorkspaceView = "editor" | "preview";
 
@@ -310,6 +311,7 @@
     </div>
 
     <CopyRecovery />
+    <CopiedOutputDialog />
 </div>
 
 <style>

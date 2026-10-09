@@ -17,6 +17,7 @@ type PreviewRendererOptions = {
 
 type CopyStateOptions = {
   setState: (state: WorkspaceCopyState) => void;
+  onCopied?: (html: string) => void;
   resetDelayMs?: number;
   scheduleReset?: (setState: (state: WorkspaceCopyState) => void, delayMs: number) => void;
 };
@@ -54,7 +55,7 @@ function scheduleCopiedStateReset({
   }, resetDelayMs);
 }
 
-export type CopyChannel = "preview" | "source" | "guide";
+export type CopyChannel = "preview" | "source" | "guide" | "saved";
 
 /** Clipboard writes from all entry points share one in-flight task. */
 export function createCopyTaskController(publish: (channel: CopyChannel | null) => void) {
@@ -80,7 +81,7 @@ export function createCopyTaskController(publish: (channel: CopyChannel | null) 
 }
 
 export function createCopyFeedbackController() {
-  const turns: Record<CopyChannel, number> = { preview: 0, source: 0, guide: 0 };
+  const turns: Record<CopyChannel, number> = { preview: 0, source: 0, guide: 0, saved: 0 };
   const resetTimers = new Map<CopyChannel, ReturnType<typeof setTimeout>>();
   let disposed = false;
 
@@ -116,7 +117,7 @@ export function createCopyFeedbackController() {
 
   function dispose() {
     disposed = true;
-    for (const channel of ["preview", "source", "guide"] as const) {
+    for (const channel of ["preview", "source", "guide", "saved"] as const) {
       turns[channel] += 1;
       clearReset(channel);
     }
@@ -206,6 +207,7 @@ export async function copyDcPreview({
   setState,
   resetDelayMs,
   scheduleReset,
+  onCopied,
 }: CopyDcPreviewOptions) {
   setState("idle");
   setManualHtml("");
@@ -222,6 +224,7 @@ export async function copyDcPreview({
 
   try {
     await copyDcHtmlWhenReady(copyHtmlPromise, plainText);
+    onCopied?.(completedHtml);
     if (isCurrent()) {
       setState("copied");
       scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
@@ -244,11 +247,13 @@ export async function copySourceHtml({
   setState,
   resetDelayMs,
   scheduleReset,
+  onCopied,
 }: CopySourceHtmlOptions) {
   setState("idle");
 
   try {
     await copyPlainText(html);
+    onCopied?.(html);
     setState("copied");
     scheduleCopiedStateReset({ setState, resetDelayMs, scheduleReset });
   } catch {
