@@ -1,6 +1,12 @@
 import type { Transaction } from "@tiptap/pm/state";
 
-export const privateDocumentAttributes = ["sentenceRelations", "readingNotes", "writingPurpose"];
+export const privateDocumentAttributes = [
+  "sentenceRelations",
+  "readingNotes",
+  "writingPurpose",
+  "thoughtFragments",
+];
+export const privateNodeAttributes = ["thoughtFragmentAnchors"];
 
 /** Metadata-only transactions must not append the editor's empty insertion paragraph. */
 export function changesOnlyPrivateWritingMetadata(transactions: readonly Transaction[]): boolean {
@@ -10,6 +16,7 @@ export function changesOnlyPrivateWritingMetadata(transactions: readonly Transac
       changed = true;
       const data = step.toJSON();
       if (data.stepType === "docAttr" && privateDocumentAttributes.includes(data.attr)) continue;
+      if (data.stepType === "attr" && privateNodeAttributes.includes(data.attr)) continue;
       if (
         (data.stepType === "addMark" || data.stepType === "removeMark") &&
         data.mark?.type === "relationAnchor"

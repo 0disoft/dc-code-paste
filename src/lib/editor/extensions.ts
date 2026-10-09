@@ -21,6 +21,7 @@ import { RelationAnchorMark, SentenceRelationAttributes } from "./sentence-relat
 import { ReadingNoteAttributes } from "./reading-notes.ts";
 import { WritingPurposeAttributes } from "./writing-purpose.ts";
 import { changesOnlyPrivateWritingMetadata } from "./private-writing-metadata.ts";
+import { ThoughtFragmentAttributes } from "./thought-fragments.ts";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -146,6 +147,7 @@ export function createEditorExtensions() {
     ReadingIntentMark,
     ReadingNoteAttributes,
     WritingPurposeAttributes,
+    ThoughtFragmentAttributes,
     SentenceSourceMark,
     RelationAnchorMark,
     SentenceRelationAttributes,

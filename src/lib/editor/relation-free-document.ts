@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { privateDocumentAttributes } from "./private-writing-metadata.ts";
+import { privateDocumentAttributes, privateNodeAttributes } from "./private-writing-metadata.ts";
 
 /** Keep private writing metadata out of export and rejoin text split by anchor identities. */
 export function relationFreeDocument(node: JSONContent): JSONContent {
@@ -10,10 +10,8 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
   const content = node.content?.map(relationFreeDocument);
   const childrenChanged = content?.some((child, index) => child !== node.content![index]);
   const attributes = node.attrs;
-  const privateAttribute =
-    node.type === "doc" &&
-    attributes &&
-    privateDocumentAttributes.some((name) => name in attributes);
+  const privateNames = node.type === "doc" ? privateDocumentAttributes : privateNodeAttributes;
+  const privateAttribute = attributes && privateNames.some((name) => name in attributes);
   if (!privateMark && !childrenChanged && !privateAttribute) return node;
   const result = { ...node };
   if (privateMark) {
@@ -22,7 +20,7 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
   }
   if (privateAttribute) {
     const attrs = { ...node.attrs };
-    for (const name of privateDocumentAttributes) delete attrs[name];
+    for (const name of privateNames) delete attrs[name];
     if (Object.keys(attrs).length) result.attrs = attrs;
     else delete result.attrs;
   }
