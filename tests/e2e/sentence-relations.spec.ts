@@ -182,6 +182,43 @@ test("connects a multi-paragraph endpoint and navigates each part", async ({ pag
   await expect(card.getByRole("button", { name: /^처음 선택한 구간 \d 이동$/ })).toHaveCount(2);
   await card.getByRole("button", { name: "처음 선택한 구간 2 이동", exact: true }).click();
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("둘째 문장");
+  await relations(page);
+  await card.getByRole("button", { name: "문장 관계 1 나란히 보기", exact: true }).click();
+  const review = page.getByRole("region", { name: "연결 구간 나란히 보기", exact: true });
+  await expect(review).toContainText("첫 문장");
+  await expect(review).toContainText("둘째 문장");
+  await expect(review).toContainText("다른 의견");
+  await review
+    .getByRole("button", { name: "처음 선택한 구간 2 비교에서 이동", exact: true })
+    .click();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("둘째 문장");
+  await blockAction(page, "블록 복제");
+  await expect(review).toContainText("연결 당시 원문");
+  await expect(
+    review.getByRole("button", { name: "처음 선택한 구간 2 비교에서 이동", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    review.getByRole("button", { name: "처음 선택한 구간 1 비교에서 이동", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+  await expect(
+    review.getByRole("button", { name: "처음 선택한 구간 2 비교에서 이동", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitemcheckbox", { name: "집중해서 쓰기", exact: true }).click();
+  await expect(review).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 568 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(
+    await page
+      .locator(".canvas-view:not([hidden]) .canvas-scroll")
+      .evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeGreaterThan(100);
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+  await page.getByLabel("Markdown 원문").fill("# 新 글\n\n다른 문장");
+  await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+  await expect(review).toHaveCount(0);
 });
 
 test("cancels uncommitted connections and refuses a first passage changed during selection", async ({
@@ -212,3 +249,115 @@ test("cancels uncommitted connections and refuses a first passage changed during
   const list = await relations(page);
   await expect(list.getByRole("article")).toHaveCount(0);
 });
+
+for (const mobile of [false, true]) {
+  test(`compares distant passages while editing without changing output on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1280, height: 900 });
+    await page.addInitScript(() => {
+      (window as ClipboardWindow).copiedDocuments = [];
+      Object.defineProperty(navigator, "clipboard", {
+        value: {
+          write: async (items: ClipboardItem[]) => {
+            (window as ClipboardWindow).copiedDocuments.push(
+              await (await items[0].getType("text/html")).text(),
+            );
+          },
+        },
+      });
+    });
+    await setup(
+      page,
+      `# 함께 읽는 구간\n\n**[처음 문장](https://example.com/original)**\n\n${Array.from({ length: 12 }, (_, index) => `사이 문단 ${index + 1}`).join("\n\n")}\n\n멀리 떨어진 조건`,
+    );
+    await begin(page, 0);
+    await select(page, 13);
+    await page.getByRole("button", { name: "선택한 구간 연결", exact: true }).click();
+    await expect(page.locator(".topbar-status")).toContainText("저장됨");
+    await page.reload();
+    const editor = page.locator(".article-editor");
+    const original = await editor.textContent();
+    const copy = page.locator('[data-copy-trigger="preview"]');
+    await copy.click();
+    await expect
+      .poll(() => page.evaluate(() => (window as ClipboardWindow).copiedDocuments.length))
+      .toBe(1);
+    const html = await page.evaluate(() => (window as ClipboardWindow).copiedDocuments[0]);
+    const list = await relations(page);
+    const open = list.getByRole("button", { name: "문장 관계 1 나란히 보기", exact: true });
+    await open.focus();
+    await page.keyboard.press("Enter");
+    const review = page.getByRole("region", { name: "연결 구간 나란히 보기", exact: true });
+    await expect(review).toBeFocused();
+    await expect(review).toContainText("처음 문장");
+    await expect(review).toContainText("멀리 떨어진 조건");
+    if (mobile)
+      await expect(
+        page.getByRole("complementary", { name: "블록 삽입", exact: true }),
+      ).toBeHidden();
+    expect(await editor.textContent()).toBe(original);
+    await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeDisabled();
+    expect(
+      await page
+        .locator(".canvas-view:not([hidden]) .canvas-scroll")
+        .evaluate((element) => element.getBoundingClientRect().height),
+    ).toBeGreaterThan(120);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await copy.click();
+    await expect
+      .poll(() => page.evaluate(() => (window as ClipboardWindow).copiedDocuments.length))
+      .toBe(2);
+    expect(await page.evaluate(() => (window as ClipboardWindow).copiedDocuments[1])).toBe(html);
+    await review.getByRole("button", { name: "조건 구간 1 비교에서 이동", exact: true }).click();
+    await expect(editor).toBeFocused();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("멀리 떨어진 조건");
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.insertText("고친 ");
+    const edited = await editor.locator("p").last().textContent();
+    await expect(review).toContainText(edited!);
+    await expect(review).toContainText("바뀌었습니다");
+    await page.screenshot({
+      path: testInfo.outputPath(`sentence-relation-review-${mobile ? "mobile" : "desktop"}.png`),
+    });
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    expect(await editor.textContent()).toBe(original);
+    await expect(review).not.toContainText("바뀌었습니다");
+    await review
+      .getByRole("button", { name: "처음 선택한 구간 1 비교에서 이동", exact: true })
+      .click();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("처음 문장");
+    await review.getByRole("button", { name: "연결 구간 비교 닫기", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await expect(editor).toBeFocused();
+    expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("처음 문장");
+    await expect(editor.locator("p").first().locator("a")).toHaveAttribute(
+      "href",
+      "https://example.com/original",
+    );
+    await expect(editor.locator("p").first().locator("strong")).toHaveText("처음 문장");
+    await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeDisabled();
+    await relations(page);
+    await open.click();
+    await page.reload();
+    await expect(review).toHaveCount(0);
+    await relations(page);
+    await open.click();
+    await review.getByRole("button", { name: "조건 구간 1 비교에서 이동", exact: true }).click();
+    await blockAction(page, "블록 삭제");
+    await expect(review).toContainText("연결 당시 원문");
+    await expect(review).toContainText("멀리 떨어진 조건");
+    await expect(
+      review.getByRole("button", { name: "조건 구간 1 비교에서 이동", exact: true }),
+    ).toBeDisabled();
+    await relations(page);
+    await list.getByRole("button", { name: "문장 관계 1 해제", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await expect(review).toHaveCount(0);
+    await expect(list.getByRole("article")).toHaveCount(1);
+  });
+}

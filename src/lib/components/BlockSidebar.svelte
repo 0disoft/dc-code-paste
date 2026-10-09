@@ -43,9 +43,10 @@
         onNavigate: (index: number) => void;
         onPassageNavigate: (passage: ReadingPassage) => void;
         onRelationNavigate: (anchor: RelationAnchor) => void;
+        onRelationCompare: (id: string) => void;
     };
 
-    let { open = true, compact = false, onInsert, onNavigate, onPassageNavigate, onRelationNavigate }: Props = $props();
+    let { open = true, compact = false, onInsert, onNavigate, onPassageNavigate, onRelationNavigate, onRelationCompare }: Props = $props();
 
     let tab = $state<"blocks" | "templates" | "outline">("blocks");
     let query = $state("");
@@ -222,7 +223,7 @@
         </div>
     {:else}
         <div id="outline-tabpanel" class="rail-scroll" role="tabpanel" aria-labelledby="outline-tab">
-            <DocumentOutline {onNavigate} {onPassageNavigate} {onRelationNavigate} />
+            <DocumentOutline {onNavigate} {onPassageNavigate} {onRelationNavigate} {onRelationCompare} />
         </div>
     {/if}
 </aside>

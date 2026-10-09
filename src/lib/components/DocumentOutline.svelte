@@ -8,7 +8,7 @@
     import SentenceRelationsList from "./SentenceRelationsList.svelte";
     import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
 
-    let { onNavigate, onPassageNavigate, onRelationNavigate }: { onNavigate: (index: number) => void; onPassageNavigate: (passage: ReadingPassage) => void; onRelationNavigate: (anchor: RelationAnchor) => void } = $props();
+    let { onNavigate, onPassageNavigate, onRelationNavigate, onRelationCompare }: { onNavigate: (index: number) => void; onPassageNavigate: (passage: ReadingPassage) => void; onRelationNavigate: (anchor: RelationAnchor) => void; onRelationCompare: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let query = $state("");
     let route = $state<"all" | "relations" | ReadingIntent>("all");
@@ -18,7 +18,7 @@
 
 <label class="ui-field path-selector"><span class="ui-label">읽기 경로</span><select class="ui-select" aria-label="읽기 경로" bind:value={route}><option value="all">전체 글</option><option value="relations">문장 관계</option>{#each readingIntentOptions as item (item.value)}<option value={item.value}>{item.label}</option>{/each}</select></label>
 {#if route === "relations"}
-    <SentenceRelationsList entries={workspace.sentenceRelations} onNavigate={onRelationNavigate} />
+    <SentenceRelationsList entries={workspace.sentenceRelations} onNavigate={onRelationNavigate} onCompare={onRelationCompare} />
 {:else if route !== "all"}
     <ReadingPath intent={route} onNavigate={onPassageNavigate} />
 {:else}

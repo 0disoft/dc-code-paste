@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import type { RelationAnchor, SentenceRelationEntry, RelationState } from "#lib/editor/sentence-relations.ts";
     import { sentenceRelationKinds } from "#lib/editor/sentence-relations-format.ts";
-    let { entries, onNavigate, onRemoved, label = "문장 관계 목록" }: { entries: SentenceRelationEntry[]; onNavigate: (anchor: RelationAnchor) => void; onRemoved?: () => void; label?: string } = $props();
+    let { entries, onNavigate, onCompare, onRemoved, label = "문장 관계 목록" }: { entries: SentenceRelationEntry[]; onNavigate: (anchor: RelationAnchor) => void; onCompare: (id: string) => void; onRemoved?: () => void; label?: string } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let list = $state<HTMLElement>();
     const messages: Record<RelationState, string> = {
@@ -27,6 +27,7 @@
         <article class="relation-item" data-relation-state={entry.state} aria-label={`${kind} 관계 ${index + 1}`}>
             <div class="relation-head"><strong>{kind}</strong><span>{entry.state === "linked" ? "연결됨" : "다시 확인"}</span></div>
             {#if entry.state !== "linked"}<p class="relation-status" role="status">{messages[entry.state]}</p>{/if}
+            <button class="ui-btn ui-btn--outline" type="button" aria-label={`문장 관계 ${index + 1} 나란히 보기`} onclick={() => onCompare(entry.relation.id)}>두 구간 나란히 보기</button>
             {#each [{ label: "처음 선택한 구간", endpoint: entry.claim }, { label: `${kind} 구간`, endpoint: entry.related }] as side (side.label)}
                 <div class="relation-side">
                     <h3>{side.label}</h3>

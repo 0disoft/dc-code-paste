@@ -5,7 +5,7 @@
     import { sentenceRelationKinds, type SentenceRelationKind } from "#lib/editor/sentence-relations-format.ts";
     import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import SentenceRelationsList from "./SentenceRelationsList.svelte";
-    let { request = 0, onApplied, onNavigate }: { request?: number; onApplied?: () => void; onNavigate: (anchor: RelationAnchor) => void } = $props();
+    let { request = 0, onApplied, onNavigate, onCompare }: { request?: number; onApplied?: () => void; onNavigate: (anchor: RelationAnchor) => void; onCompare: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let open = $state(false);
     let kind = $state<SentenceRelationKind>("condition");
@@ -22,7 +22,7 @@
         <label class="ui-field"><span class="ui-label">연결할 관계</span><select class="ui-select" id="sentence-relation-kind" aria-label="연결할 관계" bind:value={kind} disabled={!!workspace.pendingSentenceRelation}>{#each sentenceRelationKinds as item (item.value)}<option value={item.value}>{item.label}</option>{/each}</select></label>
         <button class="ui-btn ui-btn--outline" type="button" disabled={!selection || !!workspace.pendingSentenceRelation} onclick={begin}>연결 시작</button>
         <p class="ui-hint">구간마다 8,000자까지 선택할 수 있습니다. 코드는 제외합니다.</p>
-        <SentenceRelationsList entries={workspace.selectedSentenceRelations} {onNavigate} onRemoved={onApplied} label="선택한 구간의 관계" />
+        <SentenceRelationsList entries={workspace.selectedSentenceRelations} {onNavigate} {onCompare} onRemoved={onApplied} label="선택한 구간의 관계" />
     </section>
 </details>
 

@@ -29,6 +29,32 @@
     const drawerMode = $derived(compact || focusMode);
     let sourceRequest = $state(0);
     let relationRequest = $state(0);
+    let relationReviewId = $state<string>();
+    const relationReview = $derived(workspace.sentenceRelations.find((entry) => entry.relation.id === relationReviewId));
+
+    $effect(() => {
+        if (relationReviewId && !relationReview) relationReviewId = undefined;
+    });
+
+    async function onRelationCompare(id: string) {
+        if (!workspace.sentenceRelations.some((entry) => entry.relation.id === id)) return;
+        const restorePosition = captureCanvasPosition();
+        selectWorkspaceView("editor");
+        closeRails();
+        relationReviewId = id;
+        await tick();
+        if (relationReviewId !== id) return;
+        document.getElementById("sentence-relation-review")?.focus({ preventScroll: true });
+        restorePosition();
+    }
+
+    async function closeRelationReview() {
+        const restorePosition = captureCanvasPosition();
+        relationReviewId = undefined;
+        await tick();
+        workspace.editor?.view.focus();
+        restorePosition();
+    }
 
     async function onSourceRequest() {
         selectWorkspaceView("editor");
@@ -83,6 +109,7 @@
             selectWorkspaceView("editor");
             closeRails();
             workspace.isStoragePanelOpen = false;
+            relationReviewId = undefined;
             void tick().then(() => {
                 if (workspace.documentReplacementVersion === version) workspace.editor?.commands.focus("start");
             });
@@ -283,7 +310,7 @@
     {/if}
 
     <div class="app-body">
-        <BlockSidebar open={leftRailOpen} compact={drawerMode} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} {onRelationNavigate} />
+        <BlockSidebar open={leftRailOpen} compact={drawerMode} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} {onRelationNavigate} {onRelationCompare} />
 
         <section class="canvas" aria-label="글쓰기 작업 영역" inert={drawerMode && (leftRailOpen || rightRailOpen)}>
             {#if workspace.isStoragePanelOpen ||
@@ -373,7 +400,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} layoutRevision={focusMode ? 1 : 0} />
+            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0)} />
             <PreviewCanvas hidden={activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
 
             {#if workspace.codeLineContextMenu}
@@ -406,7 +433,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {relationRequest} {onSourceNavigate} {onRelationNavigate} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {relationRequest} {onSourceNavigate} {onRelationNavigate} {onRelationCompare} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />

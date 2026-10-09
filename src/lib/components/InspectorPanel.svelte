@@ -27,10 +27,11 @@
         sourceRequest?: number;
         relationRequest?: number;
         onRelationNavigate: (anchor: RelationAnchor) => void;
+        onRelationCompare: (id: string) => void;
         onSourceNavigate?: (href: string, from: number, to: number) => void;
     };
 
-    let { open = true, compact = false, onBlockAction, sourceRequest = 0, relationRequest = 0, onSourceNavigate, onRelationNavigate }: Props = $props();
+    let { open = true, compact = false, onBlockAction, sourceRequest = 0, relationRequest = 0, onSourceNavigate, onRelationNavigate, onRelationCompare }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -192,7 +193,7 @@
 
             {/if}
 
-            <SentenceRelationSection request={relationRequest} onApplied={onBlockAction} onNavigate={onRelationNavigate} />
+            <SentenceRelationSection request={relationRequest} onApplied={onBlockAction} onNavigate={onRelationNavigate} onCompare={onRelationCompare} />
             <ReadingIntentSection />
             <SentenceSourceSection onApplied={onBlockAction} />
             <SelectionTextSection />

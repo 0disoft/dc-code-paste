@@ -8,16 +8,21 @@
     import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
     import ReadingIntentToolbar from "./ReadingIntentToolbar.svelte";
     import PendingSentenceRelation from "./PendingSentenceRelation.svelte";
+    import SentenceRelationReview from "./SentenceRelationReview.svelte";
+    import type { SentenceRelationEntry, RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
 
     type Props = {
         hidden?: boolean;
         onSourceRequest?: () => void;
         onRelationRequest?: () => void;
+        relationReview?: SentenceRelationEntry;
+        onRelationNavigate: (anchor: RelationAnchor) => void;
+        onReviewClose: () => void;
         layoutRevision?: number;
     };
 
-    let { hidden = false, onSourceRequest, onRelationRequest, layoutRevision = 0 }: Props = $props();
+    let { hidden = false, onSourceRequest, onRelationRequest, relationReview, onRelationNavigate, onReviewClose, layoutRevision = 0 }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const colors = $derived(documentTextColors[workspace.documentTheme]);
@@ -58,6 +63,7 @@
 <div class="canvas-view" hidden={hidden}>
     <ReadingIntentToolbar hidden={hidden || workspace.editorMountState !== "ready"} {onSourceRequest} {onRelationRequest} {layoutRevision} />
     <PendingSentenceRelation />
+    {#if relationReview}<SentenceRelationReview entry={relationReview} onNavigate={onRelationNavigate} onClose={onReviewClose} />{/if}
     {#if workspace.editorMountState === "error"}
         <div class="canvas-notice is-error" role="alert">
             <span>편집기를 열지 못했습니다. 저장된 초안은 그대로 있습니다.</span>

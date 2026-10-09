@@ -59,8 +59,10 @@
         }
         const start = current.view.coordsAtPos(current.state.selection.from);
         const end = current.view.coordsAtPos(current.state.selection.to);
-        const canvas = current.view.dom.closest(".canvas-view")?.getBoundingClientRect();
-        const headerBottom = Math.max(canvas?.top ?? 0, document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0);
+        const view = current.view.dom.closest(".canvas-view");
+        const canvas = view?.getBoundingClientRect();
+        const scroll = view?.querySelector(".canvas-scroll")?.getBoundingClientRect();
+        const headerBottom = Math.max(scroll?.top ?? canvas?.top ?? 0, document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 0);
         const bottom = Math.min(canvas?.bottom ?? window.innerHeight, window.innerHeight);
         const left = Math.max(0, canvas?.left ?? 0);
         const right = Math.min(window.innerWidth, canvas?.right ?? window.innerWidth);
@@ -115,7 +117,11 @@
         window.addEventListener("keydown", handleEscape, true);
         window.addEventListener("resize", updatePosition);
         window.addEventListener("scroll", updatePosition, true);
+        const scroller = document.querySelector(".canvas-view .canvas-scroll");
+        const observer = new ResizeObserver(updatePosition);
+        if (scroller) observer.observe(scroller);
         return () => {
+            observer.disconnect();
             window.removeEventListener("keydown", handleEscape, true);
             window.removeEventListener("resize", updatePosition);
             window.removeEventListener("scroll", updatePosition, true);
