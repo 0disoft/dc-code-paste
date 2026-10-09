@@ -92,7 +92,7 @@
             {#if !entries.length}<p class="fragments-hint">아직 보관한 조각이 없습니다.</p>{/if}
             {#if entries.length && !matches.length}<p class="fragments-hint">조건에 맞는 조각이 없습니다. 검색어나 보기 조건을 바꿔 보세요.</p>{/if}
             <div class="fragments-list">
-                {#each entries as entry, index (entry.fragment.id)}<div class="fragment-slot" hidden={!visibleIds.has(entry.fragment.id)}><ThoughtFragmentCard {entry} {index} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} /></div>{/each}
+                {#each entries as entry, index (entry.fragment.id)}<div class="fragment-slot" hidden={!visibleIds.has(entry.fragment.id)}><ThoughtFragmentCard {entry} {index} visible={visibleIds.has(entry.fragment.id)} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} /></div>{/each}
             </div>
         </div>
     {/if}

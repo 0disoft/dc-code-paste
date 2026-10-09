@@ -456,3 +456,76 @@ for (const mobile of [false, true]) {
     expect(await copied(page, 2)).toBe(html);
   });
 }
+
+test("renders only expanded usage details while keeping large histories searchable and edits intact", async ({
+  page,
+}) => {
+  await setup(page);
+  const original = await page.locator(".article-editor").textContent();
+  const originalHtml = await copied(page, 1);
+  await page.evaluate(() => {
+    const key = "dc-code-paste:draft:v1";
+    const snapshot = JSON.parse(localStorage.getItem(key)!);
+    snapshot.document.attrs = {
+      ...snapshot.document.attrs,
+      thoughtFragments: Array.from({ length: 16 }, (_, fragment) => ({
+        id: `fixture-fragment-${fragment}`,
+        text: `보관 조각 ${fragment + 1}`,
+        createdAt: new Date().toISOString(),
+        uses: Array.from({ length: 8 }, (_, use) => ({
+          id: `fixture-use-${fragment}-${use}`,
+          kind: "prose",
+          parts: Array.from({ length: 128 }, (_, part) => ({
+            id: `fixture-part-${fragment}-${use}-${part}`,
+            text:
+              fragment === 0 && use === 0 && part === 0
+                ? "원래 문장"
+                : `기록 ${fragment + 1}-${use + 1}-${part + 1}`,
+          })),
+        })),
+      })),
+    };
+    const first = snapshot.document.content.find(
+      (node: { type: string }) => node.type === "paragraph",
+    );
+    first.attrs = { ...first.attrs, thoughtFragmentAnchors: ["fixture-part-0-0-0"] };
+    snapshot.updatedAt = new Date().toISOString();
+    localStorage.setItem(key, JSON.stringify(snapshot));
+  });
+  await page.reload();
+  const editor = page.locator(".article-editor");
+  await expect(editor).toContainText("생각을 담는 글");
+  const dialog = await openFragments(page);
+  await expect(dialog.getByRole("article")).toHaveCount(16);
+  await expect(dialog.locator(".fragment-part")).toHaveCount(0);
+  const first = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
+  const toggle = first.getByText("넣은 자리 보기", { exact: true });
+  await toggle.click();
+  await expect(dialog.locator(".fragment-part")).toHaveCount(1024);
+  await expect(first.locator(".fragment-use")).toHaveCount(8);
+  await expect(
+    first.getByRole("button", { name: "조각 1 넣은 자리 1 구간 1 이동", exact: true }),
+  ).toBeEnabled();
+  await toggle.click();
+  await expect(dialog.locator(".fragment-part")).toHaveCount(0);
+  await toggle.click();
+  await first.getByRole("button", { name: "조각 수정", exact: true }).click();
+  const edit = first.getByLabel("보관할 조각 내용", { exact: true });
+  await edit.fill("저장 전 입력 유지");
+  const search = dialog.getByRole("searchbox", { name: "생각 조각 검색", exact: true });
+  await search.fill("기록 16-8-128");
+  await expect(dialog.getByRole("article")).toHaveCount(1);
+  await expect(dialog.getByRole("article", { name: "생각 조각 16", exact: true })).toBeVisible();
+  await expect(dialog.locator(".fragment-part")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "검색 조건 지우기", exact: true }).click();
+  await expect(edit).toHaveValue("저장 전 입력 유지");
+  await expect(first.locator(".fragment-uses")).toHaveAttribute("open", "");
+  await expect(dialog.locator(".fragment-part")).toHaveCount(1024);
+  await first.getByRole("button", { name: "조각 수정 취소", exact: true }).click();
+  await first.getByRole("button", { name: "조각 1 넣은 자리 1 구간 1 이동", exact: true }).click();
+  await expect(editor).toBeFocused();
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("원래 문장");
+  expect(await editor.textContent()).toBe(original);
+  await expect(page.getByRole("button", { name: "실행 취소", exact: true })).toBeDisabled();
+  expect(await copied(page, 1)).toBe(originalHtml);
+});

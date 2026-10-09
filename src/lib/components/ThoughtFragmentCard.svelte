@@ -3,15 +3,17 @@
     import type { ThoughtFragmentEntry } from "#lib/editor/thought-fragments.ts";
     import { maxThoughtFragmentLength } from "#lib/editor/thought-fragments-format.ts";
     import { thoughtFragmentNeedsReview } from "#lib/editor/thought-fragment-query.ts";
-    let { entry, index, onUpdate, onRemove, onInsert, onNavigate }: {
+    let { entry, index, visible = true, onUpdate, onRemove, onInsert, onNavigate }: {
         entry: ThoughtFragmentEntry;
         index: number;
+        visible?: boolean;
         onUpdate: (id: string, text: string, expected: string) => boolean;
         onRemove: (id: string) => void;
         onInsert: (id: string, kind: "prose" | "code") => void;
         onNavigate: (id: string) => void;
     } = $props();
     let editing = $state(false);
+    let usesOpen = $state(false);
     let draft = $state("");
     let baseline = "";
     let field = $state<HTMLTextAreaElement>();
@@ -42,7 +44,8 @@
         <button class="ui-btn ui-btn--outline" type="button" onclick={() => onRemove(entry.fragment.id)}>조각 삭제</button>
     </div>
     {#if entry.uses.length}
-        <details class="fragment-uses"><summary>넣은 자리 보기</summary>
+        <details class="fragment-uses" bind:open={usesOpen}><summary>넣은 자리 보기</summary>
+            {#if usesOpen && visible}
             {#each entry.uses as useEntry, useIndex (useEntry.use.id)}
                 <section class="fragment-use" data-use-state={useEntry.state} aria-label={`조각 ${index + 1} 넣은 자리 ${useIndex + 1}`}>
                     <strong>{useEntry.use.kind === "code" ? "코드" : "글"} · {stateLabels[useEntry.state]}</strong>
@@ -56,6 +59,7 @@
                     {/each}
                 </section>
             {/each}
+            {/if}
         </details>
     {/if}
 </article>
