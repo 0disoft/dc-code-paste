@@ -18,6 +18,7 @@ import { SelectedBlockDecoration } from "./block-inspector";
 import { ReadingIntentMark } from "./reading-intent";
 import { SentenceSourceMark } from "./sentence-source";
 import { RelationAnchorMark, SentenceRelationAttributes } from "./sentence-relations";
+import { ReadingNoteAttributes } from "./reading-notes.ts";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -138,6 +139,7 @@ export function createEditorExtensions() {
     ...editorialExtensions,
     LinkBox,
     ReadingIntentMark,
+    ReadingNoteAttributes,
     SentenceSourceMark,
     RelationAnchorMark,
     SentenceRelationAttributes,

@@ -8,7 +8,10 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
     : node.marks;
   const content = node.content?.map(relationFreeDocument);
   const childrenChanged = content?.some((child, index) => child !== node.content![index]);
-  const privateAttribute = node.type === "doc" && node.attrs && "sentenceRelations" in node.attrs;
+  const privateAttribute =
+    node.type === "doc" &&
+    node.attrs &&
+    ("sentenceRelations" in node.attrs || "readingNotes" in node.attrs);
   if (!privateMark && !childrenChanged && !privateAttribute) return node;
   const result = { ...node };
   if (privateMark) {
@@ -18,6 +21,7 @@ export function relationFreeDocument(node: JSONContent): JSONContent {
   if (privateAttribute) {
     const attrs = { ...node.attrs };
     delete attrs.sentenceRelations;
+    delete attrs.readingNotes;
     if (Object.keys(attrs).length) result.attrs = attrs;
     else delete result.attrs;
   }

@@ -20,7 +20,7 @@ type SelectedPart = { from: number; to: number; text: string };
 export type SelectedRelationPassage = { document: Node; parts: SelectedPart[] };
 
 export function selectedRelationPassage(
-  state: EditorState | undefined,
+  state: Pick<EditorState, "doc" | "schema" | "selection"> | undefined,
 ): SelectedRelationPassage | null {
   const type = state?.schema.marks.relationAnchor;
   if (!state || !type || state.selection.empty) return null;
