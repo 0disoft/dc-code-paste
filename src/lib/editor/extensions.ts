@@ -15,6 +15,7 @@ import { createCodeBlockHighlightPlugin } from "./code-block-highlight";
 import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
 import { normalizeHighlightLines } from "#lib/highlighter/highlight-lines.ts";
 import { SelectedBlockDecoration } from "./block-inspector";
+import { ReadingIntentMark } from "./reading-intent";
 
 const DcStarterKit = StarterKit.extend({
   addExtensions() {
@@ -134,6 +135,7 @@ export function createEditorExtensions() {
     ...calloutExtensions,
     ...editorialExtensions,
     LinkBox,
+    ReadingIntentMark,
     TextStyle,
     Color,
     FontFamily,

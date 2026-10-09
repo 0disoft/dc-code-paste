@@ -11,6 +11,7 @@ import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts";
 import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
 import { normalizeTableSpan } from "#lib/editor/data-table.ts";
+import { readingIntentAttributes } from "#lib/editor/reading-intent-format.ts";
 import {
   normalizeBlockAppearance,
   summaryToneColors,
@@ -67,6 +68,7 @@ export const dcExportSupportedNodeTypes = new Set([
   "rebuttalBox",
 ]);
 export const dcExportSupportedMarkTypes = new Set([
+  "readingIntent",
   "bold",
   "italic",
   "strike",
@@ -711,6 +713,12 @@ function applyMarks(
   let html = escapeHtml(text).replace(/\n/g, "<br>");
 
   for (const mark of marks ?? []) {
+    if (mark.type === "readingIntent") {
+      const attrs = readingIntentAttributes(mark.attrs?.intent);
+      if (attrs)
+        html = `<span data-reading-intent="${attrs["data-reading-intent"]}" title="${attrs.title}" style="${attrs.style}">${html}</span>`;
+      continue;
+    }
     if (mark.type === "bold") {
       html = `<strong style="font-weight:700">${html}</strong>`;
       continue;

@@ -87,6 +87,7 @@ const draftNodeTypes = new Set([
   "calloutBox",
 ]);
 const draftMarkTypes = new Set([
+  "readingIntent",
   "bold",
   "italic",
   "strike",
