@@ -1,39 +1,42 @@
+<script module lang="ts">
+    export type ThoughtFragmentEdit = { draft: string; baseline: string };
+</script>
+
 <script lang="ts">
     import { tick } from "svelte";
     import type { ThoughtFragmentEntry } from "#lib/editor/thought-fragments.ts";
     import { maxThoughtFragmentLength } from "#lib/editor/thought-fragments-format.ts";
     import { thoughtFragmentNeedsReview } from "#lib/editor/thought-fragment-query.ts";
-    let { entry, index, visible = true, onUpdate, onRemove, onInsert, onNavigate }: {
+    let { entry, index, visible = true, editState = $bindable(), onUpdate, onRemove, onInsert, onNavigate }: {
         entry: ThoughtFragmentEntry;
         index: number;
         visible?: boolean;
+        editState?: ThoughtFragmentEdit;
         onUpdate: (id: string, text: string, expected: string) => boolean;
         onRemove: (id: string) => void;
         onInsert: (id: string, kind: "prose" | "code") => void;
         onNavigate: (id: string) => void;
     } = $props();
-    let editing = $state(false);
+    const editing = $derived(editState !== undefined);
     let usesOpen = $state(false);
-    let draft = $state("");
-    let baseline = "";
     let field = $state<HTMLTextAreaElement>();
     let editButton = $state<HTMLButtonElement>();
     const fieldId = $derived(`thought-fragment-${entry.fragment.id}`);
     const stateLabels = { linked: "그대로 있음", changed: "본문이 바뀜", missing: "구간 사라짐", duplicated: "표시가 여러 곳에 있음" };
     function edit() {
-        if (!editing) { baseline = entry.fragment.text; draft = baseline; editing = true; }
+        if (!editState) editState = { draft: entry.fragment.text, baseline: entry.fragment.text };
         void tick().then(() => field?.focus());
     }
-    function cancel() { editing = false; editButton?.focus({ preventScroll: true }); }
-    function save() { if (onUpdate(entry.fragment.id, draft, baseline)) cancel(); }
+    function cancel() { editState = undefined; editButton?.focus({ preventScroll: true }); }
+    function save() { if (editState && onUpdate(entry.fragment.id, editState.draft, editState.baseline)) cancel(); }
 </script>
 
 <article class="fragment-card" aria-label={`생각 조각 ${index + 1}`}>
     <div class="fragment-head"><strong>조각 {index + 1}</strong><span class:needs-review={thoughtFragmentNeedsReview(entry)}>{entry.uses.length ? `${thoughtFragmentNeedsReview(entry) ? "다시 확인 · " : ""}넣은 자리 ${entry.uses.length}` : "아직 넣지 않음"}</span></div>
-    {#if editing}
+    {#if editState}
         <label for={fieldId}>보관할 조각 내용</label>
-        <textarea class="ui-input" id={fieldId} bind:this={field} bind:value={draft} maxlength={maxThoughtFragmentLength} rows="4" onkeydown={(event) => { if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); event.stopPropagation(); cancel(); } }}></textarea>
-        <div class="fragment-actions"><button class="ui-btn ui-btn--primary" type="button" disabled={!draft.trim()} onclick={save}>조각 수정 저장</button><button class="ui-btn ui-btn--outline" type="button" onclick={cancel}>조각 수정 취소</button></div>
+        <textarea class="ui-input" id={fieldId} bind:this={field} bind:value={editState.draft} maxlength={maxThoughtFragmentLength} rows="4" onkeydown={(event) => { if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); event.stopPropagation(); cancel(); } }}></textarea>
+        <div class="fragment-actions"><button class="ui-btn ui-btn--primary" type="button" disabled={!editState.draft.trim()} onclick={save}>조각 수정 저장</button><button class="ui-btn ui-btn--outline" type="button" onclick={cancel}>조각 수정 취소</button></div>
     {:else}
         <pre class="fragment-text">{entry.fragment.text}</pre>
     {/if}

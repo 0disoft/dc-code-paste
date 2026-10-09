@@ -1,9 +1,9 @@
 <script lang="ts">
-    import { getContext, tick } from "svelte";
+    import { getContext, tick, untrack } from "svelte";
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { maxThoughtFragmentLength, maxThoughtFragments } from "#lib/editor/thought-fragments-format.ts";
-    import ThoughtFragmentCard from "./ThoughtFragmentCard.svelte";
+    import ThoughtFragmentCard, { type ThoughtFragmentEdit } from "./ThoughtFragmentCard.svelte";
     import { queryThoughtFragments, thoughtFragmentNeedsReview, type ThoughtFragmentFilter } from "#lib/editor/thought-fragment-query.ts";
     let { open, selectionStored = 0, dockAvailable = false, docked = false, onToggleDock, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: number; dockAvailable?: boolean; docked?: boolean; onToggleDock: () => void; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
@@ -11,6 +11,8 @@
     let dialog = $state<HTMLDialogElement>();
     let field = $state<HTMLTextAreaElement>();
     let draft = $state("");
+    // Cards unmount when another tool closes the panel; keep their unsaved edits here.
+    let edits = $state<Record<string, ThoughtFragmentEdit | undefined>>({});
     let status = $state("");
     let query = $state("");
     let filter = $state<ThoughtFragmentFilter>("all");
@@ -19,7 +21,7 @@
     let draftVersion = 0;
     $effect(() => {
         const version = workspace.documentReplacementVersion;
-        if (version !== draftVersion) { draftVersion = version; draft = ""; resetSearch(); }
+        if (version !== draftVersion) { draftVersion = version; draft = ""; edits = {}; resetSearch(); }
         if (!dialog) return;
         if (open) {
             const wasOpen = dialog.open;
@@ -41,6 +43,13 @@
     });
     $effect(() => { if (open && selectionStored) { status = "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다."; resetSearch(); } });
     const entries = $derived(open ? fragments.entries : []);
+    $effect(() => {
+        if (!open) return;
+        const ids = new Set(entries.map((entry) => entry.fragment.id));
+        untrack(() => {
+            for (const id of Object.keys(edits)) if (!ids.has(id)) delete edits[id];
+        });
+    });
     const matches = $derived(queryThoughtFragments(entries, query, filter));
     const visibleIds = $derived(new Set(matches.map((entry) => entry.fragment.id)));
     const unusedCount = $derived(entries.filter((entry) => !entry.uses.length).length);
@@ -57,7 +66,7 @@
         return true;
     }
     function remove(id: string) {
-        if (current() && fragments.remove(id)) { status = "조각을 삭제했습니다. 본문에 넣었던 글은 그대로 있습니다."; field?.focus(); }
+        if (current() && fragments.remove(id)) { delete edits[id]; status = "조각을 삭제했습니다. 본문에 넣었던 글은 그대로 있습니다."; field?.focus(); }
     }
     function insert(id: string, kind: "prose" | "code") { if (current() && fragments.insert(id, kind)) onInserted(); }
     function navigate(id: string) { if (current()) onNavigate(id); }
@@ -92,7 +101,7 @@
             {#if !entries.length}<p class="fragments-hint">아직 보관한 조각이 없습니다.</p>{/if}
             {#if entries.length && !matches.length}<p class="fragments-hint">조건에 맞는 조각이 없습니다. 검색어나 보기 조건을 바꿔 보세요.</p>{/if}
             <div class="fragments-list">
-                {#each entries as entry, index (entry.fragment.id)}<div class="fragment-slot" hidden={!visibleIds.has(entry.fragment.id)}><ThoughtFragmentCard {entry} {index} visible={visibleIds.has(entry.fragment.id)} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} /></div>{/each}
+                {#each entries as entry, index (entry.fragment.id)}<div class="fragment-slot" hidden={!visibleIds.has(entry.fragment.id)}><ThoughtFragmentCard {entry} {index} bind:editState={edits[entry.fragment.id]} visible={visibleIds.has(entry.fragment.id)} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} /></div>{/each}
             </div>
         </div>
     {/if}

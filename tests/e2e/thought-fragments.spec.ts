@@ -288,6 +288,8 @@ test("keeps fragments beside editable prose, preserves unfinished edits across p
   await openFragments(page);
   await expect(dialog).toHaveAttribute("aria-modal", "false");
   await expect(input).toHaveValue("계속 담을 입력");
+  await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+  await edit.fill("출처 확인 후 계속 작성할 수정 중 문장");
   await editor.locator("p").first().click({ clickCount: 3 });
   await page
     .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
@@ -295,7 +297,83 @@ test("keeps fragments beside editable prose, preserves unfinished edits across p
     .click();
   await expect(dialog).toBeHidden();
   await expect(page.getByLabel("자료 주소", { exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await openFragments(page);
+  await expect(edit).toHaveValue("출처 확인 후 계속 작성할 수정 중 문장");
+  await expect(input).toHaveValue("계속 담을 입력");
+  await card.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+  await expect(edit).toHaveCount(0);
+  await expect(card.locator(".fragment-text").first()).toHaveText(
+    "출처 확인 후 계속 작성할 수정 중 문장",
+  );
+  await dialog.getByRole("button", { name: "생각 조각 닫기", exact: true }).click();
+  expect(await copied(page, 2)).toBe(html);
 });
+
+for (const mobile of [false, true]) {
+  test(`preserves pending fragment edits through closing and rejects stale saves on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1400, height: 900 });
+    await setup(page);
+    const dialog = await openFragments(page);
+    await dialog.getByLabel("새 생각 조각", { exact: true }).fill("처음 보관한 원문");
+    await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+    const card = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
+    const edit = card.getByLabel("보관할 조각 내용", { exact: true });
+    const close = dialog.getByRole("button", { name: "생각 조각 닫기", exact: true });
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await edit.fill("저장한 새 원문");
+    await card.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await edit.fill("계속 작성 중인 비공개 수정문");
+    await close.click();
+    await openFragments(page);
+    await expect(edit).toHaveValue("계속 작성 중인 비공개 수정문");
+    await close.click();
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await openFragments(page);
+    await expect(edit).toHaveValue("계속 작성 중인 비공개 수정문");
+    await card.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    await expect(edit).toHaveValue("계속 작성 중인 비공개 수정문");
+    await card.getByRole("button", { name: "조각 수정 취소", exact: true }).click();
+    await expect(card.locator(".fragment-text")).toHaveText("처음 보관한 원문");
+    await close.click();
+    await openFragments(page);
+    await expect(edit).toHaveCount(0);
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await expect(edit).toHaveValue("처음 보관한 원문");
+    await edit.fill("다시 확인하고 저장한 원문");
+    await card.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+    await close.click();
+    await openFragments(page);
+    await expect(edit).toHaveCount(0);
+    await expect(card.locator(".fragment-text")).toHaveText("다시 확인하고 저장한 원문");
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await edit.fill("삭제한 조각에서 버릴 수정문");
+    await card.getByRole("button", { name: "조각 삭제", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await close.click();
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await openFragments(page);
+    await expect(edit).toHaveCount(0);
+    await expect(card.locator(".fragment-text")).toHaveText("다시 확인하고 저장한 원문");
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await edit.fill("이전 문서에서 작성한 수정문");
+    await close.click();
+    await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+    await page.getByLabel("Markdown 원문").fill("# 교체한 글\n\n새 문서 본문");
+    await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+    await expect(page.locator(".article-editor")).toContainText("새 문서 본문");
+    await page.getByRole("button", { name: "실행 취소", exact: true }).click();
+    await openFragments(page);
+    await expect(edit).toHaveCount(0);
+    await card.getByRole("button", { name: "조각 수정", exact: true }).click();
+    await expect(edit).toHaveValue("다시 확인하고 저장한 원문");
+  });
+}
 
 for (const mobile of [false, true]) {
   test(`finds fragment material and review states without losing unfinished edits on ${mobile ? "mobile" : "desktop"}`, async ({
