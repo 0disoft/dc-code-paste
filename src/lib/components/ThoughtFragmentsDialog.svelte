@@ -4,18 +4,22 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { maxThoughtFragmentLength, maxThoughtFragments } from "#lib/editor/thought-fragments-format.ts";
     import ThoughtFragmentCard from "./ThoughtFragmentCard.svelte";
-    let { open, selectionStored = false, dockAvailable = false, docked = false, onToggleDock, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: boolean; dockAvailable?: boolean; docked?: boolean; onToggleDock: () => void; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
+    import { queryThoughtFragments, thoughtFragmentNeedsReview, type ThoughtFragmentFilter } from "#lib/editor/thought-fragment-query.ts";
+    let { open, selectionStored = 0, dockAvailable = false, docked = false, onToggleDock, onClose, onInserted, onNavigate }: { open: boolean; selectionStored?: number; dockAvailable?: boolean; docked?: boolean; onToggleDock: () => void; onClose: () => void; onInserted: () => void; onNavigate: (id: string) => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const fragments = workspace.thoughtFragments;
     let dialog = $state<HTMLDialogElement>();
     let field = $state<HTMLTextAreaElement>();
     let draft = $state("");
     let status = $state("");
+    let query = $state("");
+    let filter = $state<ThoughtFragmentFilter>("all");
+    let searchField = $state<HTMLInputElement>();
     let openedVersion = 0;
     let draftVersion = 0;
     $effect(() => {
         const version = workspace.documentReplacementVersion;
-        if (version !== draftVersion) { draftVersion = version; draft = ""; }
+        if (version !== draftVersion) { draftVersion = version; draft = ""; resetSearch(); }
         if (!dialog) return;
         if (open) {
             const wasOpen = dialog.open;
@@ -35,13 +39,23 @@
             }
         } else if (!open && dialog.open) dialog.close();
     });
-    $effect(() => { if (open && selectionStored) status = "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다."; });
+    $effect(() => { if (open && selectionStored) { status = "선택한 글을 조각으로 보관했습니다. 본문은 그대로 있습니다."; resetSearch(); } });
     const entries = $derived(open ? fragments.entries : []);
+    const matches = $derived(queryThoughtFragments(entries, query, filter));
+    const visibleIds = $derived(new Set(matches.map((entry) => entry.fragment.id)));
+    const unusedCount = $derived(entries.filter((entry) => !entry.uses.length).length);
+    const reviewCount = $derived(entries.filter(thoughtFragmentNeedsReview).length);
+    function resetSearch() { query = ""; filter = "all"; }
     function current() { return open && openedVersion === workspace.documentReplacementVersion; }
     function add() {
-        if (current() && fragments.add(draft)) { draft = ""; status = "조각을 보관했습니다."; field?.focus(); }
+        if (current() && fragments.add(draft)) { draft = ""; resetSearch(); status = "조각을 보관했습니다."; field?.focus(); }
     }
-    function update(id: string, text: string, expected: string) { return current() && fragments.update(id, text, expected); }
+    function update(id: string, text: string, expected: string) {
+        if (!current() || !fragments.update(id, text, expected)) return false;
+        status = "조각을 수정했습니다.";
+        void tick().then(() => { if (current() && !visibleIds.has(id)) searchField?.focus({ preventScroll: true }); });
+        return true;
+    }
     function remove(id: string) {
         if (current() && fragments.remove(id)) { status = "조각을 삭제했습니다. 본문에 넣었던 글은 그대로 있습니다."; field?.focus(); }
     }
@@ -61,10 +75,24 @@
             </form>
             <p class="fragments-hint">본문에 넣을 때 글과 코드를 고를 수 있습니다. 선택한 내용을 지우지 않고 그 뒤에 새 블록으로 넣습니다. 넣은 자리는 조각을 새로 넣은 구간만 표시합니다.</p>
             {#if fragments.error}<p class="fragments-error" role="alert">{fragments.error}</p>{/if}
-            {#if status}<p class="fragments-hint" role="status">{status}</p>{/if}
+            {#if status}<p class="fragments-hint" role="status" aria-label="생각 조각 작업 결과">{status}</p>{/if}
+            {#if entries.length}
+                <div class="fragment-filters">
+                    <label for="thought-fragment-search">생각 조각 검색</label>
+                    <input id="thought-fragment-search" class="ui-input" type="search" maxlength="256" placeholder="보관한 내용과 넣은 구간에서 찾기" bind:this={searchField} bind:value={query} />
+                    <label for="thought-fragment-filter">생각 조각 보기</label>
+                    <select id="thought-fragment-filter" class="ui-input" bind:value={filter}>
+                        <option value="all">전체 ({entries.length})</option>
+                        <option value="unused">아직 넣지 않음 ({unusedCount})</option>
+                        <option value="review">다시 확인 ({reviewCount})</option>
+                    </select>
+                    <div class="fragments-actions"><p role="status" aria-label="생각 조각 검색 결과">{entries.length}개 중 {matches.length}개 표시</p>{#if query || filter !== "all"}<button class="ui-btn ui-btn--outline" type="button" onclick={() => { resetSearch(); searchField?.focus(); }}>검색 조건 지우기</button>{/if}</div>
+                </div>
+            {/if}
             {#if !entries.length}<p class="fragments-hint">아직 보관한 조각이 없습니다.</p>{/if}
+            {#if entries.length && !matches.length}<p class="fragments-hint">조건에 맞는 조각이 없습니다. 검색어나 보기 조건을 바꿔 보세요.</p>{/if}
             <div class="fragments-list">
-                {#each entries as entry, index (entry.fragment.id)}<ThoughtFragmentCard {entry} {index} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} />{/each}
+                {#each entries as entry, index (entry.fragment.id)}<div class="fragment-slot" hidden={!visibleIds.has(entry.fragment.id)}><ThoughtFragmentCard {entry} {index} onUpdate={update} onRemove={remove} onInsert={insert} onNavigate={navigate} /></div>{/each}
             </div>
         </div>
     {/if}
@@ -86,6 +114,8 @@
     .fragments-actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
     .fragments-actions p { margin: 0; color: var(--muted); font-size: 0.76rem; }
     .fragments-list { display: grid; gap: 12px; min-width: 0; }
+    .fragment-filters { display: grid; gap: 8px; min-width: 0; }
+    .fragment-filters .ui-input, .fragment-slot { min-width: 0; }
     .fragments-error { margin: 0; color: var(--danger); font-size: 0.8rem; }
     button:focus-visible, textarea:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     @media (max-width: 600px) { .fragments-content { padding: 14px; } button { min-height: 44px; } }

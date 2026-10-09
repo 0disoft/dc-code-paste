@@ -2,6 +2,7 @@
     import { tick } from "svelte";
     import type { ThoughtFragmentEntry } from "#lib/editor/thought-fragments.ts";
     import { maxThoughtFragmentLength } from "#lib/editor/thought-fragments-format.ts";
+    import { thoughtFragmentNeedsReview } from "#lib/editor/thought-fragment-query.ts";
     let { entry, index, onUpdate, onRemove, onInsert, onNavigate }: {
         entry: ThoughtFragmentEntry;
         index: number;
@@ -26,7 +27,7 @@
 </script>
 
 <article class="fragment-card" aria-label={`생각 조각 ${index + 1}`}>
-    <div class="fragment-head"><strong>조각 {index + 1}</strong><span>{entry.uses.length ? `넣은 자리 ${entry.uses.length}` : "아직 쓰지 않음"}</span></div>
+    <div class="fragment-head"><strong>조각 {index + 1}</strong><span class:needs-review={thoughtFragmentNeedsReview(entry)}>{entry.uses.length ? `${thoughtFragmentNeedsReview(entry) ? "다시 확인 · " : ""}넣은 자리 ${entry.uses.length}` : "아직 넣지 않음"}</span></div>
     {#if editing}
         <label for={fieldId}>보관할 조각 내용</label>
         <textarea class="ui-input" id={fieldId} bind:this={field} bind:value={draft} maxlength={maxThoughtFragmentLength} rows="4" onkeydown={(event) => { if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); event.stopPropagation(); cancel(); } }}></textarea>
@@ -64,6 +65,7 @@
     .fragment-head, .fragment-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
     .fragment-head { justify-content: space-between; font-size: 0.84rem; }
     .fragment-head span, .fragment-hint, label, summary { color: var(--muted); font-size: 0.78rem; }
+    .fragment-head .needs-review { color: var(--accent-strong); font-weight: 600; }
     .fragment-hint { margin: 0; line-height: 1.65; }
     .fragment-text { margin: 0; max-height: 180px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: 0.84rem; line-height: 1.7; }
     textarea { width: 100%; height: auto; min-height: 7rem; resize: vertical; }

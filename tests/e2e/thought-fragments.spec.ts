@@ -84,7 +84,9 @@ for (const mobile of [false, true]) {
       await page.keyboard.press("Enter");
     }
     const dialog = page.getByRole("dialog", { name: "생각 조각", exact: true });
-    await expect(dialog.getByRole("status")).toContainText("선택한 글을 조각으로 보관했습니다");
+    await expect(dialog.getByRole("status", { name: "생각 조각 작업 결과" })).toContainText(
+      "선택한 글을 조각으로 보관했습니다",
+    );
     await expect(dialog.locator(".fragment-card > .fragment-text")).toHaveText("원래 문장");
     await expect(sentence.locator("strong a, a strong")).toHaveText("원래 문장");
     await expect(sentence.locator("a")).toHaveAttribute("href", "https://example.com/source");
@@ -97,7 +99,7 @@ for (const mobile of [false, true]) {
     await expect(editor).toContainText("생각을 담는 글");
     await openFragments(page);
     await expect(dialog.locator(".fragment-card > .fragment-text")).toHaveText("원래 문장");
-    await expect(dialog.getByRole("status")).toHaveCount(0);
+    await expect(dialog.getByRole("status", { name: "생각 조각 작업 결과" })).toHaveCount(0);
   });
 }
 
@@ -115,7 +117,7 @@ for (const mobile of [false, true]) {
     await input.fill("정리 전 첫 줄\n둘째 생각");
     await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
     const card = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
-    await expect(card).toContainText("아직 쓰지 않음");
+    await expect(card).toContainText("아직 넣지 않음");
     await dialog.getByRole("button", { name: "생각 조각 닫기", exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("button", { name: "더보기 메뉴", exact: true })).toBeFocused();
@@ -294,3 +296,90 @@ test("keeps fragments beside editable prose, preserves unfinished edits across p
   await expect(dialog).toBeHidden();
   await expect(page.getByLabel("자료 주소", { exact: true })).toBeFocused();
 });
+
+for (const mobile of [false, true]) {
+  test(`finds fragment material and review states without losing unfinished edits on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1400, height: 900 });
+    await setup(page);
+    const editor = page.locator(".article-editor");
+    const dialog = await openFragments(page);
+    const input = dialog.getByLabel("새 생각 조각", { exact: true });
+    for (const text of ["Alpha 첫 조각", "Beta 다음 조각", "Gamma 마지막 조각"]) {
+      await input.fill(text);
+      await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+    }
+    const first = dialog.getByRole("article", { name: "생각 조각 1", exact: true });
+    await first.getByRole("button", { name: "글로 넣기", exact: true }).click();
+    const inserted = editor.locator("p").filter({ hasText: "Alpha 첫 조각" });
+    await inserted.click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText(" 수정한 본문");
+    await expect(inserted).toHaveText("Alpha 첫 조각 수정한 본문");
+    const html = await copied(page, 1);
+    await openFragments(page);
+    const search = dialog.getByRole("searchbox", { name: "생각 조각 검색", exact: true });
+    const filter = dialog.getByRole("combobox", { name: "생각 조각 보기", exact: true });
+    await expect(filter.getByRole("option", { name: "다시 확인 (1)", exact: true })).toHaveCount(1);
+    await filter.selectOption("review");
+    await expect(dialog.getByRole("article")).toHaveCount(1);
+    await expect(first.locator(".fragment-head")).toContainText("다시 확인");
+    await search.fill("수정한 본문");
+    await expect(dialog.getByRole("article")).toHaveCount(1);
+    await search.fill("없는 검색 결과");
+    await expect(dialog.getByRole("article")).toHaveCount(0);
+    await expect(
+      dialog.getByRole("status", { name: "생각 조각 검색 결과", exact: true }),
+    ).toHaveText("3개 중 0개 표시");
+    await expect(dialog).toContainText("조건에 맞는 조각이 없습니다.");
+    await dialog.getByRole("button", { name: "검색 조건 지우기", exact: true }).click();
+    const second = dialog.getByRole("article", { name: "생각 조각 2", exact: true });
+    await second.getByRole("button", { name: "조각 수정", exact: true }).click();
+    const edit = second.getByLabel("보관할 조각 내용", { exact: true });
+    await edit.fill("고친 내용만");
+    await search.fill("alpha");
+    await expect(first).toBeVisible();
+    await expect(edit).toBeHidden();
+    await filter.selectOption("unused");
+    await expect(dialog.getByRole("article")).toHaveCount(0);
+    await dialog.getByRole("button", { name: "검색 조건 지우기", exact: true }).click();
+    await expect(edit).toBeVisible();
+    await expect(edit).toHaveValue("고친 내용만");
+    await search.fill("beta");
+    await expect(second).toBeVisible();
+    await second.getByRole("button", { name: "조각 수정 저장", exact: true }).click();
+    await expect(second).toBeHidden();
+    await expect(search).toBeFocused();
+    await search.fill("고친 내용만");
+    await expect(second).toBeVisible();
+    await expect(second).toContainText("고친 내용만");
+    await input.fill("Delta 새 내용");
+    await dialog.getByRole("button", { name: "조각 보관", exact: true }).click();
+    await expect(search).toHaveValue("");
+    await expect(filter).toHaveValue("all");
+    await expect(dialog.getByRole("article")).toHaveCount(4);
+    if (!mobile) {
+      await dialog.getByRole("button", { name: "생각 조각 본문 곁에 두기", exact: true }).click();
+      for (let index = 0; index < 2; index++) {
+        await search.fill("없는 검색 결과");
+        await inserted.click({ clickCount: 3 });
+        await expect(editor).toBeFocused();
+        await expect
+          .poll(() => page.evaluate(() => window.getSelection()?.toString()))
+          .toBe("Alpha 첫 조각 수정한 본문");
+        await page
+          .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
+          .getByRole("button", { name: "선택한 글 조각으로 보관", exact: true })
+          .click();
+        await expect(search).toHaveValue("");
+        await expect(dialog.getByRole("article")).toHaveCount(5 + index);
+      }
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await dialog.getByRole("button", { name: "생각 조각 닫기", exact: true }).click();
+    expect(await copied(page, 2)).toBe(html);
+  });
+}

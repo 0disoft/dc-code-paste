@@ -61,6 +61,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { createReadingExperimentState } from "./reading-experiment.svelte.ts";
 import { createWritingPurposeState } from "./writing-purpose.svelte.ts";
 import { createThoughtFragmentsState } from "./thought-fragments.svelte.ts";
+import { restoreRepeatedTextblockSelection } from "#lib/editor/selection-focus.ts";
 import {
   clearCopiedOutput,
   copiedOutputChanges,
@@ -3031,6 +3032,7 @@ export function createWorkspaceState() {
         extensions,
         content: documentJson,
         editorProps: {
+          handleTripleClick: restoreRepeatedTextblockSelection,
           handleDrop: (_view, event) => {
             const kind = event.dataTransfer?.getData("application/x-dc-block") ?? "";
             if (!isPaletteBlockKind(kind)) return false;

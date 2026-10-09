@@ -35,7 +35,7 @@
     let writingPurposeOpen = $state(false);
     let writingPurposeReturnFocus: HTMLElement | undefined;
     let thoughtFragmentsOpen = $state(false);
-    let thoughtSelectionStored = $state(false);
+    let thoughtSelectionStored = $state(0);
     let thoughtFragmentsDockPreference = $state(false);
     const fragmentsDocked = $derived(thoughtFragmentsOpen && thoughtFragmentsDockPreference && !compact);
     let thoughtFragmentsReturnFocus: HTMLElement | undefined;
@@ -70,7 +70,7 @@
 
     function openThoughtFragments() {
         if (workspace.editorMountState !== "ready") return;
-        thoughtSelectionStored = false;
+        thoughtSelectionStored = 0;
         workspace.thoughtFragments.clearError();
         thoughtFragmentsReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
         closeRails();
@@ -82,9 +82,10 @@
 
     function storeSelectedThoughtFragment() {
         if (workspace.editorMountState !== "ready") return;
-        openThoughtFragments();
+        if (!thoughtFragmentsOpen) openThoughtFragments();
+        else workspace.thoughtFragments.clearError();
         thoughtFragmentsReturnFocus = workspace.editor?.view.dom;
-        thoughtSelectionStored = workspace.thoughtFragments.captureSelection();
+        thoughtSelectionStored = workspace.thoughtFragments.captureSelection() ? thoughtSelectionStored + 1 : 0;
     }
 
     async function toggleThoughtFragmentsDock() {

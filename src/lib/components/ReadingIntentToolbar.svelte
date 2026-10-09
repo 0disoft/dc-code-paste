@@ -54,6 +54,7 @@
     function updatePosition() {
         const current = workspace.editor;
         if (hidden || dismissedSelection === selectionKey() || !selection.canApply || !current || current.isDestroyed ||
+            (!current.view.hasFocus() && !toolbar?.contains(document.activeElement)) ||
             workspace.isMarkdownPanelOpen || workspace.isStoragePanelOpen || workspace.isLlmPanelOpen) {
             position = null;
             return;
@@ -99,6 +100,10 @@
     });
 
     onMount(() => {
+        function handleFocus() {
+            updatePosition();
+            void tick().then(updatePosition);
+        }
         function handleEscape(event: KeyboardEvent) {
             const editorFocused = workspace.editor?.view.dom.contains(document.activeElement);
             const toolbarFocused = toolbar?.contains(document.activeElement);
@@ -116,6 +121,7 @@
             }
         }
         window.addEventListener("keydown", handleEscape, true);
+        window.addEventListener("focusin", handleFocus);
         window.addEventListener("resize", updatePosition);
         window.addEventListener("scroll", updatePosition, true);
         const scroller = document.querySelector(".canvas-view .canvas-scroll");
@@ -124,6 +130,7 @@
         return () => {
             observer.disconnect();
             window.removeEventListener("keydown", handleEscape, true);
+            window.removeEventListener("focusin", handleFocus);
             window.removeEventListener("resize", updatePosition);
             window.removeEventListener("scroll", updatePosition, true);
         };
