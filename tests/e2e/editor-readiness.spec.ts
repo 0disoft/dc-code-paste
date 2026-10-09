@@ -37,7 +37,7 @@ for (const mobile of [false, true]) {
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
     await expect(
-      page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true }),
+      page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true }),
     ).toBeVisible();
   });
 }

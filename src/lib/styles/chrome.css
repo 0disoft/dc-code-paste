@@ -878,6 +878,12 @@ a.ui-menu-item {
   }
 }
 
+@media (max-width: 360px) {
+  .topbar [data-copy-trigger="preview"] > span:not(.spin-icon) {
+    display: none;
+  }
+}
+
 .rail-head .ui-segmented button {
   height: 34px;
   font-size: 14px;

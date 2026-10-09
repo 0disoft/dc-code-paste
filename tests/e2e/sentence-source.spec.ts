@@ -38,7 +38,7 @@ for (const mobile of [false, true]) {
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
     await page
-      .getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true })
+      .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
       .getByRole("button", { name: "문장 출처 연결", exact: true })
       .click();
     const form = page.getByRole("region", { name: "문장 출처", exact: true });

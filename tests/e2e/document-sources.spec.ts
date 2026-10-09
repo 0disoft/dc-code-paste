@@ -28,17 +28,17 @@ for (const mobile of [false, true]) {
       await page.keyboard.press("Shift+End");
       if (index === 0) {
         await expect(
-          page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true }),
+          page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true }),
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(
-          page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true }),
+          page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true }),
         ).toHaveCount(0);
         await page.keyboard.press("Home");
         await page.keyboard.press("Shift+End");
       }
       await page
-        .getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true })
+        .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
         .getByRole("button", { name: "문장 출처 연결", exact: true })
         .click();
     }
@@ -92,7 +92,7 @@ for (const mobile of [false, true]) {
       .poll(() => page.evaluate(() => getSelection()?.toString()))
       .toBe("둘째 문장에 다른 근거를 붙입니다.");
     await page
-      .getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true })
+      .getByRole("toolbar", { name: "선택한 글자 도구", exact: true })
       .getByRole("button", { name: "문장 출처 연결", exact: true })
       .click();
     await expect(excerpt).toHaveValue("둘째 문장의 원문");

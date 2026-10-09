@@ -21,7 +21,7 @@ for (const mobile of [false, true]) {
     await sentence.click();
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
-    const toolbar = page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true });
+    const toolbar = page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true });
     await expect(toolbar).toBeVisible();
     expect(
       await toolbar.evaluate((element) => {
@@ -34,6 +34,7 @@ for (const mobile of [false, true]) {
         );
       }),
     ).toBe(true);
+    await toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true }).click();
     await toolbar.getByRole("button", { name: "읽는 의도: 먼저 읽기", exact: true }).click();
     await expect(sentence.locator('[data-reading-intent="focus"]')).toHaveText("기억할 핵심 문장");
     await expect(sentence.locator("a")).toHaveAttribute("href", "https://example.com/source");
@@ -46,6 +47,7 @@ for (const mobile of [false, true]) {
     await expect(toolbar).toBeVisible();
     await editor.press("Control+y");
     await expect(sentence.locator('[data-reading-intent="focus"]')).toHaveCount(1);
+    await toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true }).click();
     await toolbar
       .getByRole("button", { name: "읽는 의도: 아직 답하지 못한 질문", exact: true })
       .click();
@@ -67,6 +69,7 @@ for (const mobile of [false, true]) {
     await sentence.click();
     await page.keyboard.press("Home");
     await page.keyboard.press("Shift+End");
+    await toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true }).click();
     await toolbar.getByRole("button", { name: "읽는 의도 해제", exact: true }).click();
     await expect(sentence.locator("[data-reading-intent]")).toHaveCount(0);
     expect(await editor.textContent()).toBe(original);
@@ -86,9 +89,7 @@ test("keeps code formatting and disables reading intentions for a code-only sele
   await code.click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
-  await expect(page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true })).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true })).toHaveCount(0);
   const controls = page.getByRole("group", { name: "읽는 의도", exact: true });
   for (const button of await controls.getByRole("button").all())
     await expect(button).toBeDisabled();

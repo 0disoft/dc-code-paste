@@ -11,7 +11,8 @@ async function markParagraph(page: Page, index: number, label: string) {
   await page.locator(".article-editor p").nth(index).click();
   await page.keyboard.press("Home");
   await page.keyboard.press("Shift+End");
-  const toolbar = page.getByRole("toolbar", { name: "선택 문장 읽는 의도", exact: true });
+  const toolbar = page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true });
+  await toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true }).click();
   await toolbar.getByRole("button", { name: `읽는 의도: ${label}`, exact: true }).click();
   await expect(toolbar).toHaveCount(0);
 }
