@@ -86,6 +86,12 @@
   color: oklch(100% 0 0 / 0.45);
 }
 
+.focus-mode-label {
+  flex: 0 0 auto;
+  color: var(--chrome-text);
+  font-size: 0.76rem;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -667,7 +673,13 @@ a.ui-menu-item {
 }
 
 .rail-backdrop {
-  display: none;
+  position: fixed;
+  inset: var(--topbar-height) 0 0;
+  z-index: 85;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: oklch(22% 0.01 265 / 0.4);
 }
 
 .canvas {
@@ -713,40 +725,55 @@ a.ui-menu-item {
   box-shadow: var(--shadow-pop);
 }
 
+.rail[data-drawer="true"] {
+  position: fixed;
+  top: var(--topbar-height);
+  bottom: 0;
+  z-index: 90;
+  width: min(320px, 88vw);
+  visibility: hidden;
+  box-shadow: var(--shadow-pop);
+  transition: transform 0.2s ease;
+}
+
+.rail-left[data-drawer="true"] {
+  transform: translateX(-102%);
+}
+
+.rail-right[data-drawer="true"] {
+  transform: translateX(102%);
+}
+
+.rail[data-drawer="true"][data-open="true"] {
+  transform: none;
+  visibility: visible;
+}
+
+/* Keep narrow prerendered pages collapsed before the client measures the viewport. */
 @media (max-width: 1100px) {
-  .rail {
-    position: fixed;
-    top: var(--topbar-height);
-    bottom: 0;
-    z-index: 90;
-    width: min(320px, 88vw);
-    visibility: hidden;
-    box-shadow: var(--shadow-pop);
-    transition: transform 0.2s ease;
+  .rail:not([data-drawer="true"]) {
+    display: none;
   }
+}
 
-  .rail-left {
-    transform: translateX(-102%);
-  }
+.app-shell.is-focused .rail-toggle {
+  display: inline-flex;
+}
 
-  .rail-right {
-    transform: translateX(102%);
-  }
+.app-shell.is-focused .canvas-scroll {
+  background: var(--panel-2);
+}
 
-  .rail[data-open="true"] {
-    transform: none;
-    visibility: visible;
-  }
+.app-shell.is-focused .editor-surface {
+  width: 100%;
+  max-width: 900px;
+  min-height: 100%;
+  margin-inline: auto;
+}
 
-  .rail-backdrop {
-    position: fixed;
-    inset: var(--topbar-height) 0 0;
-    z-index: 85;
-    display: block;
-    padding: 0;
-    border: 0;
-    background: oklch(22% 0.01 265 / 0.4);
-  }
+.app-shell.is-focused .panel-dock {
+  align-self: center;
+  width: min(900px, calc(100% - 24px));
 }
 
 @media (min-width: 1101px) {

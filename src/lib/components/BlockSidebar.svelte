@@ -102,7 +102,7 @@
     }
 </script>
 
-<aside class="rail rail-left" data-open={open} inert={compact && !open} id="block-rail" aria-label="블록 삽입">
+<aside class="rail rail-left" data-open={open} data-drawer={compact} inert={compact && !open} id="block-rail" aria-label="블록 삽입">
     <div class="rail-head">
         <div class="ui-segmented ui-segmented--fill" role="tablist" aria-label="삽입 패널">
             <button

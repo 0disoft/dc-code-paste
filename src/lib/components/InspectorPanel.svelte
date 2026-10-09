@@ -72,7 +72,7 @@
     }
 </script>
 
-<aside id="inspector-rail" class="rail rail-right" data-open={open} inert={compact && !open} aria-label="블록 설정">
+<aside id="inspector-rail" class="rail rail-right" data-open={open} data-drawer={compact} inert={compact && !open} aria-label="블록 설정">
     <div class="rail-head">
         <div class="ui-segmented ui-segmented--fill" role="tablist" aria-label="설정 범위">
             <button

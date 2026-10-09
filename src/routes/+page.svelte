@@ -23,6 +23,8 @@
     let leftRailOpen = $state(false);
     let rightRailOpen = $state(false);
     let compact = $state(false);
+    let focusMode = $state(false);
+    const drawerMode = $derived(compact || focusMode);
     let sourceRequest = $state(0);
 
     async function onSourceRequest() {
@@ -36,14 +38,14 @@
 
     async function onSourceNavigate(href: string, from: number, to: number) {
         selectWorkspaceView("editor");
-        if (compact) closeRails();
+        if (drawerMode) closeRails();
         await tick();
         workspace.navigateSentenceSource(href, from, to);
     }
 
     async function onPassageNavigate(passage: ReadingPassage) {
         selectWorkspaceView("editor");
-        if (compact) closeRails();
+        if (drawerMode) closeRails();
         await tick();
         workspace.navigateReadingPassage(passage);
     }
@@ -64,8 +66,13 @@
     onMount(() => {
         const query = window.matchMedia("(max-width: 1100px)");
         function updateMode() {
+            const activeRail = document.activeElement?.closest(".rail");
             compact = query.matches;
             closeRails();
+            if (activeRail && (compact || focusMode)) {
+                const label = activeRail.id === "block-rail" ? "블록 삽입 패널" : "블록 설정 패널";
+                void tick().then(() => document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.focus({ preventScroll: true }));
+            }
         }
         updateMode();
         query.addEventListener("change", updateMode);
@@ -76,7 +83,7 @@
         const opening = side === "left" ? !leftRailOpen : !rightRailOpen;
         leftRailOpen = side === "left" && opening;
         rightRailOpen = side === "right" && opening;
-        if (opening && compact) {
+        if (opening && drawerMode) {
             await tick();
             document.querySelector<HTMLElement>(`${side === "left" ? "#block-rail" : "#inspector-rail"} button`)?.focus();
         }
@@ -84,7 +91,7 @@
 
     async function onPaletteInsert(kind?: PaletteBlockKind) {
         selectWorkspaceView("editor");
-        if (compact) {
+        if (drawerMode) {
             closeRails();
             if (kind === "link") rightRailOpen = true;
         }
@@ -100,14 +107,14 @@
 
     async function onOutlineNavigate(index: number) {
         selectWorkspaceView("editor");
-        if (compact) closeRails();
+        if (drawerMode) closeRails();
         await tick();
         workspace.navigateToBlock(index);
     }
 
     async function onInspectorBlockAction() {
         selectWorkspaceView("editor");
-        if (compact) closeRails();
+        if (drawerMode) closeRails();
         await tick();
         workspace.editor?.commands.focus();
     }
@@ -122,17 +129,73 @@
         rightRailOpen = false;
     }
 
+    function captureCanvasPosition() {
+        const scroller = document.querySelector<HTMLElement>(".canvas-view:not([hidden]) .canvas-scroll");
+        if (!scroller) return () => {};
+        const scrollTop = scroller.scrollTop;
+        const bounds = scroller.getBoundingClientRect();
+        const current = workspace.editor;
+        const doc = current?.state.doc;
+        let position: number | undefined;
+        let offset: number | undefined;
+        let anchor: HTMLElement | undefined;
+        if (activeWorkspaceView === "editor" && current && !current.isDestroyed) {
+            const selected = current.view.coordsAtPos(current.state.selection.from);
+            if (selected.top >= bounds.top && selected.bottom <= bounds.bottom) position = current.state.selection.from;
+            else {
+                const editorBounds = current.view.dom.getBoundingClientRect();
+                position = current.view.posAtCoords({ left: editorBounds.left + 8, top: bounds.top + 8 })?.pos;
+            }
+            if (position !== undefined) offset = current.view.coordsAtPos(position).top - bounds.top;
+        } else {
+            const blocks = "p, h1, h2, h3, pre, li, td";
+            anchor = Array.from(scroller.querySelectorAll<HTMLElement>(`.preview-surface :is(${blocks})`))
+                .find((element) => element.textContent?.trim() && !element.querySelector(blocks) && element.getBoundingClientRect().bottom > bounds.top && element.getBoundingClientRect().top < bounds.bottom);
+            if (anchor) offset = anchor.getBoundingClientRect().top - bounds.top;
+        }
+        return () => {
+            if (!scroller.isConnected) return;
+            scroller.scrollTop = scrollTop;
+            const top = position !== undefined && current && !current.isDestroyed && current.state.doc === doc
+                ? current.view.coordsAtPos(position).top
+                : anchor?.isConnected ? anchor.getBoundingClientRect().top : undefined;
+            if (top !== undefined && offset !== undefined) scroller.scrollTop += top - scroller.getBoundingClientRect().top - offset;
+        };
+    }
+
+    async function toggleFocusMode() {
+        const restorePosition = captureCanvasPosition();
+        const next = !focusMode;
+        focusMode = next;
+        closeRails();
+        if (next) {
+            workspace.isMarkdownPanelOpen = false;
+            workspace.isLlmPanelOpen = false;
+            workspace.isStoragePanelOpen = false;
+        }
+        await tick();
+        if (focusMode !== next) return;
+        if (activeWorkspaceView === "editor") workspace.editor?.view.focus();
+        else document.querySelector<HTMLButtonElement>(".topbar-preview")?.focus({ preventScroll: true });
+        restorePosition();
+    }
+
+    async function dismissRail() {
+        const label = leftRailOpen ? "블록 삽입 패널" : "블록 설정 패널";
+        closeRails();
+        await tick();
+        document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.focus({ preventScroll: true });
+    }
+
     function handleWindowKeydown(event: KeyboardEvent) {
-        if (event.isComposing || !compact || (!leftRailOpen && !rightRailOpen)) return;
+        if (event.isComposing || !drawerMode || (!leftRailOpen && !rightRailOpen)) return;
         if (event.key === "Escape") {
             event.preventDefault();
-            const label = leftRailOpen ? "블록 삽입 패널" : "블록 설정 패널";
-            closeRails();
-            document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)?.focus();
+            void dismissRail();
         } else if (event.key === "Tab") {
             const rail = document.getElementById(leftRailOpen ? "block-rail" : "inspector-rail");
             const targets = Array.from(rail?.querySelectorAll<HTMLElement>(
-                'button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select, textarea, summary, [tabindex="0"]',
+                'button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled]), a[href]:not([tabindex="-1"]), summary, [tabindex="0"]',
             ) ?? []).filter((element) => {
                 const closed = element.closest("details:not([open])");
                 return element.getClientRects().length > 0 && (!closed || closed.querySelector(":scope > summary") === element);
@@ -154,7 +217,7 @@
 
 <svelte:window onkeydown={handleWindowKeydown} />
 
-<div class="app-shell">
+<div class="app-shell" class:is-focused={focusMode}>
     <TopBar
         view={activeWorkspaceView}
         onSelectView={selectWorkspaceView}
@@ -163,14 +226,16 @@
         rightRailOpen={rightRailOpen}
         onToggleLeftRail={() => toggleRail("left")}
         onToggleRightRail={() => toggleRail("right")}
+        {focusMode}
+        onToggleFocusMode={toggleFocusMode}
     />
 
-    {#if leftRailOpen || rightRailOpen}
+    {#if drawerMode && (leftRailOpen || rightRailOpen)}
         <button
             class="rail-backdrop"
             type="button"
             aria-label="패널 닫기"
-            onclick={closeRails}
+            onclick={dismissRail}
         ></button>
     {/if}
 
@@ -192,9 +257,9 @@
     {/if}
 
     <div class="app-body">
-        <BlockSidebar open={leftRailOpen} {compact} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} />
+        <BlockSidebar open={leftRailOpen} compact={drawerMode} onInsert={onPaletteInsert} onNavigate={onOutlineNavigate} {onPassageNavigate} />
 
-        <section class="canvas" aria-label="글쓰기 작업 영역" inert={compact && (leftRailOpen || rightRailOpen)}>
+        <section class="canvas" aria-label="글쓰기 작업 영역" inert={drawerMode && (leftRailOpen || rightRailOpen)}>
             {#if workspace.isStoragePanelOpen ||
                 workspace.isLlmPanelOpen ||
                 workspace.isMarkdownPanelOpen}
@@ -282,7 +347,7 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} />
+            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} layoutRevision={focusMode ? 1 : 0} />
             <PreviewCanvas hidden={activeWorkspaceView !== "preview"} />
 
             {#if workspace.codeLineContextMenu}
@@ -315,7 +380,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} {compact} {sourceRequest} {onSourceNavigate} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen} compact={drawerMode} {sourceRequest} {onSourceNavigate} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />

@@ -17,6 +17,7 @@
     import WandSparkles from "@lucide/svelte/icons/wand-sparkles";
     import Eye from "@lucide/svelte/icons/eye";
     import Type from "@lucide/svelte/icons/type";
+    import Focus from "@lucide/svelte/icons/focus";
     import PanelLeft from "@lucide/svelte/icons/panel-left";
     import PanelRight from "@lucide/svelte/icons/panel-right";
     import SquareArrowOutUpRight from "@lucide/svelte/icons/square-arrow-out-up-right";
@@ -33,6 +34,8 @@
         rightRailOpen: boolean;
         onToggleLeftRail: () => void;
         onToggleRightRail: () => void;
+        focusMode: boolean;
+        onToggleFocusMode: () => void;
     };
 
     let {
@@ -43,6 +46,8 @@
         rightRailOpen,
         onToggleLeftRail,
         onToggleRightRail,
+        focusMode,
+        onToggleFocusMode,
     }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
@@ -130,6 +135,7 @@
     <p class="topbar-title" title={documentTitle}>
         <span class="topbar-title-text">{documentTitle}</span>
         <span class="topbar-title-meta">{characterCount}자</span>
+        {#if focusMode}<span class="focus-mode-label" role="status">집중 중</span>{/if}
     </p>
 
     <button
@@ -246,6 +252,10 @@
             </button>
 
             <span class="ui-menu-sep" aria-hidden="true"></span>
+
+            <button class="ui-menu-item" class:is-active={focusMode} type="button" role="menuitemcheckbox" aria-label={focusMode ? "집중 모드 끝내기" : "집중해서 쓰기"} aria-checked={focusMode} onclick={onToggleFocusMode}>
+                <Focus size={16} aria-hidden="true" /><span>{focusMode ? "집중 모드 끝내기" : "집중해서 쓰기"}</span>
+            </button>
 
             <button class="ui-menu-item" type="button" role="menuitem" aria-label="마지막 복사 결과" disabled={!workspace.lastCopiedOutput} onclick={() => (workspace.isCopiedOutputOpen = true)}>
                 <Clipboard size={16} aria-hidden="true" />

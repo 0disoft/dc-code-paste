@@ -19,6 +19,7 @@
     let open = $state(false);
     let wrap = $state<HTMLDivElement | null>(null);
     let trigger = $state<HTMLButtonElement | null>(null);
+    const menuItemSelector = ':is([role="menuitem"], [role="menuitemcheckbox"]):not([disabled]):not([aria-disabled="true"])';
 
     function close() {
         if (!open) return;
@@ -29,7 +30,7 @@
         open = !open;
         if (open) {
             await tick();
-            wrap?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])')?.focus();
+            wrap?.querySelector<HTMLElement>(menuItemSelector)?.focus();
         }
     }
 
@@ -55,7 +56,7 @@
             trigger?.focus();
         } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
             event.preventDefault();
-            const items = Array.from(wrap?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])') ?? []);
+            const items = Array.from(wrap?.querySelectorAll<HTMLElement>(menuItemSelector) ?? []);
             if (!items.length) return;
             const active = items.findIndex((item) => item === document.activeElement);
             const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (active + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;

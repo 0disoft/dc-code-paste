@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
 
-    let { hidden = false, onSourceRequest }: { hidden?: boolean; onSourceRequest?: () => void } = $props();
+    let { hidden = false, onSourceRequest, layoutRevision = 0 }: { hidden?: boolean; onSourceRequest?: () => void; layoutRevision?: number } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const selection = $derived(workspace.readingIntentSelection);
     let toolbar = $state<HTMLDivElement>();
@@ -52,6 +52,7 @@
         void workspace.documentReplacementVersion;
         void dismissedSelection;
         void hidden;
+        void layoutRevision;
         void workspace.isMarkdownPanelOpen;
         void workspace.isStoragePanelOpen;
         void workspace.isLlmPanelOpen;
