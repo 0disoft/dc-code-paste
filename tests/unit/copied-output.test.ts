@@ -141,3 +141,28 @@ it("reports failed persistence separately from the clipboard result", () => {
   expect(storage.getItem(copiedOutputStorageKey)).toBeNull();
   expect(output.html).toContain("복사한 문장");
 });
+
+it("ignores source review metadata in output comparisons while detecting changed evidence", () => {
+  const original = document();
+  original.content[0].content[0] = {
+    ...original.content[0].content[0],
+    marks: [
+      {
+        type: "sentenceSource",
+        attrs: { href: "https://example.com/source", label: "자료", excerpt: "근거 원문" },
+      },
+    ],
+  } as (typeof original.content)[0]["content"][0];
+  const output = createCopiedOutput(
+    original,
+    preferences,
+    "<p>복사한 문장</p>",
+    "복사한 문장",
+    "preview",
+  )!;
+  const reviewed = structuredClone(output.draft.document);
+  reviewed.content![0].content![0].marks![0].attrs!.reviewKey = "100:0000000100000002";
+  expect(copiedOutputChanges(output, reviewed, preferences).content).toBe(false);
+  reviewed.content![0].content![0].marks![0].attrs!.excerpt = "수정된 근거";
+  expect(copiedOutputChanges(output, reviewed, preferences).content).toBe(true);
+});

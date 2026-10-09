@@ -123,7 +123,16 @@ export function copiedOutputChanges(
   preferences: DraftPreferences,
 ) {
   return {
-    content: JSON.stringify(output.draft.document) !== JSON.stringify(document),
+    content: documentFingerprint(output.draft.document) !== documentFingerprint(document),
     appearance: appearance(output.draft.preferences) !== appearance(preferences),
   };
+}
+
+function documentFingerprint(document: JSONContent) {
+  return JSON.stringify(document, (_key, value) => {
+    if (value?.type !== "sentenceSource" || !value.attrs) return value;
+    const attrs = { ...value.attrs };
+    delete attrs.reviewKey;
+    return { ...value, attrs };
+  });
 }

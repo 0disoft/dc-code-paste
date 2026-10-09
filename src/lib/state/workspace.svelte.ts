@@ -23,7 +23,9 @@ import type { ReadingIntent } from "#lib/editor/reading-intent-format.ts";
 import { normalizeReadingLayout, type ReadingLayout } from "#lib/editor/reading-layout.ts";
 import {
   readSelectionSentenceSource,
+  readSelectionSourceReview,
   setSelectionSentenceSource,
+  setSelectionSourceReviewed,
 } from "#lib/editor/sentence-source.ts";
 import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
 import { createDocumentSourceReader } from "#lib/editor/document-sources.ts";
@@ -3179,6 +3181,19 @@ export function createWorkspaceState() {
     get sentenceSourceSelection() {
       void editorSignal;
       return readSelectionSentenceSource(editor?.state);
+    },
+    get sentenceSourceReview() {
+      void editorSignal;
+      return readSelectionSourceReview(editor?.state, readDocumentSources(editor?.state.doc));
+    },
+    reviewSentenceSource() {
+      if (!editor) return false;
+      const changed = setSelectionSourceReviewed(editor);
+      if (changed) {
+        refreshEditorState(editor);
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
+      }
+      return changed;
     },
     setSentenceSource(source: SentenceSource | null) {
       if (!editor) return false;

@@ -1,5 +1,10 @@
 import type { Node } from "@tiptap/pm/model";
 import {
+  normalizeSourceReviewKey,
+  sourceReviewState,
+  type SourceReviewState,
+} from "./source-review-format.ts";
+import {
   maxSourceLabelLength,
   normalizeSentenceSource,
   type SentenceSource,
@@ -11,6 +16,8 @@ export type SourceMention = {
   text: string;
   label: string;
   excerpt: string;
+  reviewKey: string;
+  review: SourceReviewState;
 };
 export type DocumentSource = {
   href: string;
@@ -23,6 +30,23 @@ const maxMentionTextLength = 220;
 export function documentSourceCatalog(document: Node | undefined): DocumentSource[] {
   if (!document) return [];
   const sources = new Map<string, DocumentSource>();
+  let pending:
+    | { source: SentenceSource; from: number; to: number; text: string; reviewKey: string }
+    | undefined;
+  function flush() {
+    if (!pending) return;
+    const { source, from, to, text, reviewKey } = pending;
+    entryFor(source).mentions.push({
+      from,
+      to,
+      text: text.slice(0, maxMentionTextLength),
+      label: source.label,
+      excerpt: source.excerpt,
+      reviewKey,
+      review: sourceReviewState(text, reviewKey),
+    });
+    pending = undefined;
+  }
   function entryFor(source: SentenceSource) {
     let entry = sources.get(source.href);
     if (!entry) {
@@ -32,7 +56,10 @@ export function documentSourceCatalog(document: Node | undefined): DocumentSourc
     return entry;
   }
   document.descendants((node, pos, parent) => {
-    if (node.type.spec.code) return false;
+    if (node.type.spec.code) {
+      flush();
+      return false;
+    }
     if (node.type.name === "referenceItem") {
       const source = normalizeSentenceSource({
         href: node.attrs.href,
@@ -46,30 +73,33 @@ export function documentSourceCatalog(document: Node | undefined): DocumentSourc
       !mark ||
       !parent?.type.allowsMarkType(mark.type) ||
       node.marks.some((item) => item.type.name === "code")
-    )
-      return;
-    const source = normalizeSentenceSource(mark.attrs);
-    if (!source) return;
-    const entry = entryFor(source);
-    const previous = entry.mentions.at(-1);
-    if (
-      previous &&
-      previous.to === pos &&
-      previous.label === source.label &&
-      previous.excerpt === source.excerpt
     ) {
-      previous.to = pos + node.nodeSize;
-      previous.text = (previous.text + (node.text ?? "")).slice(0, maxMentionTextLength);
+      flush();
+      return;
+    }
+    const source = normalizeSentenceSource(mark.attrs);
+    if (!source) {
+      flush();
+      return;
+    }
+    const reviewKey = normalizeSourceReviewKey(mark.attrs.reviewKey);
+    if (
+      pending &&
+      pending.to === pos &&
+      pending.source.href === source.href &&
+      pending.source.label === source.label &&
+      pending.source.excerpt === source.excerpt &&
+      pending.reviewKey === reviewKey
+    ) {
+      pending.to = pos + node.nodeSize;
+      pending.text += node.text ?? "";
     } else {
-      entry.mentions.push({
-        from: pos,
-        to: pos + node.nodeSize,
-        text: (node.text ?? "").slice(0, maxMentionTextLength),
-        label: source.label,
-        excerpt: source.excerpt,
-      });
+      flush();
+      entryFor(source);
+      pending = { source, from: pos, to: pos + node.nodeSize, text: node.text ?? "", reviewKey };
     }
   });
+  flush();
   return [...sources.values()];
 }
 

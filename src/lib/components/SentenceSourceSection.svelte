@@ -9,6 +9,7 @@
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const selection = $derived(workspace.sentenceSourceSelection);
     const sources = $derived(workspace.documentSources);
+    const review = $derived(workspace.sentenceSourceReview);
     const target = $derived(JSON.stringify([selection.from, selection.to, selection.source, selection.mixed, workspace.documentReplacementVersion]));
     const sentence = $derived(workspace.editor?.state.doc.textBetween(selection.from, selection.to, " ").slice(0, 200) ?? "");
     let href = $state("");
@@ -16,6 +17,8 @@
     let excerpt = $state("");
     let error = $state("");
     let reusableHref = $state("");
+    const reviewState = $derived(review.changedCount ? "changed" : review.untrackedCount ? "untracked" : "unchanged");
+    const savedSourceMatches = $derived(JSON.stringify(normalizeSentenceSource({ href, label, excerpt })) === JSON.stringify(selection.source));
 
     $effect(() => {
         void target;
@@ -50,6 +53,11 @@
         if (!workspace.setSentenceSource(null)) return;
         onApplied?.();
     }
+
+    function renewReview() {
+        if (!savedSourceMatches || !workspace.reviewSentenceSource()) return;
+        onApplied?.();
+    }
 </script>
 
 <section class="ui-section" aria-label="문장 출처">
@@ -59,6 +67,10 @@
         {#if selection.mixed}<p class="ui-hint">선택 영역의 출처가 서로 다릅니다. 적용하면 같은 출처로 연결합니다.</p>{/if}
         {#if selection.source}
             <a class="source-open" href={selection.source.href} target="_blank" rel="noopener noreferrer">자료 열기 · {sentenceSourceLabel(selection.source)}</a>
+            {#if review.mentions.length}
+                <p class="source-review-note" data-source-review-state={reviewState} role="status">{reviewState === "changed" ? "연결한 뒤 이 구간의 문장이 바뀌었습니다. 근거 원문과 현재 문장을 다시 비교하세요." : reviewState === "untracked" ? "이 출처에는 비교할 구간 기록이 없습니다." : "연결·기준 갱신 이후 구간 문장이 같습니다."}</p>
+                {#if reviewState !== "unchanged"}<button class="ui-btn ui-btn--outline" type="button" disabled={!savedSourceMatches} onclick={renewReview}>현재 구간으로 기준 갱신</button>{/if}
+            {/if}
         {/if}
     {:else}
         <p class="ui-hint">문장을 선택해 출처를 연결하세요. 연결한 문장을 누르면 자료를 수정할 수 있습니다.</p>
@@ -95,7 +107,7 @@
             <button class="ui-btn ui-btn--outline" type="button" disabled={!selection.hasSource} onclick={remove}>출처 해제</button>
         </div>
     </form>
-    <p class="ui-hint">복사할 때 문장 뒤에 출처 링크를 표시합니다. 근거 원문은 이 편집기에서 문장을 눌러 확인합니다.</p>
+    <p class="ui-hint">복사할 때 문장 뒤에 출처 링크를 표시합니다. 근거 원문은 이 편집기에서 문장을 눌러 확인합니다. 출처 연결·수정 또는 기준 갱신 시점의 구간과 비교합니다.</p>
     {/if}
 </section>
 
@@ -107,4 +119,6 @@
     .source-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .source-open { color: var(--accent); font-size: 0.8rem; overflow-wrap: anywhere; }
     .source-error { margin: 0; color: var(--danger, #b91c1c); font-size: 0.8rem; }
+    .source-review-note { margin: 0; font-size: 0.8rem; line-height: 1.65; color: var(--muted); }
+    .source-review-note[data-source-review-state="changed"] { color: var(--accent-strong); }
 </style>
