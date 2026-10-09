@@ -61,6 +61,10 @@
     }
 
     function startNote() {
+        if (open) {
+            field?.focus();
+            return;
+        }
         pinned = unit;
         draft = "";
         status = "";
@@ -94,7 +98,7 @@
     }
 </script>
 
-<article class="reading-unit" data-unit-code={unit.code}>
+<article class="reading-unit" data-unit-code={unit.code} data-reading-unit-index={unit.index} aria-label={`읽기 구간 ${unit.index + 1}`} tabindex="-1">
     {#if busy && !html}
         <p class="unit-notice" role="status">구간을 준비하는 중</p>
     {:else if failed}
@@ -154,6 +158,10 @@
     .reading-unit {
         min-width: 0;
         max-width: 100%;
+    }
+    .reading-unit:focus-visible {
+        outline: 2px solid var(--focus);
+        outline-offset: 2px;
     }
     .unit-document {
         min-width: 0;

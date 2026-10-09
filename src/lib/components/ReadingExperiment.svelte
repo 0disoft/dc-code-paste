@@ -26,6 +26,7 @@
     let recapOpen = $state(false);
     let scroller = $state<HTMLElement>();
     let recapButton = $state<HTMLButtonElement>();
+    let navigationRevision = 0;
 
     const widths = [
         { value: "fit", label: "맞춤", width: "100%" },
@@ -80,21 +81,32 @@
         return readingIntentOptions.find((item) => item.value === value)?.label ?? value;
     }
 
-    function startProgressive() {
-        progressive = true;
-        revealed = 1;
+    async function focusUnit(index: number | undefined, revision: number) {
+        await tick();
+        if (hidden || !progressive || revision !== navigationRevision || !scroller || index === undefined) return;
+        const target = scroller.querySelector<HTMLElement>(`[data-reading-unit-index="${index}"]`);
+        if (!target) return;
+        target.focus({ preventScroll: true });
+        const inset = Number.parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+        scroller.scrollTop += target.getBoundingClientRect().top - scroller.getBoundingClientRect().top - inset;
     }
 
-    function revealNext() {
-        revealed = Math.min(revealed + 1, units.length);
+    async function startProgressive() {
+        progressive = true;
+        revealed = Math.min(1, units.length);
+        recapOpen = false;
+        await focusUnit(units[0]?.index, ++navigationRevision);
     }
 
-    function resetProgressive() {
-        progressive = true;
-        revealed = 1;
+    async function revealNext() {
+        if (!progressive || hidden || revealed >= units.length) return;
+        const next = units[revealed];
+        revealed += 1;
+        await focusUnit(next.index, ++navigationRevision);
     }
 
     function showAll() {
+        navigationRevision += 1;
         progressive = false;
     }
 
@@ -130,14 +142,14 @@
         </div>
         <div class="reading-progress">
             {#if progressive}
-                <span role="status">{revealed} / {units.length} 구간</span>
+                <span role="status">{Math.min(revealed, units.length)} / {units.length} 구간</span>
                 <button
                     class="ui-btn ui-btn--outline"
                     type="button"
                     disabled={revealed >= units.length}
                     onclick={revealNext}>다음 구간 펼치기</button
                 >
-                <button class="ui-btn ui-btn--outline" type="button" onclick={resetProgressive}
+                <button class="ui-btn ui-btn--outline" type="button" disabled={!units.length} onclick={startProgressive}
                     >처음부터 다시 읽기</button
                 >
                 <button class="ui-btn ui-btn--outline" type="button" onclick={showAll}
@@ -265,9 +277,12 @@
                     <p class="reading-empty" role="status">아직 읽을 본문이 없습니다.</p>
                 {/if}
                 {#if progressive && revealed < units.length}
-                    <p class="reading-hint" role="status">
-                        여기까지 읽었습니다. ‘다음 구간 펼치기’로 이어서 보세요.
-                    </p>
+                    <div class="reading-continuation">
+                        <p class="reading-hint" role="status">여기까지 펼쳤습니다.</p>
+                        <button class="ui-btn ui-btn--primary" type="button" onclick={revealNext}>이어서 다음 구간 펼치기</button>
+                    </div>
+                {:else if progressive && units.length}
+                    <p class="reading-hint" role="status">마지막 구간까지 펼쳤습니다.</p>
                 {/if}
             </div>
         </div>
@@ -325,6 +340,13 @@
         color: var(--muted);
         font-size: 0.82rem;
         line-height: 1.65;
+    }
+    .reading-continuation {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        padding: 8px 0;
     }
     .note-recap {
         display: grid;
@@ -479,6 +501,7 @@
             padding: 8px;
         }
         .reading-head button,
+        .reading-continuation button,
         .note-recap button {
             min-height: 44px;
         }

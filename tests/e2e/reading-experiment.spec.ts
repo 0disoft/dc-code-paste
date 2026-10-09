@@ -9,24 +9,55 @@ async function startReading(page: Page) {
   return reader;
 }
 
-async function prepare(page: Page) {
+async function prepare(
+  page: Page,
+  markdown = "# 처음 보는 글\n\n**[핵심 문장](https://example.com/source)** 입니다.\n\n설명은 뒤에 나옵니다.\n\n```js\nconsole.log('code');\n```\n\n---\n\n마지막 문장",
+) {
   await page.goto("./");
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
   await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
   await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
-  await page
-    .getByLabel("Markdown 원문")
-    .fill(
-      "# 처음 보는 글\n\n**[핵심 문장](https://example.com/source)** 입니다.\n\n설명은 뒤에 나옵니다.\n\n```js\nconsole.log('code');\n```\n\n---\n\n마지막 문장",
-    );
+  await page.getByLabel("Markdown 원문").fill(markdown);
   await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
-  await expect(page.locator(".article-editor p").first()).toContainText("핵심 문장");
+  await expect(page.locator(".article-editor p").first()).toBeVisible();
   await expect(page.locator(".topbar-status")).toContainText("저장됨");
   await page.reload();
   await expect(page.locator(".article-editor")).toContainText("처음 보는 글");
 }
 
 for (const mobile of [false, true]) {
+  test(`keeps newly revealed passages in view on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1487, height: 900 });
+    await prepare(
+      page,
+      `# 처음 보는 글\n\n${"긴 문장을 읽으며 여기까지의 뜻을 확인합니다. ".repeat(120)}\n\n다음 구간은 새로 펼친 자리입니다.\n\n마지막 구간입니다.`,
+    );
+    const reader = await startReading(page);
+    await reader.getByRole("button", { name: "차례로 펼치기", exact: true }).click();
+    const units = reader.locator(".reading-unit");
+    await expect(units).toHaveCount(1);
+    const next = reader.getByRole("button", { name: "다음 구간 펼치기", exact: true });
+    await next.click();
+    await next.click();
+    await expect(units).toHaveCount(3);
+    await expect(units.nth(2)).toBeInViewport();
+    await expect(units.nth(2)).toBeFocused();
+    const scroller = reader.locator(".reading-scroll");
+    expect(await scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+    await reader.getByRole("button", { name: "이어서 다음 구간 펼치기", exact: true }).click();
+    await expect(units).toHaveCount(4);
+    await expect(units.last()).toBeFocused();
+    await expect(units.last()).toBeInViewport();
+    await expect(next).toBeDisabled();
+    await expect(reader).toContainText("마지막 구간까지 펼쳤습니다.");
+    await reader.getByRole("button", { name: "처음부터 다시 읽기", exact: true }).click();
+    await expect(units).toHaveCount(1);
+    await expect(units.first()).toBeFocused();
+    expect(await scroller.evaluate((element) => element.scrollTop)).toBe(0);
+  });
+
   test(`reads progressively and saves notes back to the original passage on ${mobile ? "mobile" : "desktop"}`, async ({
     page,
   }, testInfo) => {
@@ -137,6 +168,11 @@ test("keeps the editor selection on exit and undoes notes without leaving the re
   const noteButton = reader.getByRole("button", { name: "읽기 구간 2 메모", exact: true });
   await noteButton.click();
   await reader.getByRole("textbox", { name: "읽기 메모", exact: true }).fill("설명 필요");
+  await noteButton.click();
+  await expect(reader.getByRole("textbox", { name: "읽기 메모", exact: true })).toHaveValue(
+    "설명 필요",
+  );
+  await expect(reader.getByRole("textbox", { name: "읽기 메모", exact: true })).toBeFocused();
   await reader.getByRole("textbox", { name: "읽기 메모", exact: true }).press("Escape");
   await expect(noteButton).toBeFocused();
   await expect(reader.getByRole("textbox", { name: "읽기 메모", exact: true })).toHaveCount(0);
