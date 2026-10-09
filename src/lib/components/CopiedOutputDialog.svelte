@@ -4,6 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { downloadReadableHtml } from "#lib/dc/html-file.ts";
     import X from "@lucide/svelte/icons/x";
+    import RoundtripComparison from "./RoundtripComparison.svelte";
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     let dialog = $state<HTMLDialogElement>();
@@ -11,6 +12,8 @@
     let fileError = $state("");
     let source = $state<HTMLTextAreaElement>();
     let showSource = $state(false);
+    let view = $state<"current" | "returned">("current");
+    let returnedOpened = $state(false);
     const output = $derived(workspace.lastCopiedOutput);
     const changes = $derived(workspace.isCopiedOutputOpen ? workspace.copiedOutputChanges : undefined);
     const changeLabel = $derived(changes?.content && changes.appearance ? "내용과 글 설정이 바뀌었습니다." : changes?.content ? "내용이 바뀌었습니다." : changes?.appearance ? "글 설정이 바뀌었습니다." : "현재 글이 복사 당시와 같습니다.");
@@ -27,6 +30,8 @@
             openedDocumentVersion = workspace.documentReplacementVersion;
             fileError = "";
             showSource = false;
+            view = "current";
+            returnedOpened = false;
             dialog.showModal();
         } else if ((!workspace.isCopiedOutputOpen || !output) && dialog.open) dialog.close();
     });
@@ -34,6 +39,14 @@
     $effect(() => { if (workspace.savedOutputCopyState === "error") showSource = true; });
 
     function close() { workspace.isCopiedOutputOpen = false; }
+    function selectView(next: "current" | "returned") { view = next; if (next === "returned") returnedOpened = true; }
+    function tabKey(event: KeyboardEvent) {
+        if (event.isComposing || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? "current" : event.key === "End" ? "returned" : view === "current" ? "returned" : "current";
+        selectView(next);
+        document.getElementById(`copied-output-${next}-tab`)?.focus();
+    }
     async function restoreFocus() {
         close();
         await tick();
@@ -64,11 +77,20 @@
             </div>
             {#if workspace.savedOutputCopyState === "error"}<p class="ui-hint" role="alert">자동 복사가 막혔습니다. 아래 HTML 원문을 디씨 HTML 모드에 붙여넣거나 파일로 저장해 주세요.</p>{/if}
             {#if workspace.copiedOutputError || fileError}<p class="ui-hint" role="alert">{workspace.copiedOutputError || fileError}</p>{/if}
+            <div class="ui-segmented ui-segmented--fill" role="tablist" aria-label="복사 결과 비교 방식">
+                <button id="copied-output-current-tab" class:is-active={view === "current"} type="button" role="tab" aria-selected={view === "current"} aria-controls="copied-output-current-panel" tabindex={view === "current" ? 0 : -1} onclick={() => selectView("current")} onkeydown={tabKey}>현재 글과 비교</button>
+                <button id="copied-output-returned-tab" class:is-active={view === "returned"} type="button" role="tab" aria-selected={view === "returned"} aria-controls="copied-output-returned-panel" tabindex={view === "returned" ? 0 : -1} onclick={() => selectView("returned")} onkeydown={tabKey}>붙여넣은 결과와 비교</button>
+            </div>
+            <div id="copied-output-current-panel" role="tabpanel" aria-labelledby="copied-output-current-tab" hidden={view !== "current"}>
             <div class="output-comparison">
                 <section aria-label="복사 당시 결과"><h3>복사 당시</h3><iframe title="복사 당시 글 미리보기" sandbox="" srcdoc={previewDocument(output.html)}></iframe></section>
                 <section aria-label="현재 글 결과"><h3>현재 글</h3>{#if workspace.isRendering}<p role="status">현재 글을 만드는 중입니다.</p>{:else if workspace.previewError}<p role="alert">{workspace.previewError}</p>{:else}<iframe title="현재 글 미리보기" sandbox="" srcdoc={previewDocument(workspace.html)}></iframe>{/if}</section>
             </div>
             <details bind:open={showSource}><summary>복사 당시 HTML 원문</summary><div class="source-tools"><button class="ui-btn ui-btn--outline" type="button" onclick={() => { source?.focus(); source?.select(); }}>원문 전체 선택</button><p class="ui-hint">HTML 원문은 디씨 HTML 모드에 붙여넣습니다.</p></div><textarea bind:this={source} aria-label="복사 당시 HTML 원문" readonly spellcheck="false" value={output.html}></textarea></details>
+            </div>
+            <div id="copied-output-returned-panel" role="tabpanel" aria-labelledby="copied-output-returned-tab" hidden={view !== "returned"}>
+                {#if returnedOpened}<RoundtripComparison {output} />{/if}
+            </div>
         </div>
     {/if}
 </dialog>

@@ -9,6 +9,12 @@ test("extracts inert clipboard HTML, preserves code, compares equivalent lists a
   page,
 }) => {
   const folder = await mkdtemp(join(tmpdir(), "dc-roundtrip-parser-"));
+  const target = resolve(folder);
+  if (
+    !target.startsWith(`${resolve(tmpdir())}${sep}`) ||
+    !basename(target).startsWith("dc-roundtrip-parser-")
+  )
+    throw new Error("Unexpected temporary fixture path");
   try {
     const bundle = join(folder, "fixture.js");
     execFileSync(
@@ -111,12 +117,6 @@ test("extracts inert clipboard HTML, preserves code, compares equivalent lists a
     expect(result.stale).toContain("구간이 바뀌었습니다");
     expect(result.deep).toContain("구조가 너무 깊습니다");
   } finally {
-    const target = resolve(folder);
-    if (
-      !target.startsWith(`${resolve(tmpdir())}${sep}`) ||
-      !basename(target).startsWith("dc-roundtrip-parser-")
-    )
-      throw new Error("Unexpected temporary fixture path");
     await rm(target, { recursive: true, force: true });
   }
 });
