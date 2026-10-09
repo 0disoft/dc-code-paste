@@ -36,6 +36,9 @@
         onToggleRightRail: () => void;
         focusMode: boolean;
         onToggleFocusMode: () => void;
+        readingMode?: boolean;
+        onStartReading: () => void;
+        onEndReading: () => void;
     };
 
     let {
@@ -48,6 +51,9 @@
         onToggleRightRail,
         focusMode,
         onToggleFocusMode,
+        readingMode = false,
+        onStartReading,
+        onEndReading,
     }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
@@ -135,10 +141,10 @@
     <p class="topbar-title" title={documentTitle}>
         <span class="topbar-title-text">{documentTitle}</span>
         <span class="topbar-title-meta">{characterCount}자</span>
-        {#if focusMode}<span class="focus-mode-label" role="status">집중 중</span>{/if}
+        {#if readingMode}<span class="focus-mode-label" role="status">읽는 중</span>{:else if focusMode}<span class="focus-mode-label" role="status">집중 중</span>{/if}
     </p>
 
-    <button
+    {#if !readingMode}<button
         class="ui-btn ui-btn--chrome ui-btn--icon rail-toggle"
         type="button"
         aria-label="블록 삽입 패널"
@@ -156,6 +162,7 @@
     >
         <PanelRight size={18} />
     </button>
+    {/if}
 
     <div class="topbar-actions">
         <button
@@ -165,7 +172,7 @@
             aria-label="실행 취소"
             disabled={!workspace.canUndo()}
             onclick={() =>
-                workspace.runEditorCommand((current) => current.chain().focus().undo().run())}
+                workspace.runEditorCommand((current) => readingMode ? current.chain().undo().run() : current.chain().focus().undo().run())}
         >
             <Undo2 size={17} />
         </button>
@@ -176,7 +183,7 @@
             aria-label="다시 실행"
             disabled={!workspace.canRedo()}
             onclick={() =>
-                workspace.runEditorCommand((current) => current.chain().focus().redo().run())}
+                workspace.runEditorCommand((current) => readingMode ? current.chain().redo().run() : current.chain().focus().redo().run())}
         >
             <Redo2 size={17} />
         </button>
@@ -196,12 +203,12 @@
             class="ui-btn ui-btn--chrome topbar-preview"
             class:is-active={view === "preview"}
             type="button"
-            aria-label={view === "editor" ? "미리보기" : "글쓰기"}
+            aria-label={readingMode ? "글쓰기" : view === "editor" ? "미리보기" : "글쓰기"}
             aria-pressed={view === "preview"}
-            onclick={() => onSelectView(view === "editor" ? "preview" : "editor")}
+            onclick={() => readingMode ? onEndReading() : onSelectView(view === "editor" ? "preview" : "editor")}
         >
             {#if view === "editor"}<Eye size={17} aria-hidden="true" />{:else}<Type size={17} aria-hidden="true" />{/if}
-            <span>{view === "editor" ? "미리보기" : "글쓰기"}</span>
+            <span>{readingMode ? "글쓰기" : view === "editor" ? "미리보기" : "글쓰기"}</span>
         </button>
 
         <OverflowMenu label="더보기 메뉴" menuLabel="도구 메뉴">
@@ -252,6 +259,8 @@
             </button>
 
             <span class="ui-menu-sep" aria-hidden="true"></span>
+
+            <button class="ui-menu-item" type="button" role="menuitem" aria-label={readingMode ? "읽어보기 끝내기" : "처음부터 읽어보기"} disabled={workspace.editorMountState !== "ready"} onclick={() => readingMode ? onEndReading() : onStartReading()}><Eye size={16} aria-hidden="true" /><span>{readingMode ? "읽어보기 끝내기" : "처음부터 읽어보기"}</span></button>
 
             <button class="ui-menu-item" class:is-active={focusMode} type="button" role="menuitemcheckbox" aria-label={focusMode ? "집중 모드 끝내기" : "집중해서 쓰기"} aria-checked={focusMode} onclick={onToggleFocusMode}>
                 <Focus size={16} aria-hidden="true" /><span>{focusMode ? "집중 모드 끝내기" : "집중해서 쓰기"}</span>

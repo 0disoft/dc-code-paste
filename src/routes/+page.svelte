@@ -16,6 +16,8 @@
     import PreviewCanvas from "#lib/components/PreviewCanvas.svelte";
     import CopyRecovery from "#lib/components/CopyRecovery.svelte";
     import CopiedOutputDialog from "#lib/components/CopiedOutputDialog.svelte";
+    import ReadingExperiment from "#lib/components/ReadingExperiment.svelte";
+    import { relationFreeDocument } from "#lib/editor/relation-free-document.ts";
 
     type WorkspaceView = "editor" | "preview";
 
@@ -26,11 +28,51 @@
     let rightRailOpen = $state(false);
     let compact = $state(false);
     let focusMode = $state(false);
-    const drawerMode = $derived(compact || focusMode);
+    let readingMode = $state(false);
+    let readingOpened = $state(false);
+    let readingReturnPosition: (() => void) | undefined;
+    const drawerMode = $derived(compact || focusMode || readingMode);
     let sourceRequest = $state(0);
     let relationRequest = $state(0);
     let relationReviewId = $state<string>();
     const relationReview = $derived(workspace.sentenceRelations.find((entry) => entry.relation.id === relationReviewId));
+
+    async function startReading() {
+        if (workspace.editorMountState !== "ready") return;
+        readingReturnPosition = captureCanvasPosition();
+        readingOpened = true;
+        readingMode = true;
+        closeRails();
+        workspace.isStoragePanelOpen = false;
+        workspace.isMarkdownPanelOpen = false;
+        workspace.isLlmPanelOpen = false;
+        workspace.readingExperiment.clearError();
+        await tick();
+        if (readingMode) document.getElementById("reading-experiment-view")?.focus({ preventScroll: true });
+    }
+
+    async function endReading() {
+        const restore = readingReturnPosition;
+        readingReturnPosition = undefined;
+        readingMode = false;
+        await tick();
+        if (activeWorkspaceView === "editor") workspace.editor?.view.focus();
+        else document.querySelector<HTMLButtonElement>(".topbar-preview")?.focus({ preventScroll: true });
+        restore?.();
+    }
+
+    async function onReadingNoteNavigate(anchor: RelationAnchor) {
+        readingMode = false;
+        readingReturnPosition = undefined;
+        await onRelationNavigate(anchor);
+    }
+
+    $effect(() => {
+        if (readingMode && (workspace.isStoragePanelOpen || workspace.isMarkdownPanelOpen || workspace.isLlmPanelOpen)) {
+            readingMode = false;
+            readingReturnPosition = undefined;
+        }
+    });
 
     $effect(() => {
         if (relationReviewId && !relationReview) relationReviewId = undefined;
@@ -110,6 +152,9 @@
             closeRails();
             workspace.isStoragePanelOpen = false;
             relationReviewId = undefined;
+            readingMode = false;
+            readingOpened = false;
+            readingReturnPosition = undefined;
             void tick().then(() => {
                 if (workspace.documentReplacementVersion === version) workspace.editor?.commands.focus("start");
             });
@@ -154,6 +199,7 @@
     }
 
     function selectWorkspaceView(view: WorkspaceView) {
+        readingMode = false;
         activeWorkspaceView = view;
         workspace.setPreviewVisible(view === "preview");
     }
@@ -209,7 +255,8 @@
         return () => {
             if (!scroller.isConnected) return;
             scroller.scrollTop = scrollTop;
-            const top = position !== undefined && current && !current.isDestroyed && current.state.doc === doc
+            const unchanged = current && doc && (current.state.doc === doc || JSON.stringify(relationFreeDocument(current.state.doc.toJSON())) === JSON.stringify(relationFreeDocument(doc.toJSON())));
+            const top = position !== undefined && current && !current.isDestroyed && unchanged
                 ? current.view.coordsAtPos(position).top
                 : anchor?.isConnected ? anchor.getBoundingClientRect().top : undefined;
             if (top !== undefined && offset !== undefined) scroller.scrollTop += top - scroller.getBoundingClientRect().top - offset;
@@ -217,6 +264,7 @@
     }
 
     async function toggleFocusMode() {
+        if (readingMode) { focusMode = !focusMode; closeRails(); return; }
         const restorePosition = captureCanvasPosition();
         const next = !focusMode;
         focusMode = next;
@@ -270,7 +318,7 @@
 
 <svelte:window onkeydown={handleWindowKeydown} />
 
-<div class="app-shell" class:is-focused={focusMode}>
+<div class="app-shell" class:is-focused={focusMode || readingMode}>
     <TopBar
         view={activeWorkspaceView}
         onSelectView={selectWorkspaceView}
@@ -281,6 +329,9 @@
         onToggleRightRail={() => toggleRail("right")}
         {focusMode}
         onToggleFocusMode={toggleFocusMode}
+        {readingMode}
+        onStartReading={startReading}
+        onEndReading={endReading}
     />
 
     {#if drawerMode && (leftRailOpen || rightRailOpen)}
@@ -400,8 +451,9 @@
                 </div>
             {/if}
 
-            <EditorCanvas hidden={activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0)} />
-            <PreviewCanvas hidden={activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
+            <EditorCanvas hidden={readingMode || activeWorkspaceView !== "editor"} {onSourceRequest} {onRelationRequest} {relationReview} {onRelationNavigate} onReviewClose={closeRelationReview} layoutRevision={(focusMode ? 1 : 0) + (relationReview ? 2 : 0)} />
+            <PreviewCanvas hidden={readingMode || activeWorkspaceView !== "preview"} {onEmphasisNavigate} />
+            {#if readingOpened}<ReadingExperiment hidden={!readingMode} onExit={endReading} onNavigate={onReadingNoteNavigate} />{/if}
 
             {#if workspace.codeLineContextMenu}
                 <div

@@ -58,6 +58,7 @@ import {
   type SelectedRelationPassage,
 } from "#lib/editor/sentence-relation-commands.ts";
 import { closeHistory } from "@tiptap/pm/history";
+import { createReadingExperimentState } from "./reading-experiment.svelte.ts";
 import {
   clearCopiedOutput,
   copiedOutputChanges,
@@ -483,6 +484,14 @@ export function createWorkspaceState() {
   const readReadingPassages = createReadingPassageReader();
   const readEmphasisReview = createEmphasisReviewReader();
   const readSentenceRelations = createSentenceRelationReader();
+  const readingExperiment = createReadingExperimentState({
+    editor: () => {
+      void documentJson;
+      return editor;
+    },
+    exportOptions,
+    render: (document, options) => exportSession.exportDocument(document, options),
+  });
 
   $effect(() => {
     void documentReplacementVersion;
@@ -3264,6 +3273,7 @@ export function createWorkspaceState() {
       void documentJson;
       return readSentenceRelations(editor?.state.doc);
     },
+    readingExperiment,
     get selectedSentenceRelations() {
       void editorSignal;
       const selection = editor?.state.selection;
