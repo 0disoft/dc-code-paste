@@ -32,6 +32,13 @@
         document.getElementById("sentence-source-href")?.focus();
     }
 
+    async function onSourceNavigate(href: string, from: number, to: number) {
+        selectWorkspaceView("editor");
+        if (compact) closeRails();
+        await tick();
+        workspace.navigateSentenceSource(href, from, to);
+    }
+
     $effect(() => {
         const version = workspace.documentReplacementVersion;
         if (!version) return;
@@ -299,7 +306,7 @@
             {/if}
         </section>
 
-        <InspectorPanel open={rightRailOpen} {compact} {sourceRequest} onBlockAction={onInspectorBlockAction} />
+        <InspectorPanel open={rightRailOpen} {compact} {sourceRequest} {onSourceNavigate} onBlockAction={onInspectorBlockAction} />
     </div>
 
     <CopyRecovery />

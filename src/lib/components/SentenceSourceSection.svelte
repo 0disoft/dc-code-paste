@@ -3,16 +3,19 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import { maxSourceLabelLength, maxSourceExcerptLength, normalizeSentenceSource, sentenceSourceLabel } from "#lib/editor/sentence-source-format.ts";
+    import { reuseDocumentSource } from "#lib/editor/document-sources.ts";
 
     let { onApplied }: { onApplied?: () => void } = $props();
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
     const selection = $derived(workspace.sentenceSourceSelection);
+    const sources = $derived(workspace.documentSources);
     const target = $derived(JSON.stringify([selection.from, selection.to, selection.source, selection.mixed, workspace.documentReplacementVersion]));
     const sentence = $derived(workspace.editor?.state.doc.textBetween(selection.from, selection.to, " ").slice(0, 200) ?? "");
     let href = $state("");
     let label = $state("");
     let excerpt = $state("");
     let error = $state("");
+    let reusableHref = $state("");
 
     $effect(() => {
         void target;
@@ -20,7 +23,18 @@
         label = selection.source?.label ?? "";
         excerpt = selection.source?.excerpt ?? "";
         error = "";
+        reusableHref = "";
     });
+
+    function reuse(selectedHref: string) {
+        const entry = sources.find((item) => item.href === selectedHref);
+        if (!entry) return;
+        const draft = reuseDocumentSource({ href, label, excerpt }, entry);
+        href = draft.href;
+        label = draft.label;
+        excerpt = draft.excerpt;
+        error = "";
+    }
 
     function apply(event: SubmitEvent) {
         event.preventDefault();
@@ -51,6 +65,18 @@
     {/if}
     {#if selection.canApply}
     <form class="source-form" onsubmit={apply}>
+        {#if sources.length}
+            <label class="ui-field">
+                <span class="ui-label">이 글의 자료에서 선택</span>
+                <select class="ui-select" aria-label="이 글의 자료에서 선택" bind:value={reusableHref} onchange={(event) => reuse(event.currentTarget.value)}>
+                    <option value="">자료를 선택하세요</option>
+                    {#each sources as source (source.href)}
+                        <option value={source.href}>{sentenceSourceLabel({ href: source.href, label: source.label, excerpt: "" })}</option>
+                    {/each}
+                </select>
+            </label>
+            <p class="ui-hint">주소와 이름만 가져옵니다. 근거 원문은 문장마다 입력하세요.</p>
+        {/if}
         <label class="ui-field">
             <span class="ui-label">자료 주소</span>
             <input id="sentence-source-href" class="ui-input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://…" maxlength="4096" bind:value={href} disabled={!selection.canApply} aria-invalid={!!error} aria-describedby={error ? "sentence-source-error" : undefined} oninput={() => error = ""} />

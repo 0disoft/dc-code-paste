@@ -11,6 +11,7 @@
     import SelectionTextSection from "./SelectionTextSection.svelte";
     import ReadingIntentSection from "./ReadingIntentSection.svelte";
     import SentenceSourceSection from "./SentenceSourceSection.svelte";
+    import DocumentSourcesSection from "./DocumentSourcesSection.svelte";
     import ArticleSettingsSection from "./ArticleSettingsSection.svelte";
     import Megaphone from "@lucide/svelte/icons/megaphone";
     import Type from "@lucide/svelte/icons/type";
@@ -21,9 +22,10 @@
         compact?: boolean;
         onBlockAction?: () => void;
         sourceRequest?: number;
+        onSourceNavigate?: (href: string, from: number, to: number) => void;
     };
 
-    let { open = true, compact = false, onBlockAction, sourceRequest = 0 }: Props = $props();
+    let { open = true, compact = false, onBlockAction, sourceRequest = 0, onSourceNavigate }: Props = $props();
 
     const workspace = getContext<WorkspaceState>(WORKSPACE_CONTEXT_KEY);
 
@@ -205,6 +207,7 @@
             aria-labelledby="article-tab"
         >
             <ArticleSettingsSection />
+            <DocumentSourcesSection onNavigate={onSourceNavigate} />
         </div>
     {/if}
 </aside>

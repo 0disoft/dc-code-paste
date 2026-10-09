@@ -26,6 +26,7 @@ import {
   setSelectionSentenceSource,
 } from "#lib/editor/sentence-source.ts";
 import type { SentenceSource } from "#lib/editor/sentence-source-format.ts";
+import { createDocumentSourceReader } from "#lib/editor/document-sources.ts";
 import {
   documentOutline,
   activeOutlineIndex,
@@ -310,6 +311,8 @@ export function createWorkspaceState() {
 
   let documentTheme = $state<DcDocumentTheme>("cleanEditorial");
   let readingLayout = $state<ReadingLayout>("balanced");
+  let selectionToolbarAction = $state({ revision: 0, dismiss: false });
+  let editorSelectionRevision = $state(0);
 
   let html = $state("");
   let previewVisible = $state(false);
@@ -413,6 +416,7 @@ export function createWorkspaceState() {
   let invalidDraftDownloaded = $state(false);
 
   const exportSession = createDcExportSession();
+  const readDocumentSources = createDocumentSourceReader();
   const copyFeedback = createCopyFeedbackController();
   const copyTasks = createCopyTaskController((channel) => {
     activeCopyChannel = channel;
@@ -2877,6 +2881,7 @@ export function createWorkspaceState() {
             refreshEditorState(current);
         },
         onSelectionUpdate: ({ editor: current }) => {
+          editorSelectionRevision++;
           syncBlockLabelDraft(current, true);
           syncTutorialBlockTarget(current);
           syncCalloutColorDraft(current);
@@ -2932,6 +2937,31 @@ export function createWorkspaceState() {
     return clearScheduledDraftPersist;
   });
   return {
+    get selectionToolbarAction() {
+      return selectionToolbarAction;
+    },
+    get editorSelectionRevision() {
+      return editorSelectionRevision;
+    },
+    get documentSources() {
+      void documentJson;
+      return readDocumentSources(editor?.state.doc);
+    },
+    navigateSentenceSource(href: string, from: number, to: number) {
+      if (
+        !editor ||
+        !readDocumentSources(editor.state.doc).some(
+          (source) =>
+            source.href === href &&
+            source.mentions.some((mention) => mention.from === from && mention.to === to),
+        )
+      )
+        return false;
+      const selected = editor.chain().focus().setTextSelection({ from, to }).run();
+      if (selected)
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: false };
+      return selected;
+    },
     get sentenceSourceSelection() {
       void editorSignal;
       return readSelectionSentenceSource(editor?.state);
@@ -2939,7 +2969,10 @@ export function createWorkspaceState() {
     setSentenceSource(source: SentenceSource | null) {
       if (!editor) return false;
       const changed = setSelectionSentenceSource(editor, source);
-      if (changed) refreshEditorState(editor);
+      if (changed) {
+        refreshEditorState(editor);
+        selectionToolbarAction = { revision: selectionToolbarAction.revision + 1, dismiss: true };
+      }
       return changed;
     },
     get readingIntentSelection() {

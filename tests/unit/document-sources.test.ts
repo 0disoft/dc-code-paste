@@ -14,7 +14,11 @@ const source = {
   label: "실험 기록",
   excerpt: "첫 문장의 원문",
 };
-const marked = (text: string, attrs = source, extra: JSONContent[] = []): JSONContent => ({
+const marked = (
+  text: string,
+  attrs = source,
+  extra: NonNullable<JSONContent["marks"]> = [],
+): JSONContent => ({
   type: "text",
   text,
   marks: [{ type: "sentenceSource", attrs }, ...extra],

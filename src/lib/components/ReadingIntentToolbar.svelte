@@ -9,10 +9,23 @@
     const selection = $derived(workspace.readingIntentSelection);
     let toolbar = $state<HTMLDivElement>();
     let position = $state<{ left: number; top: number } | null>(null);
+    let dismissedSelection = $state<string | null>(null);
+    function selectionKey() {
+        return `${workspace.editorSelectionRevision}:${workspace.documentReplacementVersion}`;
+    }
+
+    $effect(() => {
+        const action = workspace.selectionToolbarAction;
+        if (action.revision) untrack(() => dismissedSelection = action.dismiss ? selectionKey() : null);
+    });
+    $effect(() => {
+        void selection;
+        if (dismissedSelection !== selectionKey()) dismissedSelection = null;
+    });
 
     function updatePosition() {
         const current = workspace.editor;
-        if (hidden || !selection.canApply || !current || current.isDestroyed ||
+        if (hidden || dismissedSelection === selectionKey() || !selection.canApply || !current || current.isDestroyed ||
             workspace.isMarkdownPanelOpen || workspace.isStoragePanelOpen || workspace.isLlmPanelOpen) {
             position = null;
             return;
@@ -36,6 +49,8 @@
 
     $effect(() => {
         void selection;
+        void workspace.documentReplacementVersion;
+        void dismissedSelection;
         void hidden;
         void workspace.isMarkdownPanelOpen;
         void workspace.isStoragePanelOpen;
@@ -45,9 +60,26 @@
     });
 
     onMount(() => {
+        function handleEscape(event: KeyboardEvent) {
+            const editorFocused = workspace.editor?.view.dom.contains(document.activeElement);
+            const toolbarFocused = toolbar?.contains(document.activeElement);
+            if (editorFocused && !event.isComposing && (
+                event.key.startsWith("Arrow") || ["Home", "End", "PageUp", "PageDown"].includes(event.key) ||
+                ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a")
+            )) dismissedSelection = null;
+            if (event.key === "Escape" && !hidden && selection.canApply && !event.isComposing && (editorFocused || toolbarFocused)) {
+                event.preventDefault();
+                event.stopPropagation();
+                dismissedSelection = selectionKey();
+                position = null;
+                if (toolbarFocused) workspace.editor?.commands.focus();
+            }
+        }
+        window.addEventListener("keydown", handleEscape, true);
         window.addEventListener("resize", updatePosition);
         window.addEventListener("scroll", updatePosition, true);
         return () => {
+            window.removeEventListener("keydown", handleEscape, true);
             window.removeEventListener("resize", updatePosition);
             window.removeEventListener("scroll", updatePosition, true);
         };
