@@ -54,6 +54,7 @@ test("changes summary appearance, exports it and restores it after reload", asyn
   await waitForEditor(page);
   const summary = page.locator(".article-editor .dc-summary-box").first();
   await summary.locator(".dc-summary-item").first().click();
+  await expect(summary).toHaveClass(/dc-selected-block/);
   await page.getByRole("button", { name: "초록 테마", exact: true }).click();
   await page.getByRole("button", { name: "가운데 정렬", exact: true }).click();
   await page
@@ -122,6 +123,7 @@ test("duplicates, moves and deletes a block with undo support", async ({ page })
   const summaries = page.locator(".article-editor .dc-summary-box");
   const count = await summaries.count();
   await summaries.first().locator(".dc-summary-item").first().click();
+  await expect(summaries.first()).toHaveClass(/dc-selected-block/);
   await page.getByRole("button", { name: "블록 복제", exact: true }).click();
   await expect(summaries).toHaveCount(count + 1);
   await page.getByRole("button", { name: "위로 이동", exact: true }).click();

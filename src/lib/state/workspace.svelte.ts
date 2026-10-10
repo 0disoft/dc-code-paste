@@ -61,7 +61,10 @@ import { closeHistory } from "@tiptap/pm/history";
 import { createReadingExperimentState } from "./reading-experiment.svelte.ts";
 import { createWritingPurposeState } from "./writing-purpose.svelte.ts";
 import { createThoughtFragmentsState } from "./thought-fragments.svelte.ts";
-import { restoreRepeatedTextblockSelection } from "#lib/editor/selection-focus.ts";
+import {
+  restoreClickedTextblockSelection,
+  restoreRepeatedTextblockSelection,
+} from "#lib/editor/selection-focus.ts";
 import {
   clearCopiedOutput,
   copiedOutputChanges,
@@ -3115,7 +3118,8 @@ export function createWorkspaceState() {
             dblclick: (view, event) =>
               event instanceof MouseEvent ? openCodeFilenameEditorFromEvent(view, event) : false,
           },
-          handleClick: (view, pos) => {
+          handleClick: (view, pos, event) => {
+            restoreClickedTextblockSelection(view, pos, event);
             closeCodeLineContextMenu();
             if (editor) {
               syncBlockLabelDraftFromPosition(editor, pos);
