@@ -890,8 +890,9 @@ export function createWorkspaceState() {
     }
 
     try {
-      if (!invalidDraftBackupKey) {
+      if (!invalidDraftBackupKey && storage.getItem(draftStorageKey) === invalidDraftRaw) {
         storage.removeItem(draftStorageKey);
+        draftPersistence.seedObserved(null);
       }
       invalidDraftRaw = "";
       canPersistDraft = true;

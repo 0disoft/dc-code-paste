@@ -3,6 +3,8 @@ import type { JSONContent } from "@tiptap/core";
 import {
   createDraftSnapshot,
   draftStorageKey,
+  invalidDraftBackupKey,
+  readDraftSnapshotWithRecovery,
   type DraftPreferences,
 } from "#lib/editor/draft-storage.ts";
 import {
@@ -94,6 +96,43 @@ describe("draft persistence lifecycle", () => {
     expect(JSON.parse(storage.getItem(draftStorageKey) ?? "").document).toEqual(document("latest"));
     expect(onSaved).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("resumes saving after an invalid draft's backup fails and the original is explicitly cleared", async () => {
+    const { controller, storage, getCurrent, setState } = createHarness();
+    const invalid = "{invalid downloaded draft";
+    storage.setItem(draftStorageKey, invalid);
+    const setItem = storage.setItem.bind(storage);
+    vi.spyOn(storage, "setItem").mockImplementation((key, value) => {
+      if (key.startsWith(invalidDraftBackupKey)) throw new Error("Backup storage blocked");
+      setItem(key, value);
+    });
+    expect(readDraftSnapshotWithRecovery(storage)).toEqual({ invalidRaw: invalid });
+    controller.seedObserved(invalid);
+    storage.removeItem(draftStorageKey);
+    controller.seedObserved(null);
+    controller.schedule(getCurrent());
+    await vi.advanceTimersByTimeAsync(50);
+    expect(setState).toHaveBeenLastCalledWith("saved");
+    expect(setState).not.toHaveBeenCalledWith("conflict");
+    expect(JSON.parse(storage.getItem(draftStorageKey)!).document).toEqual(getCurrent().document);
+  });
+
+  it("still detects another tab's write between clearing an invalid draft and saving its replacement", async () => {
+    const { controller, storage, getCurrent, setState } = createHarness();
+    const invalid = "{invalid draft";
+    storage.setItem(draftStorageKey, invalid);
+    controller.seedObserved(invalid);
+    storage.removeItem(draftStorageKey);
+    controller.seedObserved(null);
+    controller.schedule(getCurrent());
+    const remote = JSON.stringify(
+      createDraftSnapshot(document("other tab after recovery"), preferences),
+    );
+    storage.setItem(draftStorageKey, remote);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(setState).toHaveBeenLastCalledWith("conflict");
+    expect(storage.getItem(draftStorageKey)).toBe(remote);
   });
 
   it("reports an oversized draft as unsaved", () => {
