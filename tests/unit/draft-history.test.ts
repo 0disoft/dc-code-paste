@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JSONContent } from "@tiptap/core";
 import {
   draftHistoryStorageKey,
+  maxSavedDraftCount,
+  maxDraftHistoryCount,
+  isManualDraftSnapshot,
   type DraftHistorySnapshot,
   type DraftPreferences,
 } from "#lib/editor/draft-storage.ts";
@@ -91,6 +94,51 @@ describe("draft history lifecycle", () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it("keeps manual saves through repeated automatic history rotation", () => {
+    const { controller, history, edit, setMarkdown } = harness();
+    setMarkdown("비공개 미적용 보관 원고");
+    expect(controller.save({ automatic: false })).toBe(true);
+    const saved = history()[0]!;
+    for (let index = 0; index < maxDraftHistoryCount + 3; index++) {
+      edit(`자동 기록 ${index}`);
+      vi.advanceTimersByTime(30_000);
+      controller.maybeSaveAutomatic();
+    }
+    expect(history().filter((item) => !isManualDraftSnapshot(item))).toHaveLength(
+      maxDraftHistoryCount,
+    );
+    expect(history().find((item) => item.id === saved.id)).toEqual(saved);
+    expect(controller.restore(saved)).toBe(true);
+    expect(history().find((item) => item.id === saved.id)?.markdownDraft).toBe(
+      "비공개 미적용 보관 원고",
+    );
+    controller.dispose();
+  });
+
+  it("reports manual capacity without blocking automatic checkpoints and permits saving after deletion", () => {
+    const { controller, history, storage, states, edit } = harness();
+    for (let index = 0; index < maxSavedDraftCount; index++) {
+      edit(`보관 ${index}`);
+      expect(controller.save({ automatic: false })).toBe(true);
+    }
+    const oldest = history().at(-1)!;
+    const raw = storage.getItem(draftHistoryStorageKey);
+    expect(controller.save({ automatic: false })).toBe(false);
+    expect(states.at(-1)).toBe("full");
+    expect(storage.getItem(draftHistoryStorageKey)).toBe(raw);
+    vi.advanceTimersByTime(1300);
+    expect(states.at(-1)).toBe("full");
+    edit("교체 전 보관할 글");
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(history().filter(isManualDraftSnapshot)).toHaveLength(maxSavedDraftCount);
+    expect(controller.rename(history()[0]!.id, "한도 초과 이름")).toBe(false);
+    expect(states.at(-1)).toBe("full");
+    expect(controller.remove(oldest.id)).toBe(true);
+    expect(controller.save({ automatic: false })).toBe(true);
+    expect(history().filter(isManualDraftSnapshot)).toHaveLength(maxSavedDraftCount);
+    controller.dispose();
   });
 
   it("keeps distinct working drafts recoverable even when the public document is unchanged", () => {

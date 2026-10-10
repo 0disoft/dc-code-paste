@@ -13,6 +13,8 @@ import {
   draftStorageKey,
   invalidDraftBackupKey,
   maxDraftHistoryCount,
+  maxSavedDraftCount,
+  isManualDraftSnapshot,
   parseDraftHistorySnapshots,
   parseDraftSnapshot,
   readDraftHistorySnapshots,
@@ -398,7 +400,7 @@ describe("draft storage", () => {
     expect(storage.getItem(draftHistoryStorageKey)).toBeNull();
   });
 
-  it("filters malformed draft history payloads and limits the list", () => {
+  it("filters malformed history without hiding valid records beyond the automatic limit", () => {
     const validSnapshots = Array.from({ length: maxDraftHistoryCount + 3 }, () =>
       createDraftHistorySnapshot(sampleDocument, preferences),
     );
@@ -411,10 +413,59 @@ describe("draft storage", () => {
       JSON.stringify([malformedSnapshot, ...validSnapshots]),
     );
 
-    expect(restored).toHaveLength(maxDraftHistoryCount);
+    expect(restored).toHaveLength(maxDraftHistoryCount + 3);
     expect(restored[0]?.id).toBe(validSnapshots[0]?.id);
     expect(parseDraftHistorySnapshots("{")).toEqual([]);
     expect(parseDraftHistorySnapshots(JSON.stringify({ items: validSnapshots }))).toEqual([]);
+  });
+
+  it("protects manual, renamed and legacy records while cycling automatic recovery points", () => {
+    const storage = new MemoryStorage();
+    const saved = createDraftHistorySnapshot(sampleDocument, preferences, "PRIVATE_WORKING_BUFFER");
+    const old = createDraftHistorySnapshot(sampleDocument, preferences);
+    const { kind: _kind, ...legacy } = old;
+    storage.setItem(draftHistoryStorageKey, JSON.stringify([saved, legacy]));
+    let history = readDraftHistorySnapshots(storage);
+    expect(history.every(isManualDraftSnapshot)).toBe(true);
+    const named = createDraftHistorySnapshot(sampleDocument, preferences, "", "automatic");
+    appendDraftHistorySnapshot(storage, named);
+    expect(renameDraftHistorySnapshot(storage, named.id, "최종 보관본").saved).toBe(true);
+    expect(renameDraftHistorySnapshot(storage, named.id, "").saved).toBe(true);
+    for (let index = 0; index < maxDraftHistoryCount + 5; index++) {
+      history = appendDraftHistorySnapshot(
+        storage,
+        createDraftHistorySnapshot(sampleDocument, preferences, `원고 ${index}`, "automatic"),
+      );
+    }
+    expect(history.filter(isManualDraftSnapshot).map((item) => item.id)).toEqual([
+      named.id,
+      saved.id,
+      legacy.id,
+    ]);
+    expect(history.filter((item) => !isManualDraftSnapshot(item))).toHaveLength(
+      maxDraftHistoryCount,
+    );
+    expect(history.find((item) => item.id === saved.id)?.markdownDraft).toBe(
+      "PRIVATE_WORKING_BUFFER",
+    );
+    expect(history[0]?.markdownDraft).toBe(`원고 ${maxDraftHistoryCount + 4}`);
+  });
+
+  it("refuses extra manual records without truncating existing manual or automatic entries", () => {
+    const storage = new MemoryStorage();
+    const saved = Array.from({ length: maxSavedDraftCount }, () =>
+      createDraftHistorySnapshot(sampleDocument, preferences),
+    );
+    const automatic = createDraftHistorySnapshot(sampleDocument, preferences, "", "automatic");
+    expect(writeDraftHistorySnapshots(storage, [...saved, automatic])).toBe(true);
+    const raw = storage.getItem(draftHistoryStorageKey);
+    const extra = createDraftHistorySnapshot(sampleDocument, preferences);
+    expect(writeDraftHistorySnapshots(storage, [extra, ...saved, automatic])).toBe(false);
+    expect(appendDraftHistorySnapshot(storage, extra)).toEqual([...saved, automatic]);
+    expect(renameDraftHistorySnapshot(storage, automatic.id, "한도 초과 이름").saved).toBe(false);
+    expect(storage.getItem(draftHistoryStorageKey)).toBe(raw);
+    expect(deleteDraftHistorySnapshot(storage, saved[0]!.id).saved).toBe(true);
+    expect(appendDraftHistorySnapshot(storage, extra)[0]?.id).toBe(extra.id);
   });
 
   it("appends and deletes draft history snapshots", () => {

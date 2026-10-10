@@ -157,6 +157,8 @@ import {
   clearDraftSnapshot,
   draftStorageKey,
   maxDraftHistoryCount,
+  maxSavedDraftCount,
+  isManualDraftSnapshot,
   parseDraftSnapshot,
   readDraftSnapshot,
   readDraftSnapshotWithRecovery,
@@ -458,7 +460,7 @@ export function createWorkspaceState() {
 
   let draftHistory = $state<DraftHistorySnapshot[]>([]);
 
-  let draftHistoryState = $state<"idle" | "saved" | "error">("idle");
+  let draftHistoryState = $state<"idle" | "saved" | "error" | "full">("idle");
 
   let renameTarget = $state<RenameTarget | null>(null);
 
@@ -687,7 +689,9 @@ export function createWorkspaceState() {
       ? "저장됨"
       : draftHistoryState === "error"
         ? "저장 실패"
-        : `${draftHistory.length}/${maxDraftHistoryCount}`,
+        : draftHistoryState === "full"
+          ? "보관 초안은 30개까지 저장합니다. 기존 보관본을 삭제한 뒤 저장해 주세요."
+          : `보관 ${draftHistory.filter(isManualDraftSnapshot).length}/${maxSavedDraftCount} · 자동 ${draftHistory.filter((item) => !isManualDraftSnapshot(item)).length}/${maxDraftHistoryCount}`,
   );
 
   const markdownImportStateLabel = $derived(

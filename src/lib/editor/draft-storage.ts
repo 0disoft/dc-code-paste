@@ -16,6 +16,7 @@ export const draftStorageKey = "dc-code-paste:draft:v1";
 export const invalidDraftBackupKey = "dc-code-paste:draft-invalid-backup:v1";
 export const draftHistoryStorageKey = "dc-code-paste:draft-history:v1";
 export const maxDraftHistoryCount = 10;
+export const maxSavedDraftCount = 30;
 
 export type DraftPreferences = {
   language: DcLanguageId;
@@ -44,7 +45,13 @@ export type DraftHistorySnapshot = DraftSnapshot & {
   id: string;
   createdAt: string;
   name?: string;
+  kind?: "manual" | "automatic";
 };
+
+export function isManualDraftSnapshot(snapshot: Pick<DraftHistorySnapshot, "kind" | "name">) {
+  // Old records do not tell us whether they were saved manually. Preserve them.
+  return snapshot.kind !== "automatic" || Boolean(snapshot.name?.trim());
+}
 
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
@@ -299,6 +306,7 @@ function normalizeDraftHistorySnapshot(value: unknown): DraftHistorySnapshot | u
     ...snapshot,
     id: value.id,
     createdAt: value.createdAt,
+    kind: value.kind === "automatic" && !name ? "automatic" : "manual",
     ...(name ? { name } : {}),
   };
 }
@@ -321,12 +329,14 @@ export function createDraftHistorySnapshot(
   document: JSONContent,
   preferences: DraftPreferences,
   markdownDraft = "",
+  kind: "manual" | "automatic" = "manual",
 ): DraftHistorySnapshot {
   const timestamp = new Date().toISOString();
 
   return {
     version: 2,
     id: createSnapshotId(),
+    kind,
     createdAt: timestamp,
     updatedAt: timestamp,
     document,
@@ -412,8 +422,7 @@ export function parseDraftHistorySnapshots(value: string): DraftHistorySnapshot[
 
   return parsed
     .map((item) => normalizeDraftHistorySnapshot(item))
-    .filter((item): item is DraftHistorySnapshot => Boolean(item))
-    .slice(0, maxDraftHistoryCount);
+    .filter((item): item is DraftHistorySnapshot => Boolean(item));
 }
 
 export function readDraftSnapshot(storage: DraftStorage): DraftSnapshot | undefined {
@@ -450,9 +459,20 @@ export function writeDraftHistorySnapshots(
   snapshots: DraftHistorySnapshot[],
 ): boolean {
   try {
-    const next = snapshots.slice(0, maxDraftHistoryCount);
-    const raw = JSON.stringify(next);
-    if (parseDraftHistorySnapshots(raw).length !== next.length) return false;
+    const current = readDraftHistorySnapshots(storage);
+    for (const [manual, limit] of [
+      [true, maxSavedDraftCount],
+      [false, maxDraftHistoryCount],
+    ] as const) {
+      const entries = snapshots.filter((item) => isManualDraftSnapshot(item) === manual);
+      if (entries.length <= limit) continue;
+      const previous = current.filter((item) => isManualDraftSnapshot(item) === manual);
+      const previousIds = new Set(previous.map((item) => item.id));
+      if (entries.length > previous.length || entries.some((item) => !previousIds.has(item.id)))
+        return false;
+    }
+    const raw = JSON.stringify(snapshots);
+    if (parseDraftHistorySnapshots(raw).length !== snapshots.length) return false;
     storage.setItem(draftHistoryStorageKey, raw);
     return true;
   } catch {
@@ -465,9 +485,9 @@ export function appendDraftHistorySnapshot(
   snapshot: DraftHistorySnapshot,
 ): DraftHistorySnapshot[] {
   const current = readDraftHistorySnapshots(storage);
-  const next = [snapshot, ...current.filter((item) => item.id !== snapshot.id)].slice(
-    0,
-    maxDraftHistoryCount,
+  let automaticCount = 0;
+  const next = [snapshot, ...current.filter((item) => item.id !== snapshot.id)].filter(
+    (item) => isManualDraftSnapshot(item) || ++automaticCount <= maxDraftHistoryCount,
   );
 
   return writeDraftHistorySnapshots(storage, next) ? next : current;
@@ -498,7 +518,9 @@ export function renameDraftHistorySnapshot(
     }
 
     const { name: _name, ...snapshotWithoutName } = snapshot;
-    return nextName ? { ...snapshotWithoutName, name: nextName } : snapshotWithoutName;
+    return nextName
+      ? { ...snapshotWithoutName, kind: "manual" as const, name: nextName }
+      : snapshotWithoutName;
   });
 
   return writeDraftHistorySnapshots(storage, next)

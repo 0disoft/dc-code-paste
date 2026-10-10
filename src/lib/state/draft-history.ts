@@ -5,12 +5,14 @@ import {
   deleteDraftHistorySnapshot,
   readDraftHistorySnapshots,
   renameDraftHistorySnapshot,
+  isManualDraftSnapshot,
+  maxSavedDraftCount,
   type DraftHistorySnapshot,
   type DraftPreferences,
 } from "#lib/editor/draft-storage.ts";
 
 type DraftData = { document: JSONContent; preferences: DraftPreferences; markdownDraft?: string };
-type DraftHistoryState = "idle" | "saved" | "error";
+type DraftHistoryState = "idle" | "saved" | "error" | "full";
 type DraftHistoryStorage = Storage;
 
 type DraftHistoryOptions = {
@@ -107,6 +109,14 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       return false;
     }
 
+    if (
+      !automatic &&
+      readDraftHistorySnapshots(storage).filter(isManualDraftSnapshot).length >= maxSavedDraftCount
+    ) {
+      refresh();
+      setState("full");
+      return false;
+    }
     const value = current();
     const fingerprint = draftHistoryFingerprint(
       value.document,
@@ -119,6 +129,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       value.document,
       value.preferences,
       value.markdownDraft,
+      automatic ? "automatic" : "manual",
     );
     const history = appendDraftHistorySnapshot(storage, snapshot);
     if (history[0]?.id !== snapshot.id) {
@@ -171,6 +182,17 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       setState("error");
       return false;
     }
+    const entries = readDraftHistorySnapshots(storage);
+    const target = entries.find((item) => item.id === id);
+    if (
+      name.trim() &&
+      target &&
+      !isManualDraftSnapshot(target) &&
+      entries.filter(isManualDraftSnapshot).length >= maxSavedDraftCount
+    ) {
+      setState("full");
+      return false;
+    }
     const result = renameDraftHistorySnapshot(storage, id, name);
     if (!result.saved) {
       setState("error");
@@ -193,6 +215,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       return false;
     }
     options.setHistory(result.snapshots);
+    setState("idle");
     return true;
   }
 

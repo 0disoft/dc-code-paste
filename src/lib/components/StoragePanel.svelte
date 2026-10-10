@@ -5,7 +5,7 @@
     import Save from "@lucide/svelte/icons/save";
     import Trash2 from "@lucide/svelte/icons/trash";
     import X from "@lucide/svelte/icons/x";
-    import type { DraftHistorySnapshot } from "#lib/editor/draft-storage.ts";
+    import { isManualDraftSnapshot, type DraftHistorySnapshot } from "#lib/editor/draft-storage.ts";
     import type { PresetSnapshot } from "#lib/editor/preset-storage.ts";
     import { isComposingKeyEvent } from "#lib/editor/keyboard-shortcuts.ts";
 
@@ -19,7 +19,7 @@
         presetStateLabel: string;
         presets: PresetSnapshot[];
         draftHistory: DraftHistorySnapshot[];
-        draftHistoryState: "idle" | "saved" | "error";
+        draftHistoryState: "idle" | "saved" | "error" | "full";
         draftHistoryStateLabel: string;
         loadError: string;
         renameTarget: RenameTarget | null;
@@ -93,6 +93,7 @@
 
         if (event.key === "Escape") {
             event.preventDefault();
+            event.stopPropagation();
             onCancelRename();
         }
     }
@@ -223,20 +224,22 @@
                 <span>스냅샷</span>
             </button>
             <span
-                class:error={draftHistoryState === "error"}
+                class:error={draftHistoryState === "error" || draftHistoryState === "full"}
                 class="draft-history-count"
                 aria-label="초안 히스토리 개수"
+                role={draftHistoryState === "error" || draftHistoryState === "full" ? "alert" : "status"}
             >
                 {draftHistoryStateLabel}
             </span>
         </div>
 
+        <p class="ui-hint">직접 저장하거나 이름 붙인 초안은 보관합니다. 자동 복구 기록은 최근 10개만 남깁니다.</p>
         <div class="draft-history-list" aria-label="저장된 초안">
             {#if draftHistory.length === 0}
                 <span class="draft-history-empty">초안 없음</span>
             {:else}
                 {#each draftHistory as snapshot (snapshot.id)}
-                    <div class="draft-history-item">
+                    <div class="draft-history-item" data-retention={isManualDraftSnapshot(snapshot) ? "manual" : "automatic"}>
                         {#if isRenaming("draft", snapshot.id)}
                             <input
                                 class="preset-rename-input"
@@ -259,7 +262,7 @@
                                 onclick={() => onRestoreDraftHistory(snapshot)}
                             >
                                 <span>{draftHistoryName(snapshot)}</span>
-                                <small>{draftHistorySummary(snapshot)}</small>
+                                <small>{isManualDraftSnapshot(snapshot) ? "보관" : "자동 복구"} · {draftHistorySummary(snapshot)}</small>
                             </button>
                         {/if}
                         <button
@@ -409,6 +412,7 @@
     .preset-count.error,
     .draft-history-count.error {
         color: var(--danger);
+        white-space: normal;
     }
 
     .preset-list,
