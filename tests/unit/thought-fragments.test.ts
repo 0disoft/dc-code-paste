@@ -218,7 +218,9 @@ it("removes a fragment and its private anchors without deleting any inserted tex
   expect(await exportDocumentToDcHtml(removed.doc.toJSON(), preferences)).toBe(
     await exportDocumentToDcHtml(state.doc.toJSON(), preferences),
   );
-});
+  // This integration assertion lazily loads Shiki and the default C++ grammar,
+  // like the code-export tests, which also allow 15 seconds for a cold start.
+}, 15_000);
 
 it("rejects malformed records and too many prose lines without changing the document", () => {
   const state = add(initial(), Array.from({ length: 129 }, () => "줄").join("\n"));
