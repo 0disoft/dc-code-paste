@@ -1172,7 +1172,7 @@ describe("exportDocumentToDcHtml", () => {
     });
 
     expect(html).toContain('bgcolor="#fbf6e6"');
-    expect(html).toContain("핵심 요약");
+    expect(html).toContain("요약");
     expect(html).toContain("핵심만 먼저 보여준다.");
     expect(html).toContain("본문은 아래에서 천천히 풀어낸다.");
     expect(html).toContain("border-top:4px solid");

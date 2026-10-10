@@ -10,6 +10,8 @@ import { normalizeCtaGroupLayout, type CtaGroupLayout } from "#lib/editor/cta-gr
 import { normalizeEditableLinkHref } from "#lib/editor/link.ts";
 import { normalizeQuoteStyle, type QuoteStyle } from "#lib/editor/quote-style.ts";
 import { normalizeTutorialStepNumber } from "#lib/editor/tutorial-block.ts";
+import { defaultHeroBlockLabel } from "#lib/editor/hero-block.ts";
+import { defaultSummaryBoxLabel } from "#lib/editor/summary-box.ts";
 import { normalizeTableSpan } from "#lib/editor/data-table.ts";
 import { readingIntentAttributes } from "#lib/editor/reading-intent-format.ts";
 import { readingLayoutMetrics } from "#lib/editor/reading-layout.ts";
@@ -1677,7 +1679,7 @@ function summaryBoxPalette(options: DcExportOptions) {
 
 async function renderSummaryBox(node: JSONContent, options: DcExportOptions): Promise<string> {
   const items = childrenOf(node).filter((child) => child.type === "summaryItem");
-  const label = labelFromAttrs(node, "핵심 요약");
+  const label = labelFromAttrs(node, defaultSummaryBoxLabel);
 
   if (items.length === 0) {
     return "";
@@ -1809,7 +1811,7 @@ function heroBlockPalette(options: DcExportOptions) {
 }
 
 function heroBlockLabel(node: JSONContent): string {
-  return labelFromAttrs(node, "CODING GUIDE");
+  return labelFromAttrs(node, defaultHeroBlockLabel);
 }
 
 function heroTextChildren(node: JSONContent): JSONContent[] {
@@ -1898,6 +1900,7 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
   const clean = options.documentTheme === "cleanEditorial";
   const palette = heroBlockPalette(options);
   const { titleNode, subtitleNodes, bodyNodes } = heroContentParts(node);
+  const label = heroBlockLabel(node);
   const title = renderHeroInline(titleNode, options, palette.title, palette.background);
   const subtitle = renderHeroSubtitle(subtitleNodes, options, palette.subtitle, palette.background);
   const tableStyle = joinStyle({
@@ -1941,12 +1944,8 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
   const titleCellStyle = joinStyle({
     ...cellBaseStyle,
     padding: clean
-      ? subtitle
-        ? "0 0 12px"
-        : "0 0 18px"
-      : subtitle
-        ? "0 24px 10px"
-        : "0 24px 22px",
+      ? `${label ? "0" : "30px"} 0 ${subtitle ? "12px" : "18px"}`
+      : `${label ? "0" : "22px"} 24px ${subtitle ? "10px" : "22px"}`,
   });
   const subtitleCellStyle = joinStyle({
     ...cellBaseStyle,
@@ -1956,9 +1955,12 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
     ...cellBaseStyle,
     padding: clean ? "0 0 18px" : "0 24px 22px",
   });
-  const rows = [
-    `<tr><td style="${labelCellStyle}"><span style="${labelStyle}">${escapeHtml(heroBlockLabel(node))}</span></td></tr>`,
-  ];
+  const rows: string[] = [];
+  if (label) {
+    rows.push(
+      `<tr><td style="${labelCellStyle}"><span style="${labelStyle}">${escapeHtml(label)}</span></td></tr>`,
+    );
+  }
 
   if (title) {
     rows.push(
@@ -1972,11 +1974,7 @@ async function renderHeroBlockTable(node: JSONContent, options: DcExportOptions)
     );
   }
 
-  if (!title && !subtitle && bodyNodes.length === 0) {
-    rows.push(
-      `<tr><td style="${titleCellStyle}"><strong style="${titleStyle}">강의 노트</strong></td></tr>`,
-    );
-  }
+  if (!title && !subtitle && !label && bodyNodes.length === 0) return "";
 
   if (bodyNodes.length > 0) {
     const body = await renderHeroBodyBlocks(

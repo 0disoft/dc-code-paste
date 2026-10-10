@@ -1,7 +1,7 @@
 import type { JSONContent } from "@tiptap/core";
 import { parseMarkdownInline } from "#lib/editor/markdown-inline.ts";
 
-export const defaultSummaryBoxLabel = "동시성 핵심";
+export const defaultSummaryBoxLabel = "요약";
 
 const defaultSummaryItems = [
   "goroutine은 go 키워드로 실행되는 가벼운 작업 단위다.",
@@ -12,7 +12,7 @@ const defaultSummaryItems = [
 export function createDefaultSummaryBox(): JSONContent {
   return {
     type: "summaryBox",
-    attrs: { label: defaultSummaryBoxLabel },
+    attrs: { label: "동시성 핵심" },
     content: defaultSummaryItems.map((text) => ({
       type: "summaryItem",
       content: [{ type: "text", text }],

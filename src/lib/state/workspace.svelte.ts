@@ -112,6 +112,7 @@ import {
 } from "#lib/editor/writing-templates.ts";
 import { createDraftFile, readDraftFile } from "#lib/editor/draft-file.ts";
 import { prepareMarkdownImportDocument } from "#lib/editor/markdown-import-validation.ts";
+import { defaultHeroBlockLabel } from "#lib/editor/hero-block.ts";
 import {
   DocumentPreferencesStep,
   recordDocumentPreferencesChange,
@@ -1569,7 +1570,7 @@ export function createWorkspaceState() {
 
   function editableBlockLabelFallback(nodeName: string, attrs: Record<string, unknown> = {}) {
     if (nodeName === "heroBlock") {
-      return { attrName: "label" as const, fallback: "CODING GUIDE" };
+      return { attrName: "label" as const, fallback: defaultHeroBlockLabel };
     }
 
     if (nodeName === "summaryBox") {

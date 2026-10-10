@@ -1,6 +1,8 @@
 import type { JSONContent } from "@tiptap/core";
 
-const defaultHero = {
+export const defaultHeroBlockLabel = "";
+
+const sampleHero = {
   label: "GO CONCURRENCY",
   title: "Go 동시성 마스터하기: 고루틴과 채널",
   subtitle: "병렬 처리를 우아하게 구현하는 Go의 동시성 모델을 실전 패턴으로 정리한다.",
@@ -13,7 +15,7 @@ type HeroInput = {
 };
 
 export function createDefaultHeroBlock(): JSONContent {
-  return createHeroBlock(defaultHero);
+  return createHeroBlock(sampleHero);
 }
 
 function createHeroBlock(input: HeroInput): JSONContent {
@@ -26,10 +28,9 @@ function createHeroBlock(input: HeroInput): JSONContent {
         attrs: { level: 1 },
         content: [{ type: "text", text: input.title }],
       },
-      {
-        type: "paragraph",
-        content: [{ type: "text", text: input.subtitle }],
-      },
+      ...(input.subtitle
+        ? [{ type: "paragraph", content: [{ type: "text", text: input.subtitle }] }]
+        : []),
     ],
   };
 }
@@ -66,7 +67,7 @@ export function createHeroBlockFromText(text: string): JSONContent | undefined {
     return createHeroBlock({
       label: firstLineLabel,
       title,
-      subtitle: lines.slice(2).join(" ") || defaultHero.subtitle,
+      subtitle: lines.slice(2).join(" "),
     });
   }
 
@@ -79,8 +80,8 @@ export function createHeroBlockFromText(text: string): JSONContent | undefined {
   }
 
   return createHeroBlock({
-    label: defaultHero.label,
+    label: defaultHeroBlockLabel,
     title: lines[0],
-    subtitle: lines.slice(1).join(" ") || defaultHero.subtitle,
+    subtitle: lines.slice(1).join(" "),
   });
 }

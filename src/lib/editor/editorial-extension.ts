@@ -2,6 +2,7 @@ import { mergeAttributes, Node } from "@tiptap/core";
 import { normalizeCtaGroupLayout } from "./cta-group";
 import { normalizeEditableLinkHref } from "./link";
 import { defaultSummaryBoxLabel } from "./summary-box";
+import { defaultHeroBlockLabel } from "./hero-block";
 import { normalizeTutorialStepNumber } from "./tutorial-block";
 import { normalizeBlockAppearance } from "./block-appearance";
 import { isPastedDataTable, normalizeTableSpan, parsePastedDataTable } from "./data-table";
@@ -249,8 +250,8 @@ export const HeroBlock = Node.create({
   addAttributes() {
     return {
       label: {
-        default: "CODING GUIDE",
-        parseHTML: (element) => element.getAttribute("data-label") ?? "CODING GUIDE",
+        default: defaultHeroBlockLabel,
+        parseHTML: (element) => element.getAttribute("data-label") ?? defaultHeroBlockLabel,
         renderHTML: (attributes) => {
           const label = typeof attributes.label === "string" ? attributes.label.trim() : "";
           return label ? { "data-label": label } : {};
@@ -267,7 +268,7 @@ export const HeroBlock = Node.create({
     const label =
       typeof HTMLAttributes["data-label"] === "string"
         ? HTMLAttributes["data-label"]
-        : "CODING GUIDE";
+        : defaultHeroBlockLabel;
 
     return [
       "section",
@@ -276,7 +277,7 @@ export const HeroBlock = Node.create({
         class: "dc-hero-block",
       }),
       ["span", { class: "dc-hero-rule" }],
-      ["strong", { class: "dc-hero-label" }, label],
+      ...(label ? [["strong", { class: "dc-hero-label" }, label]] : []),
       ["div", { class: "dc-hero-body" }, 0],
     ];
   },

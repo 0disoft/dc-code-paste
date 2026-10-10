@@ -28,14 +28,14 @@ describe("createHeroBlockFromText", () => {
     });
   });
 
-  it("uses the default label for title and subtitle selections", () => {
+  it("leaves the label empty for title and subtitle selections", () => {
     const document = createHeroBlockFromText(
       ["만물큐레이션", "맞춤형 박물관 바이브 해설"].join("\n"),
     );
 
     expect(document).toMatchObject({
       type: "heroBlock",
-      attrs: { label: "GO CONCURRENCY" },
+      attrs: { label: "" },
       content: [
         {
           type: "heading",
@@ -45,6 +45,26 @@ describe("createHeroBlockFromText", () => {
           type: "paragraph",
           content: [{ type: "text", text: "맞춤형 박물관 바이브 해설" }],
         },
+      ],
+    });
+  });
+
+  it("keeps a title-only selection free of sample labels and subtitles", () => {
+    expect(createHeroBlockFromText("봄 여행 준비")).toEqual({
+      type: "heroBlock",
+      attrs: { label: "" },
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "봄 여행 준비" }] },
+      ],
+    });
+  });
+
+  it("preserves an explicit label without inventing a subtitle", () => {
+    expect(createHeroBlockFromText("label: 여행 기록\n봄 여행 준비")).toEqual({
+      type: "heroBlock",
+      attrs: { label: "여행 기록" },
+      content: [
+        { type: "heading", attrs: { level: 1 }, content: [{ type: "text", text: "봄 여행 준비" }] },
       ],
     });
   });
