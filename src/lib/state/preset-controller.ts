@@ -10,7 +10,7 @@ import {
 } from "#lib/editor/preset-storage.ts";
 import type { DraftPreferences } from "#lib/editor/draft-storage.ts";
 
-type PresetState = "idle" | "saved" | "error";
+type PresetState = "idle" | "saved" | "error" | "full";
 
 type PresetOptions = {
   getStorage: () => Storage | undefined;
@@ -49,13 +49,19 @@ export function createPresetController(options: PresetOptions) {
       return false;
     }
 
+    const stored = readPresetSnapshots(storage);
+    if (stored.length >= maxPresetCount) {
+      options.setPresets(stored);
+      setState("full");
+      return false;
+    }
     const current = options.getCurrent();
     const preset = createPresetSnapshot(
       options.getName(),
       options.cloneDocument(current.document),
       options.clonePreferences(current.preferences),
     );
-    const nextPresets = [preset, ...readPresetSnapshots(storage)].slice(0, maxPresetCount);
+    const nextPresets = [preset, ...stored];
     if (!writePresetSnapshots(storage, nextPresets)) {
       setState("error");
       return false;
@@ -111,6 +117,7 @@ export function createPresetController(options: PresetOptions) {
       return false;
     }
     options.setPresets(result.snapshots);
+    setState("idle");
     return true;
   }
 

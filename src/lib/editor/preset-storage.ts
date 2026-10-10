@@ -105,8 +105,7 @@ export function parsePresetSnapshots(value: string): PresetSnapshot[] {
   return parsed.presets
     .map(parsePresetRecord)
     .filter((preset): preset is PresetSnapshot => Boolean(preset))
-    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    .slice(0, maxPresetCount);
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 
 export function readPresetSnapshots(storage: PresetStorage): PresetSnapshot[] {
@@ -123,9 +122,13 @@ export function writePresetSnapshots(
   presets: readonly PresetSnapshot[],
 ): boolean {
   try {
-    const next = presets.slice(0, maxPresetCount);
-    const raw = JSON.stringify({ version: 1, presets: next });
-    if (parsePresetSnapshots(raw).length !== next.length) return false;
+    // Keep legacy over-limit collections editable without admitting new entries.
+    if (presets.length > maxPresetCount) {
+      const currentIds = new Set(readPresetSnapshots(storage).map((preset) => preset.id));
+      if (presets.some((preset) => !currentIds.has(preset.id))) return false;
+    }
+    const raw = JSON.stringify({ version: 1, presets });
+    if (parsePresetSnapshots(raw).length !== presets.length) return false;
     storage.setItem(presetStorageKey, raw);
     return true;
   } catch {

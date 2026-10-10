@@ -87,7 +87,7 @@ describe("preset storage", () => {
     expect(storage.getItem(presetStorageKey)).toContain("강의글 구조");
   });
 
-  it("drops malformed presets and limits the stored list", () => {
+  it("drops malformed presets without discarding valid over-limit records", () => {
     const presets = Array.from({ length: maxPresetCount + 4 }, (_, index) =>
       createPresetSnapshot(`프리셋 ${index}`, sampleDocument, preferences),
     );
@@ -109,8 +109,25 @@ describe("preset storage", () => {
 
     const parsed = parsePresetSnapshots(serialized);
 
-    expect(parsed).toHaveLength(maxPresetCount);
+    expect(parsed).toHaveLength(maxPresetCount + 4);
     expect(parsed.some((preset) => preset.name === "깨진 프리셋")).toBe(false);
+  });
+
+  it("refuses overflow writes and still allows cleanup of legacy oversized collections", () => {
+    const storage = new MemoryStorage();
+    const presets = Array.from({ length: maxPresetCount }, (_, index) =>
+      createPresetSnapshot(`보관 ${index}`, sampleDocument, preferences),
+    );
+    expect(writePresetSnapshots(storage, presets)).toBe(true);
+    const raw = storage.getItem(presetStorageKey);
+    const extra = createPresetSnapshot("새 보관본", sampleDocument, preferences);
+    expect(writePresetSnapshots(storage, [extra, ...presets])).toBe(false);
+    expect(storage.getItem(presetStorageKey)).toBe(raw);
+    storage.setItem(presetStorageKey, JSON.stringify({ version: 1, presets: [extra, ...presets] }));
+    expect(renamePresetSnapshot(storage, extra.id, "예전 한도 초과 보관본").saved).toBe(true);
+    expect(readPresetSnapshots(storage)).toHaveLength(maxPresetCount + 1);
+    expect(deletePresetSnapshot(storage, extra.id).saved).toBe(true);
+    expect(readPresetSnapshots(storage)).toHaveLength(maxPresetCount);
   });
 
   it("deletes presets by id", () => {

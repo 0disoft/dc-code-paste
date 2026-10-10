@@ -454,7 +454,7 @@ export function createWorkspaceState() {
 
   let presets = $state<PresetSnapshot[]>([]);
 
-  let presetState = $state<"idle" | "saved" | "error">("idle");
+  let presetState = $state<"idle" | "saved" | "error" | "full">("idle");
 
   let draftHistory = $state<DraftHistorySnapshot[]>([]);
 
@@ -677,7 +677,9 @@ export function createWorkspaceState() {
       ? "저장됨"
       : presetState === "error"
         ? "저장 실패"
-        : `${presets.length}개`,
+        : presetState === "full"
+          ? "프리셋은 30개까지 보관합니다. 기존 프리셋을 삭제한 뒤 저장해 주세요."
+          : `${presets.length}개`,
   );
 
   const draftHistoryStateLabel = $derived(

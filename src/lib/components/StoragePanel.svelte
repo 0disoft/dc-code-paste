@@ -15,7 +15,7 @@
 
     type Props = {
         presetName: string;
-        presetState: "idle" | "saved" | "error";
+        presetState: "idle" | "saved" | "error" | "full";
         presetStateLabel: string;
         presets: PresetSnapshot[];
         draftHistory: DraftHistorySnapshot[];
@@ -145,7 +145,7 @@
                 <Save size={16} />
                 <span>저장</span>
             </button>
-            <span class:error={presetState === "error"} class="preset-count">{presetStateLabel}</span>
+            <span class:error={presetState === "error" || presetState === "full"} role={presetState === "error" || presetState === "full" ? "alert" : "status"} class="preset-count">{presetStateLabel}</span>
         </div>
 
         <div class="preset-list" aria-label="저장된 프리셋">

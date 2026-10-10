@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sampleDocument } from "#lib/editor/sample-document.ts";
 import type { DraftPreferences } from "#lib/editor/draft-storage.ts";
 import { createPresetController } from "#lib/state/preset-controller.ts";
-import type { PresetSnapshot } from "#lib/editor/preset-storage.ts";
+import {
+  maxPresetCount,
+  presetStorageKey,
+  type PresetSnapshot,
+} from "#lib/editor/preset-storage.ts";
 
 const preferences: DraftPreferences = {
   language: "cpp",
@@ -44,6 +48,48 @@ describe("preset controller", () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it("preserves every saved preset and pending name at capacity, then saves after explicit deletion", () => {
+    const storage = new MemoryStorage();
+    let name = "";
+    let presets: PresetSnapshot[] = [];
+    const states: string[] = [];
+    const controller = createPresetController({
+      getStorage: () => storage,
+      getName: () => name,
+      getCurrent: () => ({ document: sampleDocument, preferences }),
+      cloneDocument: structuredClone,
+      clonePreferences: structuredClone,
+      checkpointBeforeReplacement: () => true,
+      applySnapshot: () => {},
+      setPresets: (value) => {
+        presets = value;
+      },
+      setState: (value) => states.push(value),
+      clearName: () => {
+        name = "";
+      },
+    });
+    for (let index = 0; index < maxPresetCount; index++) {
+      name = `보관 ${index}`;
+      expect(controller.save()).toBe(true);
+    }
+    const raw = storage.getItem(presetStorageKey);
+    const oldest = presets.at(-1)!.id;
+    name = "계속 보관할 새 글";
+    expect(controller.save()).toBe(false);
+    expect(states.at(-1)).toBe("full");
+    expect(name).toBe("계속 보관할 새 글");
+    expect(storage.getItem(presetStorageKey)).toBe(raw);
+    vi.advanceTimersByTime(1300);
+    expect(states.at(-1)).toBe("full");
+    expect(controller.remove(presets[0]!.id)).toBe(true);
+    expect(states.at(-1)).toBe("idle");
+    expect(controller.save()).toBe(true);
+    expect(presets).toHaveLength(maxPresetCount);
+    expect(presets.some((preset) => preset.id === oldest)).toBe(true);
+    controller.dispose();
   });
 
   it("saves and applies a preset after checking the current draft", () => {
