@@ -8,7 +8,6 @@ import {
 import {
   defaultProseFontFamily,
   safeDcCodeFontFamily,
-  safeDcInlineCodeFontFamily,
   safeDcProseFontFamily,
 } from "../../src/lib/dc/font-stacks";
 import { parseMarkdownToDocument } from "../../src/lib/editor/markdown-import";
@@ -549,11 +548,7 @@ describe("exportDocumentToDcHtml", () => {
     expect(html).not.toMatch(/font-weight:(?:800|850|900)/);
     expect(html).toContain('href="https://example.com"');
     expect(html).toMatch(
-      new RegExp(
-        `<code style="background-color:#[0-9a-f]{6};color:#[0-9a-f]{6};font-family:${escapeRegExp(
-          safeDcInlineCodeFontFamily(),
-        )};font-size:\\.92em;font-weight:700;padding:1px 4px;border-radius:4px">LLM 가이드</code>`,
-      ),
+      /<code style="background-color:#[0-9a-f]{6};color:#[0-9a-f]{6};font-family:inherit;font-size:\.92em;font-weight:700;padding:1px 4px;border-radius:4px">LLM 가이드<\/code>/,
     );
     expect(html).toContain("TIP");
     expect(html).toContain("주의");

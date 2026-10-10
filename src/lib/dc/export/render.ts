@@ -29,7 +29,6 @@ import {
 } from "#lib/editor/block-appearance.ts";
 import {
   defaultProseFontFamily,
-  safeDcInlineCodeFontFamily as safeInlineCodeFontFamily,
   safeDcProseFontFamily as safeProseFontFamily,
 } from "../font-stacks";
 import { normalizeCodeFilename } from "#lib/highlighter/code-block-metadata.ts";
@@ -755,7 +754,7 @@ function applyMarks(
       const style = joinStyle({
         "background-color": context.inlineCodeBackground ?? palette.inlineCodeBackground,
         color: context.inlineCodeText ?? palette.inlineCodeText,
-        "font-family": safeInlineCodeFontFamily(),
+        "font-family": "inherit",
         "font-size": ".92em",
         "font-weight": 700,
         padding: "1px 4px",

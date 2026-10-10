@@ -2,13 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildFontStack,
   codeFallbackFonts,
-  inlineCodeFallbackFonts,
   proseFallbackFonts,
   safeCodeFontFamily,
   safeDcCodeFontFamily,
-  safeDcInlineCodeFontFamily,
   safeDcProseFontFamily,
-  safeInlineCodeFontFamily,
   safeProseFontFamily,
   serifFallbackFonts,
 } from "../../src/lib/dc/font-stacks";
@@ -102,22 +99,11 @@ describe("font stacks", () => {
     expect(buildFontStack(["ui-monospace", "Consolas"], "code")).toBe(stack);
   });
 
-  it("uses D2Coding before prose fallbacks for inline code", () => {
-    const stack = safeInlineCodeFontFamily();
-    const fonts = stack.split(", ");
-
-    expect(stack).toBe(inlineCodeFallbackFonts.join(", "));
-    expect(fonts.slice(0, 3)).toEqual(["D2Coding", "Pretendard", "Cascadia Mono"]);
-    expect(fonts.indexOf("D2Coding")).toBeLessThan(fonts.indexOf("Pretendard"));
-    expect(fonts).toContain("monospace");
-  });
-
   it("keeps DC export font stacks compact enough for inline HTML", () => {
     expect(safeDcProseFontFamily(safeProseFontFamily("Inter"))).toBe("Inter,sans-serif");
     expect(safeDcProseFontFamily()).toBe("Malgun Gothic,sans-serif");
     expect(safeDcProseFontFamily("Georgia, Times New Roman, serif")).toBe("Georgia,Batang,serif");
     expect(safeDcCodeFontFamily()).toBe("Cascadia Mono,D2Coding,monospace");
-    expect(safeDcInlineCodeFontFamily()).toBe("D2Coding,monospace");
   });
 
   it("strips unsafe font-family punctuation before export", () => {

@@ -92,24 +92,6 @@ export const codeFallbackFonts = [
   "monospace",
 ] as const;
 
-export const inlineCodeFallbackFonts = [
-  "D2Coding",
-  "Pretendard",
-  "Cascadia Mono",
-  "나눔고딕코딩",
-  "Noto Sans Mono CJK",
-  "JetBrains Mono",
-  "Fira Code",
-  "Hack",
-  "Source Code Pro",
-  "IBM Plex Mono",
-  "Roboto Mono",
-  "Consolas",
-  "Menlo",
-  "Monaco",
-  "monospace",
-] as const;
-
 function normalizeFontName(value: string): string {
   return value
     .trim()
@@ -205,10 +187,6 @@ export function safeCodeFontFamily(value = ""): string {
   return buildFontStack(parseFontFamily(value), "code");
 }
 
-export function safeInlineCodeFontFamily(): string {
-  return appendFallbackFonts([], inlineCodeFallbackFonts);
-}
-
 export function safeDcProseFontFamily(value = ""): string {
   const primaryFonts = parseFontFamily(value);
   const selectedFonts = primaryFonts.length > 0 ? primaryFonts : ["Malgun Gothic"];
@@ -222,10 +200,6 @@ export function safeDcProseFontFamily(value = ""): string {
 
 export function safeDcCodeFontFamily(): string {
   return appendFallbackFonts([], ["Cascadia Mono", "D2Coding", "monospace"], ",");
-}
-
-export function safeDcInlineCodeFontFamily(): string {
-  return appendFallbackFonts([], ["D2Coding", "monospace"], ",");
 }
 
 export const defaultProseFontFamily = safeProseFontFamily();

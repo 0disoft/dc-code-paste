@@ -161,22 +161,7 @@
   border-radius: 4px;
   background: oklch(94.93% 0.016 255.07);
   color: oklch(34.86% 0.087 278.64);
-  font-family:
-    D2Coding,
-    Pretendard,
-    Cascadia Mono,
-    나눔고딕코딩,
-    Noto Sans Mono CJK,
-    JetBrains Mono,
-    Fira Code,
-    Hack,
-    Source Code Pro,
-    IBM Plex Mono,
-    Roboto Mono,
-    Consolas,
-    Menlo,
-    Monaco,
-    monospace;
+  font-family: inherit;
   font-weight: 700;
   padding: 1px 4px;
 }

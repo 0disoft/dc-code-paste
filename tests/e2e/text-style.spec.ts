@@ -1,5 +1,39 @@
 import { expect, test } from "@playwright/test";
 
+test("keeps inline emphasis in the body font while code blocks use coding fonts", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Markdown", exact: true }).click();
+  await page
+    .getByLabel("Markdown 원문")
+    .fill("`LLM 가이드`를 참고하세요.\n\n```javascript\nconst value = 1;\n```");
+  await page.getByRole("button", { name: "Markdown 적용하기", exact: true }).click();
+
+  const editor = page.locator(".article-editor");
+  const inlineCode = editor.locator("p code");
+  const codeBlock = editor.locator("pre");
+  await expect(inlineCode).toHaveText("LLM 가이드");
+  await expect(inlineCode).toHaveCSS("font-family", /Pretendard/);
+  await expect(codeBlock).toHaveCSS("font-family", /D2Coding/);
+  await page.getByRole("tab", { name: "전체 글", exact: true }).click();
+  await page.getByLabel("본문 글꼴", { exact: true }).selectOption({ label: "명조" });
+  await expect(inlineCode).toHaveCSS(
+    "font-family",
+    await editor.evaluate((element) => getComputedStyle(element).fontFamily),
+  );
+  await expect(codeBlock).toHaveCSS("font-family", /D2Coding/);
+
+  await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
+  await page.getByRole("menuitem", { name: "HTML 원문 보기", exact: true }).click();
+  const html = await page.getByLabel("복사용 HTML 원문", { exact: true }).inputValue();
+  expect(html).toMatch(/<code style="[^"]*font-family:inherit[^"]*">LLM 가이드<\/code>/);
+  expect(html).toContain("font-family:Noto Serif KR,Batang,serif");
+  expect(html).toContain("font-family:Cascadia Mono,D2Coding,monospace");
+});
+
 test("shows inherited text size instead of the previous selection's size", async ({ page }) => {
   await page.goto("./");
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
