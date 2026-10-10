@@ -111,6 +111,7 @@ import {
   type WritingTemplateId,
 } from "#lib/editor/writing-templates.ts";
 import { createDraftFile, readDraftFile } from "#lib/editor/draft-file.ts";
+import { prepareMarkdownImportDocument } from "#lib/editor/markdown-import-validation.ts";
 import {
   DocumentPreferencesStep,
   recordDocumentPreferencesChange,
@@ -978,13 +979,14 @@ export function createWorkspaceState() {
           cloneDraftPreferences(preferences),
         )
       )
-        return;
+        return false;
       refreshEditorState(editor);
       documentReplacementVersion += 1;
     } else {
       documentJson = nextDocument;
       applyDraftPreferences(preferences);
     }
+    return true;
   }
 
   function isKnownBodySize(value: string) {
@@ -1348,22 +1350,47 @@ export function createWorkspaceState() {
       return;
     }
 
+    if (!editor) {
+      markdownImportState = "error";
+      markdownImportError = "편집기를 연 뒤 다시 시도해 주세요.";
+      return;
+    }
+
+    let nextDocument: JSONContent;
+    let nextPreferences: DraftPreferences;
+    try {
+      const parsed = parseMarkdownToDocument(markdownDraft, {
+        defaultLanguage: language,
+        sanitizeCodeHighlightLines: true,
+      });
+      nextPreferences = {
+        ...currentDraftPreferences(),
+        language: firstCodeBlockLanguage(parsed) ?? language,
+      };
+      nextDocument = prepareMarkdownImportDocument(
+        editor.schema,
+        parsed,
+        nextPreferences,
+        markdownDraft,
+      );
+    } catch (error) {
+      markdownImportState = "error";
+      markdownImportError =
+        error instanceof Error ? error.message : "Markdown 문서를 읽을 수 없습니다.";
+      return;
+    }
+
     if (!checkpointCurrentDraftBeforeReplacement()) {
       markdownImportState = "error";
       markdownImportError = "복구 지점 저장 실패";
       return;
     }
 
-    const nextDocument = parseMarkdownToDocument(markdownDraft, {
-      defaultLanguage: language,
-      sanitizeCodeHighlightLines: true,
-    });
-    const importedLanguage = firstCodeBlockLanguage(nextDocument);
-
-    replaceEditorDocument(nextDocument, {
-      ...currentDraftPreferences(),
-      language: importedLanguage ?? language,
-    });
+    if (!replaceEditorDocument(nextDocument, nextPreferences)) {
+      markdownImportState = "error";
+      markdownImportError = "글을 적용하지 못했습니다. 다시 시도해 주세요.";
+      return;
+    }
 
     markdownImportError = "";
     markdownImportState = "imported";

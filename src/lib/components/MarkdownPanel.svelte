@@ -61,6 +61,7 @@
         </button>
         <span
             class:error={markdownImportState === "error"}
+            role={markdownImportState === "error" ? "alert" : "status"}
             class="markdown-status">{markdownImportStateLabel}</span
         >
     </div>
@@ -157,5 +158,6 @@
 
     .markdown-status.error {
         color: var(--danger);
+        white-space: normal;
     }
 </style>
