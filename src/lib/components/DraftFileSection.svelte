@@ -36,7 +36,7 @@
 
 <section class="ui-section" aria-label="초안 파일">
     <span class="ui-section-title">초안 파일</span>
-    <p class="ui-hint">글과 서식을 JSON 파일로 보관합니다. 다른 브라우저에서도 다시 불러올 수 있습니다.</p>
+    <p class="ui-hint">글과 서식, 아직 적용하지 않은 Markdown 원고를 JSON 파일로 보관합니다. 다른 브라우저에서도 다시 불러올 수 있습니다.</p>
     <div class="ui-inline-group">
         <button class="ui-btn ui-btn--outline" type="button" aria-label="초안 파일 저장"
             disabled={busy || workspace.editorMountState !== "ready"} onclick={download}>

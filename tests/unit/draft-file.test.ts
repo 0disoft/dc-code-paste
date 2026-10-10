@@ -21,6 +21,19 @@ const preferences: DraftPreferences = {
 };
 const file = (text: string) => ({ size: Buffer.byteLength(text), text: async () => text });
 
+it("backs up unapplied text using the file limit independently of the autosave limit", async () => {
+  const markdownDraft = "# PRIVATE_UNAPPLIED\n\t원문\n" + "x".repeat(2_000_001);
+  const document = createWritingTemplate("news");
+  const backup = createDraftFile(document, preferences, markdownDraft);
+  expect(parseDraftSnapshot(backup.content)).toBeUndefined();
+  const loaded = await readDraftFile(file(backup.content), schema);
+  expect(loaded.markdownDraft).toBe(markdownDraft);
+  expect(schema.nodeFromJSON(loaded.document).textContent).toBe(
+    schema.nodeFromJSON(document).textContent,
+  );
+  expect(JSON.stringify(loaded.document)).not.toContain("PRIVATE_UNAPPLIED");
+});
+
 it("round-trips a portable draft with its block appearance and preferences", async () => {
   const document = createWritingTemplate("news");
   document.content![1]!.attrs = {

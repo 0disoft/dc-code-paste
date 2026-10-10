@@ -36,6 +36,8 @@ export type DraftSnapshot = {
   updatedAt: string;
   document: JSONContent;
   preferences: DraftPreferences;
+  /** Unapplied working text; never part of the public document export. */
+  markdownDraft?: string;
 };
 
 export type DraftHistorySnapshot = DraftSnapshot & {
@@ -253,6 +255,10 @@ export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefine
     return undefined;
   }
 
+  if (value.markdownDraft !== undefined && typeof value.markdownDraft !== "string") {
+    return undefined;
+  }
+
   if (
     !isRecord(value.document) ||
     value.document.type !== "doc" ||
@@ -272,6 +278,7 @@ export function normalizeDraftSnapshot(value: unknown): DraftSnapshot | undefine
     updatedAt: value.updatedAt,
     document: value.version === 1 ? restoreLegacyTitleOnlyStep(value.document) : value.document,
     preferences,
+    ...(value.markdownDraft ? { markdownDraft: value.markdownDraft as string } : {}),
   };
 }
 
@@ -299,18 +306,21 @@ function normalizeDraftHistorySnapshot(value: unknown): DraftHistorySnapshot | u
 export function createDraftSnapshot(
   document: JSONContent,
   preferences: DraftPreferences,
+  markdownDraft = "",
 ): DraftSnapshot {
   return {
     version: 2,
     updatedAt: new Date().toISOString(),
     document,
     preferences,
+    ...(markdownDraft ? { markdownDraft } : {}),
   };
 }
 
 export function createDraftHistorySnapshot(
   document: JSONContent,
   preferences: DraftPreferences,
+  markdownDraft = "",
 ): DraftHistorySnapshot {
   const timestamp = new Date().toISOString();
 
@@ -321,6 +331,7 @@ export function createDraftHistorySnapshot(
     updatedAt: timestamp,
     document,
     preferences,
+    ...(markdownDraft ? { markdownDraft } : {}),
   };
 }
 

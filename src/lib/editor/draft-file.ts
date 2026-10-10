@@ -4,8 +4,16 @@ import { createDraftSnapshot, parseDraftSnapshot, type DraftPreferences } from "
 
 export const maxDraftFileBytes = 8 * 1024 * 1024;
 
-export function createDraftFile(document: JSONContent, preferences: DraftPreferences) {
-  const content = JSON.stringify(createDraftSnapshot(document, preferences), null, 2);
+export function createDraftFile(
+  document: JSONContent,
+  preferences: DraftPreferences,
+  markdownDraft = "",
+) {
+  const content = JSON.stringify(
+    createDraftSnapshot(document, preferences, markdownDraft),
+    null,
+    2,
+  );
   if (new TextEncoder().encode(content).byteLength > maxDraftFileBytes)
     throw new Error("초안 파일이 8MB를 넘었습니다. 글을 나눠 저장해 주세요.");
   if (!parseDraftSnapshot(content, maxDraftFileBytes))

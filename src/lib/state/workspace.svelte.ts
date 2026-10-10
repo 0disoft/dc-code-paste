@@ -559,7 +559,11 @@ export function createWorkspaceState() {
   const draftPersistence = createDraftPersistenceController({
     debounceMs: draftPersistDebounceMs,
     getStorage: draftStorage,
-    getCurrent: () => ({ document: documentJson, preferences: currentDraftPreferences() }),
+    getCurrent: () => ({
+      document: documentJson,
+      preferences: currentDraftPreferences(),
+      markdownDraft,
+    }),
     canPersist: () => canPersistDraft,
     cloneDocument: cloneDocumentContent,
     clonePreferences: cloneDraftPreferences,
@@ -574,11 +578,18 @@ export function createWorkspaceState() {
   const draftHistoryController = createDraftHistoryController({
     autoIntervalMs: draftHistoryAutoIntervalMs,
     getStorage: draftStorage,
-    getCurrent: () => ({ document: documentJson, preferences: currentDraftPreferences() }),
+    getCurrent: () => ({
+      document: documentJson,
+      preferences: currentDraftPreferences(),
+      markdownDraft,
+    }),
     cloneDocument: cloneDocumentContent,
     clonePreferences: cloneDraftPreferences,
     applySnapshot(value) {
       replaceEditorDocument(value.document, value.preferences);
+      markdownDraft = value.markdownDraft ?? "";
+      resetMarkdownImportState();
+      cancelLlmGeneration();
     },
     setHistory(value) {
       draftHistory = value;
@@ -785,7 +796,7 @@ export function createWorkspaceState() {
 
   function exportDraftFile() {
     try {
-      const file = createDraftFile(documentJson, currentDraftPreferences());
+      const file = createDraftFile(documentJson, currentDraftPreferences(), markdownDraft);
       const url = URL.createObjectURL(new Blob([file.content], { type: "application/json" }));
       const link = document.createElement("a");
       link.href = url;
@@ -830,6 +841,9 @@ export function createWorkspaceState() {
         };
       }
       replaceEditorDocument(snapshot.document, snapshot.preferences);
+      markdownDraft = snapshot.markdownDraft ?? "";
+      resetMarkdownImportState();
+      cancelLlmGeneration();
       isLinkPanelOpen = false;
       linkDraft = "";
       linkError = false;
@@ -1432,7 +1446,7 @@ export function createWorkspaceState() {
   }
 
   function scheduleDraftPersist(nextDocument: JSONContent, preferences: DraftPreferences) {
-    draftPersistence.schedule({ document: nextDocument, preferences });
+    draftPersistence.schedule({ document: nextDocument, preferences, markdownDraft });
   }
 
   function flushScheduledDraftPersist() {
@@ -1474,6 +1488,9 @@ export function createWorkspaceState() {
 
     draftPersistence.acceptRemote(raw, remote);
     replaceEditorDocument(remote.document, remote.preferences);
+    markdownDraft = remote.markdownDraft ?? "";
+    resetMarkdownImportState();
+    cancelLlmGeneration();
   }
 
   function overwriteOtherTabDraft() {
@@ -3014,6 +3031,7 @@ export function createWorkspaceState() {
       if (draftRead.snapshot) {
         documentJson = cloneDocumentContent(draftRead.snapshot.document);
         applyDraftPreferences(cloneDraftPreferences(draftRead.snapshot.preferences));
+        markdownDraft = draftRead.snapshot.markdownDraft ?? "";
         draftPersistence.acceptRemote(observedRaw, draftRead.snapshot);
       } else {
         applyDraftPreferences(defaultDraftPreferences());
@@ -3182,6 +3200,8 @@ export function createWorkspaceState() {
 
     const nextDocument = documentJson;
     const preferences = currentDraftPreferences();
+    // Track both typed and generated text, even while the Markdown panel is closed.
+    void markdownDraft;
     untrack(() => scheduleDraftPersist(nextDocument, preferences));
     return clearScheduledDraftPersist;
   });

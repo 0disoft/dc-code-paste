@@ -48,7 +48,10 @@ class MemoryStorage {
 
 function harness() {
   const storage = new MemoryStorage();
-  let value = { document: document("first"), preferences };
+  let value: { document: JSONContent; preferences: DraftPreferences; markdownDraft?: string } = {
+    document: document("first"),
+    preferences,
+  };
   let history: DraftHistorySnapshot[] = [];
   const states: string[] = [];
   const controller = createDraftHistoryController({
@@ -75,7 +78,10 @@ function harness() {
     history: () => history,
     current: () => value,
     edit: (text: string) => {
-      value = { document: document(text), preferences };
+      value = { ...value, document: document(text) };
+    },
+    setMarkdown: (text: string) => {
+      value = { ...value, markdownDraft: text };
     },
   };
 }
@@ -85,6 +91,20 @@ describe("draft history lifecycle", () => {
   afterEach(() => {
     vi.clearAllTimers();
     vi.useRealTimers();
+  });
+
+  it("keeps distinct working drafts recoverable even when the public document is unchanged", () => {
+    const { controller, history, current, setMarkdown } = harness();
+    setMarkdown("# First pending draft\n\t원문\n");
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    const first = history()[0]!;
+    setMarkdown("# Second pending draft");
+    expect(controller.checkpointBeforeReplacement()).toBe(true);
+    expect(history()).toHaveLength(2);
+    expect(controller.restore(first)).toBe(true);
+    expect(current().document).toEqual(document("first"));
+    expect(current().markdownDraft).toBe("# First pending draft\n\t원문\n");
+    expect(history()[0]?.markdownDraft).toBe("# Second pending draft");
   });
 
   it("checkpoints once before replacement and restores the requested snapshot", () => {

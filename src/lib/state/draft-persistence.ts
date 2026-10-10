@@ -10,7 +10,7 @@ import {
 
 export type DraftSaveState = "idle" | "dirty" | "saving" | "saved" | "error" | "conflict";
 
-type DraftData = { document: JSONContent; preferences: DraftPreferences };
+type DraftData = { document: JSONContent; preferences: DraftPreferences; markdownDraft?: string };
 type DraftStorage = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 
 type DraftPersistenceOptions = {
@@ -25,8 +25,8 @@ type DraftPersistenceOptions = {
   onSaved: () => void;
 };
 
-function fingerprint({ document, preferences }: DraftData) {
-  return JSON.stringify({ document, preferences });
+function fingerprint({ document, preferences, markdownDraft = "" }: DraftData) {
+  return JSON.stringify({ document, preferences, markdownDraft });
 }
 
 export function createDraftPersistenceController({
@@ -103,6 +103,7 @@ export function createDraftPersistenceController({
     const snapshot = createDraftSnapshot(
       cloneDocument(data.document),
       clonePreferences(data.preferences),
+      data.markdownDraft,
     );
     publishState("saving");
     if (!writeDraftSnapshot(storage, snapshot)) {

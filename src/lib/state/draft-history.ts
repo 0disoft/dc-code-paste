@@ -9,7 +9,7 @@ import {
   type DraftPreferences,
 } from "#lib/editor/draft-storage.ts";
 
-type DraftData = { document: JSONContent; preferences: DraftPreferences };
+type DraftData = { document: JSONContent; preferences: DraftPreferences; markdownDraft?: string };
 type DraftHistoryState = "idle" | "saved" | "error";
 type DraftHistoryStorage = Storage;
 
@@ -24,8 +24,12 @@ type DraftHistoryOptions = {
   setState: (state: DraftHistoryState) => void;
 };
 
-export function draftHistoryFingerprint(document: JSONContent, preferences: DraftPreferences) {
-  return JSON.stringify({ document, preferences });
+export function draftHistoryFingerprint(
+  document: JSONContent,
+  preferences: DraftPreferences,
+  markdownDraft = "",
+) {
+  return JSON.stringify({ document, preferences, markdownDraft });
 }
 
 export function createDraftHistoryController(options: DraftHistoryOptions) {
@@ -39,12 +43,13 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
     return {
       document: options.cloneDocument(value.document),
       preferences: options.clonePreferences(value.preferences),
+      ...(value.markdownDraft ? { markdownDraft: value.markdownDraft } : {}),
     };
   }
 
   function currentFingerprint() {
     const value = current();
-    return draftHistoryFingerprint(value.document, value.preferences);
+    return draftHistoryFingerprint(value.document, value.preferences, value.markdownDraft);
   }
 
   function setState(value: DraftHistoryState) {
@@ -56,7 +61,11 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
   }
 
   function markBaseline(value: DraftData = current()) {
-    lastFingerprint = draftHistoryFingerprint(value.document, value.preferences);
+    lastFingerprint = draftHistoryFingerprint(
+      value.document,
+      value.preferences,
+      value.markdownDraft,
+    );
     lastSavedAt = Date.now();
   }
 
@@ -73,6 +82,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
       markBaseline({
         document: options.cloneDocument(history[0].document),
         preferences: options.clonePreferences(history[0].preferences),
+        markdownDraft: history[0].markdownDraft,
       });
     } else {
       lastFingerprint = "";
@@ -98,10 +108,18 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
     }
 
     const value = current();
-    const fingerprint = draftHistoryFingerprint(value.document, value.preferences);
+    const fingerprint = draftHistoryFingerprint(
+      value.document,
+      value.preferences,
+      value.markdownDraft,
+    );
     if (automatic && !force && fingerprint === lastFingerprint) return false;
 
-    const snapshot = createDraftHistorySnapshot(value.document, value.preferences);
+    const snapshot = createDraftHistorySnapshot(
+      value.document,
+      value.preferences,
+      value.markdownDraft,
+    );
     const history = appendDraftHistorySnapshot(storage, snapshot);
     if (history[0]?.id !== snapshot.id) {
       setState("error");
@@ -121,7 +139,8 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
     // A loaded baseline may never have been saved, or its recovery point may have been deleted.
     const hasRecoveryPoint = refresh().some(
       (snapshot) =>
-        draftHistoryFingerprint(snapshot.document, snapshot.preferences) === fingerprint,
+        draftHistoryFingerprint(snapshot.document, snapshot.preferences, snapshot.markdownDraft) ===
+        fingerprint,
     );
     return hasRecoveryPoint || save({ automatic: true, force: true });
   }
@@ -137,6 +156,7 @@ export function createDraftHistoryController(options: DraftHistoryOptions) {
     const value = {
       document: options.cloneDocument(snapshot.document),
       preferences: options.clonePreferences(snapshot.preferences),
+      ...(snapshot.markdownDraft ? { markdownDraft: snapshot.markdownDraft } : {}),
     };
     options.applySnapshot(value);
     markBaseline(value);

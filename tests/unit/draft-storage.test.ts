@@ -66,6 +66,20 @@ const throwingStorage = {
 };
 
 describe("draft storage", () => {
+  it("round-trips unapplied text, accepts legacy snapshots, and rejects malformed working fields", () => {
+    const markdown = "# PRIVATE_UNAPPLIED\n\n\t원문 그대로\n";
+    const snapshot = createDraftSnapshot(sampleDocument, preferences, markdown);
+    expect(parseDraftSnapshot(JSON.stringify(snapshot))).toEqual(snapshot);
+    const legacy = createDraftSnapshot(sampleDocument, preferences);
+    expect(parseDraftSnapshot(JSON.stringify(legacy))).toEqual(legacy);
+    expect(
+      parseDraftSnapshot(JSON.stringify({ ...legacy, version: 1 }))?.markdownDraft,
+    ).toBeUndefined();
+    for (const markdownDraft of [null, 42, [], { apiKey: "should-not-be-loaded" }]) {
+      expect(parseDraftSnapshot(JSON.stringify({ ...legacy, markdownDraft }))).toBeUndefined();
+    }
+  });
+
   it("keeps the readable draft when a schema-valid document exceeds the recovery node limit", () => {
     const storage = new MemoryStorage();
     const original = createDraftSnapshot(sampleDocument, preferences);

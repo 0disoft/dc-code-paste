@@ -45,7 +45,7 @@ class MemoryStorage {
 
 function createHarness() {
   const storage = new MemoryStorage();
-  let current = { document: document("first"), preferences };
+  let current = { document: document("first"), preferences, markdownDraft: "" };
   const setState = vi.fn<(state: DraftSaveState) => void>();
   const setSavedAt = vi.fn<(updatedAt: string) => void>();
   const onSaved = vi.fn<() => void>();
@@ -68,7 +68,10 @@ function createHarness() {
     setSavedAt,
     onSaved,
     setCurrent: (value: string) => {
-      current = { document: document(value), preferences };
+      current = { ...current, document: document(value) };
+    },
+    setMarkdown: (value: string) => {
+      current = { ...current, markdownDraft: value };
     },
     getCurrent: () => current,
   };
@@ -102,6 +105,54 @@ describe("draft persistence lifecycle", () => {
     expect(storage.getItem(draftStorageKey)).toBeNull();
     expect(setSavedAt).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("marks unapplied edits dirty and flushes the latest working text without changing the document", () => {
+    const { controller, storage, getCurrent, setMarkdown, setState } = createHarness();
+    expect(controller.persistCurrent()).toBe(true);
+    setMarkdown("# Pending draft\n\n  exact indentation\n");
+    controller.schedule(getCurrent());
+    expect(setState).toHaveBeenLastCalledWith("dirty");
+    setMarkdown("# Latest pending draft\n\n\tkeep this newline\n");
+    controller.flush();
+    const snapshot = JSON.parse(storage.getItem(draftStorageKey)!);
+    expect(snapshot.document).toEqual(document("first"));
+    expect(snapshot.markdownDraft).toBe(getCurrent().markdownDraft);
+    expect(setState).toHaveBeenLastCalledWith("saved");
+    setMarkdown("");
+    controller.schedule(getCurrent());
+    controller.flush();
+    expect(JSON.parse(storage.getItem(draftStorageKey)!)).not.toHaveProperty("markdownDraft");
+  });
+
+  it("stops a save when another tab changes only the unapplied text", async () => {
+    const { controller, storage, getCurrent, setMarkdown, setState } = createHarness();
+    expect(controller.persistCurrent()).toBe(true);
+    setMarkdown("Local pending text");
+    controller.schedule(getCurrent());
+    const raw = JSON.stringify(
+      createDraftSnapshot(getCurrent().document, preferences, "Remote pending text"),
+    );
+    storage.setItem(draftStorageKey, raw);
+    controller.observeExternal(raw);
+    controller.flush();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(setState).toHaveBeenLastCalledWith("conflict");
+    expect(storage.getItem(draftStorageKey)).toBe(raw);
+    expect(getCurrent().markdownDraft).toBe("Local pending text");
+    controller.overwriteBaseline(raw);
+    expect(controller.persistCurrent()).toBe(true);
+    expect(JSON.parse(storage.getItem(draftStorageKey)!).markdownDraft).toBe("Local pending text");
+  });
+
+  it("keeps the previous snapshot when the combined document and working text exceeds storage limits", () => {
+    const { controller, storage, setMarkdown, setState } = createHarness();
+    expect(controller.persistCurrent()).toBe(true);
+    const previous = storage.getItem(draftStorageKey);
+    setMarkdown("x".repeat(2_000_000));
+    expect(controller.persistCurrent()).toBe(false);
+    expect(setState).toHaveBeenLastCalledWith("error");
+    expect(storage.getItem(draftStorageKey)).toBe(previous);
   });
 
   it("stops a pending save when another tab writes a different draft", async () => {
