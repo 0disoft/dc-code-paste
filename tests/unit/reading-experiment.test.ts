@@ -8,7 +8,7 @@ import {
   readingExperimentUnits,
   removeReadingNoteTransaction,
 } from "#lib/editor/reading-experiment.ts";
-import { readingNoteCatalog } from "#lib/editor/reading-notes.ts";
+import { readingNoteCatalog, visibleReadingNotes } from "#lib/editor/reading-notes.ts";
 import { normalizeReadingNotes } from "#lib/editor/reading-notes-format.ts";
 import {
   createSentenceRelationTransaction,
@@ -37,6 +37,48 @@ function add(state: EditorState, index = 0, text = "이 말은 어디에서 나�
   const saved = state.apply(result.transaction);
   return saved.apply(closeHistory(saved.tr));
 }
+
+it("reveals notes only after every linked passage is visible and hides them again on restart", () => {
+  const state = add(add(initial(), 0, "앞 메모"), 1, "뒤 메모");
+  const units = readingExperimentUnits(state);
+  const catalog = readingNoteCatalog(state.doc);
+  expect(visibleReadingNotes(catalog, [], false)).toEqual([]);
+  expect(visibleReadingNotes(catalog, units.slice(0, 1), false)).toEqual([catalog[0]]);
+  expect(visibleReadingNotes(catalog, units, true)).toEqual(catalog);
+  expect(visibleReadingNotes(catalog, units.slice(0, 1), false)).toEqual([catalog[0]]);
+  const mixed = { ...catalog[0], parts: [...catalog[0].parts, ...catalog[1].parts] };
+  expect(visibleReadingNotes([mixed], units.slice(0, 1), false)).toEqual([]);
+  expect(visibleReadingNotes([mixed], units, false)).toEqual([mixed]);
+});
+
+it("withholds missing and duplicated snapshots until the whole document is revealed", () => {
+  const saved = add(initial());
+  const missing = saved.apply(saved.tr.delete(0, saved.doc.firstChild!.nodeSize));
+  const duplicated = saved.apply(saved.tr.insert(saved.doc.content.size, saved.doc.firstChild!));
+  for (const state of [missing, duplicated]) {
+    const catalog = readingNoteCatalog(state.doc);
+    expect(catalog[0].state).toBe(state === missing ? "missing" : "duplicated");
+    expect(visibleReadingNotes(catalog, readingExperimentUnits(state), false)).toEqual([]);
+    expect(visibleReadingNotes(catalog, readingExperimentUnits(state), true)).toEqual(catalog);
+  }
+});
+
+it("uses current ranges for edited notes and does not expose a partially visible anchor", () => {
+  const saved = add(initial(), 1);
+  const state = saved.apply(
+    saved.tr.insertText("修正", readingExperimentUnits(saved)[1].position + 2),
+  );
+  const units = readingExperimentUnits(state);
+  const catalog = readingNoteCatalog(state.doc);
+  expect(catalog[0].state).toBe("changed");
+  expect(visibleReadingNotes(catalog, units.slice(0, 1), false)).toEqual([]);
+  expect(visibleReadingNotes(catalog, units, false)).toEqual(catalog);
+  const crossing = {
+    ...catalog[0],
+    parts: [{ ...catalog[0].parts[0], matches: [{ ...catalog[0].parts[0].matches[0], from: 1 }] }],
+  };
+  expect(visibleReadingNotes([crossing], units.slice(0, 1), false)).toEqual([]);
+});
 
 it("builds ordered reading units, retains explicit intentions, and excludes code and dividers from note targets", () => {
   const state = initial([

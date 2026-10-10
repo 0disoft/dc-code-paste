@@ -26,6 +26,70 @@ async function prepare(
 }
 
 for (const mobile of [false, true]) {
+  test(`withholds later notes and reading intentions from the recap on ${mobile ? "mobile" : "desktop"}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(mobile ? { width: 320, height: 844 } : { width: 1487, height: 900 });
+    await prepare(page, "# 처음 보는 글\n\n먼저 만나는 문장\n\n아직 읽지 않은 결론");
+    const lastParagraph = page.locator(".article-editor p").last();
+    await lastParagraph.click();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Shift+End");
+    const toolbar = page.getByRole("toolbar", { name: "선택한 글자 도구", exact: true });
+    await toolbar.getByRole("button", { name: "읽는 의도 선택", exact: true }).click();
+    await toolbar.getByRole("button", { name: "읽는 의도: 먼저 읽기", exact: true }).click();
+    const reader = await startReading(page);
+    for (const [unit, text] of [
+      [2, "앞 구간 메모"],
+      [3, "뒤 구간 메모"],
+    ] as const) {
+      await reader.getByRole("button", { name: `읽기 구간 ${unit} 메모`, exact: true }).click();
+      await reader.getByRole("textbox", { name: "읽기 메모", exact: true }).fill(text);
+      await reader.getByRole("button", { name: "읽기 메모 저장", exact: true }).click();
+    }
+    await reader.getByRole("button", { name: "차례로 펼치기", exact: true }).click();
+    await reader.getByRole("button", { name: "멈춘 자리 모아보기", exact: true }).click();
+    const recap = reader.getByRole("region", { name: "멈춘 자리 모아보기", exact: true });
+    const entries = recap.locator(".recap-item");
+    await expect(entries).toHaveCount(0);
+    await expect(recap.locator(".recap-intentions")).toHaveCount(0);
+    expect(await recap.textContent()).not.toContain("뒤 구간 메모");
+    expect(await recap.textContent()).not.toContain("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "다음 구간 펼치기", exact: true }).click();
+    await expect(entries).toHaveCount(1);
+    await expect(entries.first()).toContainText("먼저 만나는 문장");
+    expect(await recap.textContent()).not.toContain("뒤 구간 메모");
+    expect(await recap.ariaSnapshot()).not.toContain("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "다음 구간 펼치기", exact: true }).click();
+    await expect(entries).toHaveCount(2);
+    await expect(recap.locator(".recap-intentions")).toContainText("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "처음부터 다시 읽기", exact: true }).click();
+    await reader.getByRole("button", { name: "멈춘 자리 모아보기", exact: true }).click();
+    await expect(entries).toHaveCount(0);
+    expect(await recap.textContent()).not.toContain("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "전부 펼치기", exact: true }).click();
+    await expect(entries).toHaveCount(2);
+    await expect(recap.locator(".recap-intentions")).toContainText("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "읽어보기 끝내기", exact: true }).click();
+    await lastParagraph.click();
+    await page.keyboard.press("Home");
+    await page.keyboard.press("Shift+End");
+    await page.keyboard.press("Backspace");
+    await expect(page.locator(".article-editor")).not.toContainText("아직 읽지 않은 결론");
+    await startReading(page);
+    await reader.getByRole("button", { name: "차례로 펼치기", exact: true }).click();
+    await reader.getByRole("button", { name: "멈춘 자리 모아보기", exact: true }).click();
+    await expect(entries).toHaveCount(0);
+    expect(await recap.textContent()).not.toContain("아직 읽지 않은 결론");
+    expect(await recap.ariaSnapshot()).not.toContain("아직 읽지 않은 결론");
+    await reader.getByRole("button", { name: "다음 구간 펼치기", exact: true }).click();
+    await expect(entries).toHaveCount(2);
+    await expect(recap.locator('[data-note-state="missing"] .recap-passage')).toHaveText(
+      "아직 읽지 않은 결론",
+    );
+    await expect(recap.locator(".recap-snapshot")).toContainText("연결 당시 원문");
+  });
+
   test(`keeps newly revealed passages in view on ${mobile ? "mobile" : "desktop"}`, async ({
     page,
   }) => {

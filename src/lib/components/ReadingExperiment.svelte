@@ -4,7 +4,7 @@
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import type { DcExportOptions } from "#lib/dc/export-document.ts";
     import type { ReadingExperimentUnit } from "#lib/editor/reading-experiment.ts";
-    import type { ReadingNoteEntry } from "#lib/editor/reading-notes.ts";
+    import { visibleReadingNotes, type ReadingNoteEntry } from "#lib/editor/reading-notes.ts";
     import type { RelationAnchor, RelationState } from "#lib/editor/sentence-relations.ts";
     import { readingIntentOptions } from "#lib/editor/reading-intent-format.ts";
     import ReadingExperimentBlock from "./ReadingExperimentBlock.svelte";
@@ -50,11 +50,13 @@
     const notes = $derived(experiment.notes);
     const options = $derived(experiment.exportOptions);
     const visibleUnits = $derived(progressive ? units.slice(0, revealed) : units);
+    const fullyRevealed = $derived(!progressive || revealed >= units.length);
+    const visibleNotes = $derived(visibleReadingNotes(notes, visibleUnits, fullyRevealed));
     const lastVisibleUnit = $derived(visibleUnits.at(-1));
     const frontier = $derived(readingRelationFrontier(workspace.sentenceRelations, lastVisibleUnit ? lastVisibleUnit.position + lastVisibleUnit.node.nodeSize : 0));
-    const intendedUnits = $derived(units.filter((unit) => unit.intentions.length > 0));
+    const intendedUnits = $derived(visibleUnits.filter((unit) => unit.intentions.length > 0));
     const notesByUnit = $derived(groupNotesByUnit(units, notes));
-    const fragmentOriginsByUnit = $derived(readingFragmentOrigins(visibleUnits, hidden ? [] : workspace.thoughtFragments.entries, !progressive || revealed >= units.length));
+    const fragmentOriginsByUnit = $derived(readingFragmentOrigins(visibleUnits, hidden ? [] : workspace.thoughtFragments.entries, fullyRevealed));
     const error = $derived(experiment.error);
 
     const stateMessages: Record<RelationState, string> = {
@@ -233,14 +235,17 @@
                         읽는 동안에는 메모 본문을 접어둡니다. 펼치면 그때 적은 문장과 지금의
                         자리를 함께 볼 수 있습니다.
                     </p>
-                    {#if !notes.length && !intendedUnits.length}
+                    {#if progressive && !fullyRevealed}
+                        <p class="recap-note">펼친 구간의 기록만 보여줍니다. 위치를 확인할 수 없는 기록은 마지막 구간까지 펼치면 볼 수 있습니다.</p>
+                    {/if}
+                    {#if !visibleNotes.length && !intendedUnits.length}
                         <p class="recap-empty" role="status">
-                            아직 멈춘 자리가 없습니다. 읽다가 멈춘 구간에서 ‘여기서 멈춘 이유’를
+                            {progressive && !fullyRevealed ? "펼친 구간에는 멈춘 자리가 없습니다." : "아직 멈춘 자리가 없습니다."} 읽다가 멈춘 구간에서 ‘여기서 멈춘 이유’를
                             눌러보세요.
                         </p>
                     {/if}
                     <ol class="recap-list" aria-label="멈춘 자리 목록">
-                        {#each notes as entry, noteIndex (entry.note.id)}
+                        {#each visibleNotes as entry, noteIndex (entry.note.id)}
                             <li class="recap-item" data-note-state={entry.state}>
                                 <div class="recap-head">
                                     <strong>멈춘 자리 {noteIndex + 1}</strong>
