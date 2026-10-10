@@ -14,6 +14,7 @@ import {
   type BlockAction,
 } from "#lib/editor/block-actions.ts";
 import type { BlockAppearance } from "#lib/editor/block-appearance.ts";
+import { readPaletteDragKind, endPaletteDrag } from "#lib/editor/palette-drag.ts";
 import { readSelectionTextStyle } from "#lib/editor/selection-text-style.ts";
 import {
   readSelectionReadingIntent,
@@ -2632,6 +2633,9 @@ export function createWorkspaceState() {
   function insertPaletteBlock(kind: PaletteBlockKind, point?: { x: number; y: number }) {
     if (!editor || !isPaletteBlockKind(kind)) return;
     if (point) {
+      // Safari may flush a pending native selection when focus() runs inside a
+      // command chain. Focus before constructing the insertion transaction.
+      editor.view.focus();
       const position = editor.view.posAtCoords({ left: point.x, top: point.y });
       if (!position) return;
       editor.commands.setTextSelection(position.pos);
@@ -3091,10 +3095,11 @@ export function createWorkspaceState() {
         editorProps: {
           handleTripleClick: restoreRepeatedTextblockSelection,
           handleDrop: (_view, event) => {
-            const kind = event.dataTransfer?.getData("application/x-dc-block") ?? "";
-            if (!isPaletteBlockKind(kind)) return false;
+            const kind = readPaletteDragKind(event.dataTransfer);
+            if (!kind) return false;
             event.preventDefault();
             event.stopPropagation();
+            endPaletteDrag();
             insertPaletteBlock(kind, { x: event.clientX, y: event.clientY });
             return true;
           },

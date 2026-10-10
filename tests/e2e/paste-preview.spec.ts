@@ -109,6 +109,8 @@ test("applies code and edits its filename through the contextual inspector", asy
 });
 
 test("inserts a summary by dragging from the palette", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await waitForEditor(page);
   const editor = page.locator(".article-editor");
   const before = await editor.locator(".dc-summary-box").count();
@@ -116,6 +118,7 @@ test("inserts a summary by dragging from the palette", async ({ page }) => {
     .getByRole("button", { name: "요약 삽입", exact: true })
     .dragTo(editor.locator(":scope > p").first());
   await expect(editor.locator(".dc-summary-box")).toHaveCount(before + 1);
+  expect(errors).toEqual([]);
 });
 
 test("duplicates, moves and deletes a block with undo support", async ({ page }) => {

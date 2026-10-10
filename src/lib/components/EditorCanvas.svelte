@@ -5,7 +5,7 @@
     import { safeDcProseFontFamily } from "#lib/dc/font-stacks.ts";
     import { compositeColor } from "#lib/dc/sanitize-style.ts";
     import { documentTextColors } from "#lib/dc/document-colors.ts";
-    import { isPaletteBlockKind } from "#lib/editor/block-inspector.ts";
+    import { carriesPaletteBlock, readPaletteDragKind, endPaletteDrag } from "#lib/editor/palette-drag.ts";
     import ReadingIntentToolbar from "./ReadingIntentToolbar.svelte";
     import PendingSentenceRelation from "./PendingSentenceRelation.svelte";
     import SentenceRelationReview from "./SentenceRelationReview.svelte";
@@ -36,15 +36,8 @@
     const colors = $derived(documentTextColors[workspace.documentTheme]);
     const layout = $derived(readingLayoutMetrics(workspace.readingLayout));
 
-    const BLOCK_MIME = "application/x-dc-block";
-
     function dragCarriesBlock(event: DragEvent): boolean {
-        const types = event.dataTransfer?.types;
-        if (!types) return false;
-        for (const type of types) {
-            if (type === BLOCK_MIME) return true;
-        }
-        return false;
+        return carriesPaletteBlock(event.dataTransfer);
     }
 
     function handleDragOver(event: DragEvent) {
@@ -61,9 +54,10 @@
      */
     function handleDrop(event: DragEvent) {
         if (event.defaultPrevented) return;
-        const kind = event.dataTransfer?.getData(BLOCK_MIME) ?? "";
-        if (!isPaletteBlockKind(kind)) return;
+        const kind = readPaletteDragKind(event.dataTransfer);
+        if (!kind) return;
         event.preventDefault();
+        endPaletteDrag();
         workspace.insertPaletteBlock(kind, { x: event.clientX, y: event.clientY });
     }
 </script>

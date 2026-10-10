@@ -3,6 +3,7 @@
     import { WORKSPACE_CONTEXT_KEY } from "#lib/state/workspace-context.ts";
     import type { WorkspaceState } from "#lib/state/workspace.svelte.ts";
     import type { PaletteBlockKind } from "#lib/editor/block-inspector.ts";
+    import { startPaletteDrag, endPaletteDrag } from "#lib/editor/palette-drag.ts";
     import type { ReadingPassage } from "#lib/editor/reading-path.ts";
     import type { RelationAnchor } from "#lib/editor/sentence-relations.ts";
     import Heading1 from "@lucide/svelte/icons/heading-1";
@@ -83,8 +84,7 @@
 
     function startDrag(event: DragEvent, kind: PaletteBlockKind) {
         if (!event.dataTransfer) return;
-        event.dataTransfer.setData("application/x-dc-block", kind);
-        event.dataTransfer.effectAllowed = "copy";
+        startPaletteDrag(event.dataTransfer, kind);
         draggingKind = kind;
     }
 
@@ -152,7 +152,7 @@
                             title={`${row.label} · 끌어서 놓거나 눌러서 추가`}
                             ondragstart={(event) =>
                                 row.kind ? startDrag(event, row.kind) : undefined}
-                            ondragend={() => (draggingKind = null)}
+                            ondragend={() => { draggingKind = null; endPaletteDrag(); }}
                             onclick={() => trigger(row)}
                         >
                             <span class="palette-icon"><Icon size={22} /></span>
@@ -194,7 +194,7 @@
                                     title={`${row.label} · ${row.description}`}
                                     ondragstart={(event) =>
                                         row.kind ? startDrag(event, row.kind) : undefined}
-                                    ondragend={() => (draggingKind = null)}
+                                    ondragend={() => { draggingKind = null; endPaletteDrag(); }}
                                     onclick={() => trigger(row)}
                                 >
                                     <span class="palette-icon"><Icon size={22} /></span>
