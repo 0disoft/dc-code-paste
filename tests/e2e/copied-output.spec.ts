@@ -172,7 +172,10 @@ test("replays a source copy as the exact plain HTML instead of formatted content
   await captureClipboard(page);
   await page.goto("./");
   await expect(page.locator(".article-editor")).toContainText("DC-CODE-PASTE");
-  await applyMarkdown(page, "# HTML 복사\n\n원문으로 전달할 문장");
+  await applyMarkdown(
+    page,
+    "# HTML 복사\n\n원문으로 전달할 문장 [공개 자료](https://example.com/source)",
+  );
   await page.getByRole("button", { name: "더보기 메뉴", exact: true }).click();
   await page.getByRole("menuitem", { name: "HTML 원문 보기", exact: true }).click();
   await expect(page.getByLabel("복사용 HTML 원문", { exact: true })).not.toHaveValue("");
@@ -182,6 +185,7 @@ test("replays a source copy as the exact plain HTML instead of formatted content
     .not.toBeNull();
   const output = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), outputKey);
   expect(output.channel).toBe("source");
+  expect(output.plainText).toContain("공개 자료 (https://example.com/source)");
   await applyMarkdown(page, "# 이후 글\n\n별도 문장");
   const dialog = await openOutput(page);
   await dialog.getByRole("button", { name: "같은 HTML 원문 다시 복사", exact: true }).click();

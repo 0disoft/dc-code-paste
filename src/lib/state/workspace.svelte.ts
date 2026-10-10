@@ -72,6 +72,7 @@ import {
   type CopiedOutput,
 } from "#lib/editor/copied-output.ts";
 import { copyDcHtml, copyPlainText } from "#lib/dc/clipboard.ts";
+import { exportDocumentToPlainText } from "#lib/dc/export-plain-text.ts";
 import {
   clearWritingDefaults,
   normalizeWritingAppearance,
@@ -2790,7 +2791,7 @@ export function createWorkspaceState() {
       const currentDocument = documentJson;
       const currentOptions = exportOptions();
       const preferences = cloneDraftPreferences(currentDraftPreferences());
-      const plainText = editor?.getText() ?? "";
+      const plainText = exportDocumentToPlainText(currentDocument);
       const optionsFingerprint = JSON.stringify(currentOptions);
       const isCurrent = () =>
         operation.isCurrent() &&
@@ -2823,7 +2824,7 @@ export function createWorkspaceState() {
       if (!operation) return;
       const document = documentJson;
       const preferences = cloneDraftPreferences(currentDraftPreferences());
-      const plainText = editor?.getText() ?? "";
+      const plainText = exportDocumentToPlainText(document);
       await copySourceHtmlText({
         html,
         onCopied(value) {
